@@ -27,6 +27,7 @@ from flask import Flask
 
 - backend: Go + PocketBase **v0.39+**
 - frontend: solid.js + **tailwind v4**
+- extension: wxt **v0.21+**
 
 
 ## Work in progress
