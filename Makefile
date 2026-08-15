@@ -66,6 +66,8 @@ dev-front: clean
 dev-back: clean
 	npx concurrently -n "frontend,backend" -c "blue,green" "cd frontend && pnpm watch" "air"
 
+dev-ext:
+	cd extension && pnpm dev:firefox
 
 .PHONY: test
 test:

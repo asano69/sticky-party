@@ -1,34 +1,97 @@
-import { createSignal } from 'solid-js';
-import solidLogo from '@/assets/solid.svg';
-import wxtLogo from '/wxt.svg';
+import { createSignal, onMount } from 'solid-js';
 import './App.css';
 
+// All persisted settings live under a single storage key. fingerprint
+// identifies this device/install and is generated once; it is never
+// shown or edited in the UI.
+const STORAGE_KEY = 'settings';
+
+interface StoredSettings {
+  username: string;
+  password: string;
+  backendUrl: string;
+  fingerprint: string;
+}
+
+async function loadSettings(): Promise<StoredSettings | undefined> {
+  const result = await browser.storage.local.get(STORAGE_KEY);
+  return result[STORAGE_KEY] as StoredSettings | undefined;
+}
+
 function App() {
-  const [count, setCount] = createSignal(0);
+  const [username, setUsername] = createSignal('');
+  const [password, setPassword] = createSignal('');
+  const [backendUrl, setBackendUrl] = createSignal('');
+  const [saved, setSaved] = createSignal(false);
+
+  onMount(async () => {
+    const settings = await loadSettings();
+
+    if (settings) {
+      setUsername(settings.username);
+      setPassword(settings.password);
+      setBackendUrl(settings.backendUrl);
+    }
+
+    // Ensure a fingerprint exists as soon as the popup is opened, even if
+    // the user never touches the form.
+    if (!settings?.fingerprint) {
+      await browser.storage.local.set({
+        [STORAGE_KEY]: { ...settings, fingerprint: crypto.randomUUID() },
+      });
+    }
+  });
+
+  const handleSave = async (e: Event) => {
+    e.preventDefault();
+
+    const existing = await loadSettings();
+    const fingerprint = existing?.fingerprint ?? crypto.randomUUID();
+
+    await browser.storage.local.set({
+      [STORAGE_KEY]: {
+        username: username(),
+        password: password(),
+        backendUrl: backendUrl(),
+        fingerprint,
+      } satisfies StoredSettings,
+    });
+
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://wxt.dev" target="_blank">
-          <img src={wxtLogo} class="logo" alt="WXT logo" />
-        </a>
-        <a href="https://solidjs.com" target="_blank">
-          <img src={solidLogo} class="logo solid" alt="Solid logo" />
-        </a>
-      </div>
-      <h1>WXT + Solid</h1>
-      <div class="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count()}
-        </button>
-        <p>
-          Edit <code>popup/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p class="read-the-docs">
-        Click on the WXT and Solid logos to learn more
-      </p>
-    </>
+    <form class="card" onSubmit={handleSave}>
+      <h1>web-anno</h1>
+      <label>
+        Username
+        <input
+          type="text"
+          value={username()}
+          onInput={(e) => setUsername(e.currentTarget.value)}
+        />
+      </label>
+      <label>
+        Password
+        <input
+          type="password"
+          value={password()}
+          onInput={(e) => setPassword(e.currentTarget.value)}
+        />
+      </label>
+      <label>
+        Backend URL
+        <input
+          type="url"
+          placeholder="https://example.com"
+          value={backendUrl()}
+          onInput={(e) => setBackendUrl(e.currentTarget.value)}
+        />
+      </label>
+      <button type="submit">Save</button>
+      {saved() && <p class="read-the-docs">Saved.</p>}
+    </form>
   );
 }
 
