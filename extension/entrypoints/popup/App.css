@@ -1,7 +1,33 @@
 /* Popup content is intentionally narrow and compact; there is no need
  * to reserve space for a wide layout like a regular page would. */
 #root {
-  width: 220px;
+  width: 260px;
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 0;
+}
+
+.popup-header h1 {
+  margin: 0;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+.icon-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 .card {
@@ -34,6 +60,11 @@
 .field-input:focus {
   outline: 2px solid #646cff;
   outline-offset: -1px;
+}
+
+.field-textarea {
+  resize: vertical;
+  font-family: inherit;
 }
 
 .btn {

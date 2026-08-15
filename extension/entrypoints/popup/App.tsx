@@ -1,96 +1,49 @@
-import { createSignal, onMount } from 'solid-js';
-import { TextField } from '@kobalte/core/text-field';
-import { Button } from '@kobalte/core/button';
+import { createSignal, Show } from 'solid-js';
+import { ArrowLeft, Settings as SettingsIcon } from 'lucide-solid';
 import './App.css';
+import Home from './Home';
+import Settings from './Settings';
 
-// All persisted settings live under a single storage key. fingerprint
-// identifies this device/install and is generated once; it is never
-// shown or edited in the UI.
-const STORAGE_KEY = 'settings';
-
-interface StoredSettings {
-  username: string;
-  password: string;
-  backendUrl: string;
-  fingerprint: string;
-}
-
-async function loadSettings(): Promise<StoredSettings | undefined> {
-  const result = await browser.storage.local.get(STORAGE_KEY);
-  return result[STORAGE_KEY] as StoredSettings | undefined;
-}
+// Two-screen popup. Home (create an annotation) is the default view;
+// Settings is reached via the header icon, which doubles as a back button
+// while Settings is open.
+type View = 'home' | 'settings';
 
 function App() {
-  const [username, setUsername] = createSignal('');
-  const [password, setPassword] = createSignal('');
-  const [backendUrl, setBackendUrl] = createSignal('');
-  const [saved, setSaved] = createSignal(false);
-
-  onMount(async () => {
-    const settings = await loadSettings();
-
-    if (settings) {
-      setUsername(settings.username);
-      setPassword(settings.password);
-      setBackendUrl(settings.backendUrl);
-    }
-
-    // Ensure a fingerprint exists as soon as the popup is opened, even if
-    // the user never touches the form.
-    if (!settings?.fingerprint) {
-      await browser.storage.local.set({
-        [STORAGE_KEY]: { ...settings, fingerprint: crypto.randomUUID() },
-      });
-    }
-  });
-
-  const handleSave = async (e: Event) => {
-    e.preventDefault();
-
-    const existing = await loadSettings();
-    const fingerprint = existing?.fingerprint ?? crypto.randomUUID();
-
-    await browser.storage.local.set({
-      [STORAGE_KEY]: {
-        username: username(),
-        password: password(),
-        backendUrl: backendUrl(),
-        fingerprint,
-      } satisfies StoredSettings,
-    });
-
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-  };
+  const [view, setView] = createSignal<View>('home');
 
   return (
-    <form class="card" onSubmit={handleSave}>
-      <h1>web-anno</h1>
+    <div class="popup">
+      <header class="popup-header">
+        <h1>web-anno</h1>
+        <Show
+          when={view() === 'home'}
+          fallback={
+            <button
+              type="button"
+              class="icon-btn"
+              onClick={() => setView('home')}
+              aria-label="Back"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          }
+        >
+          <button
+            type="button"
+            class="icon-btn"
+            onClick={() => setView('settings')}
+            aria-label="Settings"
+          >
+            <SettingsIcon size={18} />
+          </button>
+        </Show>
+      </header>
 
-      <TextField class="field" value={username()} onChange={setUsername}>
-        <TextField.Label class="field-label">Username</TextField.Label>
-        <TextField.Input class="field-input" />
-      </TextField>
-
-      <TextField class="field" value={password()} onChange={setPassword}>
-        <TextField.Label class="field-label">Password</TextField.Label>
-        <TextField.Input class="field-input" type="password" />
-      </TextField>
-
-      <TextField class="field" value={backendUrl()} onChange={setBackendUrl}>
-        <TextField.Label class="field-label">Backend URL</TextField.Label>
-        <TextField.Input
-          class="field-input"
-          type="url"
-          placeholder="https://example.com"
-        />
-      </TextField>
-
-      <Button type="submit" class="btn">
-        Save
-      </Button>
-      {saved() && <p class="saved-hint">Saved.</p>}
-    </form>
+      <Show when={view() === 'home'} fallback={<Settings />}>
+        <Home />
+      </Show>
+    </div>
   );
 }
 
