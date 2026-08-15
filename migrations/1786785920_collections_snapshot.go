@@ -913,17 +913,6 @@ func init() {
 						"type": "text"
 					},
 					{
-						"help": "",
-						"hidden": false,
-						"id": "json3685223346",
-						"maxSize": 0,
-						"name": "body",
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "json"
-					},
-					{
 						"autogeneratePattern": "",
 						"help": "",
 						"hidden": false,
@@ -931,6 +920,21 @@ func init() {
 						"max": 0,
 						"min": 0,
 						"name": "target",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"help": "",
+						"hidden": false,
+						"id": "text3685223346",
+						"max": 0,
+						"min": 0,
+						"name": "body",
 						"pattern": "",
 						"presentable": false,
 						"primaryKey": false,
