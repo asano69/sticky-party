@@ -1,4 +1,6 @@
 import { createSignal, onMount } from 'solid-js';
+import { TextField } from '@kobalte/core/text-field';
+import { Button } from '@kobalte/core/button';
 import './App.css';
 
 // All persisted settings live under a single storage key. fingerprint
@@ -64,33 +66,30 @@ function App() {
   return (
     <form class="card" onSubmit={handleSave}>
       <h1>web-anno</h1>
-      <label>
-        Username
-        <input
-          type="text"
-          value={username()}
-          onInput={(e) => setUsername(e.currentTarget.value)}
-        />
-      </label>
-      <label>
-        Password
-        <input
-          type="password"
-          value={password()}
-          onInput={(e) => setPassword(e.currentTarget.value)}
-        />
-      </label>
-      <label>
-        Backend URL
-        <input
+
+      <TextField class="field" value={username()} onChange={setUsername}>
+        <TextField.Label class="field-label">Username</TextField.Label>
+        <TextField.Input class="field-input" />
+      </TextField>
+
+      <TextField class="field" value={password()} onChange={setPassword}>
+        <TextField.Label class="field-label">Password</TextField.Label>
+        <TextField.Input class="field-input" type="password" />
+      </TextField>
+
+      <TextField class="field" value={backendUrl()} onChange={setBackendUrl}>
+        <TextField.Label class="field-label">Backend URL</TextField.Label>
+        <TextField.Input
+          class="field-input"
           type="url"
           placeholder="https://example.com"
-          value={backendUrl()}
-          onInput={(e) => setBackendUrl(e.currentTarget.value)}
         />
-      </label>
-      <button type="submit">Save</button>
-      {saved() && <p class="read-the-docs">Saved.</p>}
+      </TextField>
+
+      <Button type="submit" class="btn">
+        Save
+      </Button>
+      {saved() && <p class="saved-hint">Saved.</p>}
     </form>
   );
 }

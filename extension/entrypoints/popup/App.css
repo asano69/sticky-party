@@ -1,27 +1,72 @@
+/* Popup content is intentionally narrow and compact; there is no need
+ * to reserve space for a wide layout like a regular page would. */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #54bc4ae0);
-}
-.logo.solid:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+  width: 220px;
 }
 
 .card {
-  padding: 2em;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 8px;
+  text-align: left;
 }
 
-.read-the-docs {
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.field-label {
+  font-size: 0.75em;
   color: #888;
+}
+
+.field-input {
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: transparent;
+  color: inherit;
+  padding: 4px 8px;
+  font-size: 0.9em;
+}
+.field-input:focus {
+  outline: 2px solid #646cff;
+  outline-offset: -1px;
+}
+
+.btn {
+  margin-top: 4px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  padding: 6px 10px;
+  font-size: 0.9em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+.btn:hover {
+  border-color: #646cff;
+}
+.btn:focus,
+.btn:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+.saved-hint {
+  margin: 0;
+  font-size: 0.8em;
+  color: #888;
+}
+
+@media (prefers-color-scheme: light) {
+  .field-input {
+    border-color: #ccc;
+  }
+  .btn {
+    background-color: #f9f9f9;
+  }
 }
