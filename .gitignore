@@ -1,0 +1,11 @@
+*.db
+/web-anno
+
+/data/
+
+pb_data/
+node_modules/
+dist/
+tmp/
+
+
