@@ -339,9 +339,14 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
           background: palette().bg,
           border: `1px solid ${palette().border}`,
           color: palette().text,
-          "font-size": "13px",
+          // Force a sans-serif stack regardless of the host page's own
+          // font, since the note must look the same on every site.
+          // Title/body inputs already use "font: inherit" so this
+          // cascades down to them.
+          "font-family": "system-ui, -apple-system, sans-serif",
+          "font-size": "14px",
           "line-height": "1.4",
-          "border-radius": "8px",
+          "border-radius": "0px",
           "box-shadow": "0 2px 8px rgba(0, 0, 0, 0.25)",
           // Base offset keeps every note comfortably above host-page
           // content while leaving headroom below the int32 max, so
