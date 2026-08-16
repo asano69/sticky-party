@@ -5,11 +5,11 @@ export
 
 BINARY := sticky-party
 
-# Ports used by the dev servers (frontend, backend, and PocketBase-style API)
-PORTS := 3000 3001
+# Port used by the backend dev server
+PORTS := 3000
 
 .PHONY: all
-all: kill-ports frontend## (*) Build frontend assets and start the server
+all: kill-ports ## (*) Build the server binary and start it
 	go run ./cmd/$(BINARY) superuser upsert admin@mail.internal password --dir=pb_data
 	go run ./cmd/$(BINARY) serve
 
@@ -23,16 +23,8 @@ init:
 	fastmod sticky-party $(notdir $(CURDIR))
 
 
-.PHONY: frontend-deps
-frontend-deps:
-	cd frontend && pnpm install
-
-.PHONY: build-frontend
-build-frontend: frontend-deps
-	cd frontend && pnpm run build
-
 .PHONY: build
-build: build-frontend
+build:
 	go build -o $(BINARY) ./cmd/$(BINARY)
 
 .PHONY: extension-deps
@@ -77,15 +69,10 @@ server:
 .PHONY: clean
 	rm -fr ./tmp/ # air
 
-# port: 3001
-.PHONY: dev-front
-dev-front: clean
-	npx concurrently -n "frontend,backend" -c "blue,green" "cd frontend && pnpm dev" "go run ./cmd/$(BINARY) serve --dev"
-
 # port: 3000
 .PHONY: dev-back
 dev-back: clean
-	npx concurrently -n "frontend,backend" -c "blue,green" "cd frontend && pnpm watch" "air"
+	air
 
 dev-ext:
 	cd extension && pnpm dev:firefox
@@ -100,12 +87,6 @@ test:
 
 lint:
 	golangci-lint run
-	cd extension && pnpm run lint
-
-
-
-format:
-	cd extension && pnpm exec prettier --write "src/**/*.{js,jsx,css}"
 
 # 本番では、後方互換性のために残しておいたほうが良いかも。
 migrate-collections:

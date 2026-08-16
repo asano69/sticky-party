@@ -8,11 +8,11 @@ package serve
 
 import (
 	"fmt"
+	"net/http"
 
 	"log/slog"
 
 	"github.com/asano69/sticky-party/internal/config"
-	"github.com/asano69/sticky-party/internal/static"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -25,17 +25,11 @@ func Run(app *pocketbase.PocketBase, cfg *config.Config) error {
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		// Serves the whole Vite build output (index.html, hashed JS/CSS
-		// under assets/, and public/ files like favicon.svg copied to the
-		// root) from a single route. indexFallback=true makes any unmatched
-		// path (e.g. /manifests/abc, /settings) fall back to index.html, so
-		// Solid Router can handle it client-side even on a hard refresh.
-		// This shell is left unauthenticated on purpose: it's an empty
-		// HTML/JS bundle with no data in it. Every route that actually
-		// returns collection data is guarded below with
-		// RequireSuperuserAuth, so an unauthenticated visitor only ever
-		// sees the login screen the SPA renders client-side.
-		e.Router.GET("/{path...}", apis.Static(static.FS, true))
+		// No custom frontend is bundled with this app; PocketBase already
+		// serves its own admin UI at "/_/", so "/" just redirects there.
+		e.Router.GET("/", func(re *core.RequestEvent) error {
+			return re.Redirect(http.StatusFound, "/_/")
+		})
 
 		return e.Next()
 	})
