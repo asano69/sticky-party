@@ -58,8 +58,11 @@ export default function NoteContent() {
     queueMicrotask(() => (field === "title" ? titleInputRef : textareaRef)?.focus());
   };
 
-  // Grows the textarea to fit its content instead of scrolling inside a
-  // fixed number of rows.
+  // Grows the textarea to fit its content, with a 4-line floor (see
+  // rows={4} below) so a short note still gets a comfortable minimum
+  // size. Setting height to "auto" first lets scrollHeight reflect that
+  // floor: with no CSS height set, a textarea's intrinsic height comes
+  // from `rows`, and scrollHeight can never be smaller than that box.
   const resizeTextarea = () => {
     const el = textareaRef;
     if (!el) return;
@@ -72,10 +75,11 @@ export default function NoteContent() {
   // host page's document, not this iframe -- to fit. contentRef's
   // scrollHeight reflects the true content height even though it's
   // styled overflow:auto, since scrollHeight always includes content
-  // that would otherwise be clipped/scrolled. Also used once editing
-  // ends, so the wrapper shrinks back down instead of staying inflated
-  // by the footer's height (footerRef?.offsetHeight is 0 once the
-  // footer unmounts).
+  // that would otherwise be clipped/scrolled. Called continuously while
+  // editing (see the createEffect below), so the note's size tracks the
+  // textarea -- including its 4-line floor -- and simply keeps that size
+  // once editing ends, rather than being re-measured from the read-mode
+  // display.
   // The footer (see the Show block below) is a flex sibling of
   // contentRef, not something contentRef's own scrollHeight measures, so
   // it never contributes to the note's required height -- only main's
@@ -100,17 +104,17 @@ export default function NoteContent() {
   // header (see content.ts) can stop intercepting pointer events while
   // editing -- otherwise clicks could never reach the title input,
   // since that header overlays this iframe from a separate document.
-  // Also re-report the content height once editing ends, so the
-  // wrapper shrinks back down now that the footer is gone.
-  let wasEditing = editing();
+  // Content height is intentionally NOT re-measured here on exiting edit
+  // mode: while editing, reportContentHeight already keeps the note's
+  // size following the textarea (with its 4-line floor), and that's the
+  // size we want to keep once saved -- re-measuring from the read-mode
+  // display here would shrink the note back down below that floor.
   createEffect(() => {
     const nowEditing = editing();
     window.parent.postMessage(
       { type: NOTE_EDITING_MESSAGE, editing: nowEditing } satisfies NoteEditingMessage,
       "*",
     );
-    if (wasEditing && !nowEditing) queueMicrotask(reportContentHeight);
-    wasEditing = nowEditing;
   });
 
   const cancelEdit = () => {
@@ -247,12 +251,20 @@ export default function NoteContent() {
                       textareaRef = el;
                       resizeTextarea();
                     }}
+                    // Floor: with no CSS height set, a textarea's
+                    // intrinsic height comes from `rows`, and
+                    // scrollHeight (used by resizeTextarea) can't go
+                    // below that -- so this keeps the note at least
+                    // 1 line tall, growing (and shrinking back) with
+                    // its content beyond that.
                     rows={1}
                     onInput={resizeTextarea}
                     onKeyDown={onEditorKeyDown}
-                    // min-h-full fills the main area even when the draft
-                    // is short, instead of shrinking to hug just the text.
-                    class="block w-full min-h-full box-border border-none resize-none overflow-hidden bg-transparent font-[inherit] text-[color:var(--note-text)]"
+                    // No min-h-full here: that would pin the textarea to
+                    // the note's current (possibly larger, e.g. from a
+                    // previous longer draft) height, preventing it from
+                    // ever shrinking back down when content is removed.
+                    class="block w-full box-border border-none resize-none overflow-hidden bg-transparent font-[inherit] text-[color:var(--note-text)]"
                   />
                 </TextField>
               }
