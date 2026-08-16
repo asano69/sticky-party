@@ -15,7 +15,7 @@
 ## Features
 - 付箋内のURLの自動認識
 - ユーザのデバイスごとに、付箋の位置とサイズを記憶
-- 付箋はExtension iframeにマウントされるため、Webサイトの管理者からも付箋の内容を読むことができません。
+- セキュリティ: 付箋はExtension page iframeとしてマウントされるため、Webサイトの管理者からも付箋の内容を読むことができません。[^1]
 - 付箋のアクセスコントロールなし。登録済みユーザのみ、すべの付箋を自由に作成・編集・削除できます。
 - 管理機能：管理者ユーザは、SQLiteに保存された付箋データをWebUIから操作できます。(PocketBase)
 - 付箋の位置・サイズ・ドラッグ用ヘッダーだけがWebページのDOMに存在し、タイトル・本文などの実際の内容は拡張機能自身のオリジンを持つiframe内にのみ存在します。
@@ -27,9 +27,6 @@
 - 付箋を貼りたいURLと本文を作成して保存ボタンを押すと、バックエンドサーバに付箋データが送信される。
 - 付箋データをサーバに保存したあと、付箋を表示するURLのルールのみがローカルストレージにキャッシュされる。
 - 任意のWebページを開くたびに、そのURLがルール集合に含まれている評価され、含まれる場合はDBから付箋データがロードされる。
-
-> [!CAUTION]
-> 付箋はClosed Shadow DOMにマウントされますが、Webサイトの管理者や権限のある他の拡張機能は技術的に付箋の内容を読むことができます。
 
 ## Tech Stack
 
@@ -43,3 +40,4 @@
 - kobalte v0.13+
 - tailwind v4
 
+[^1]: We use an extension page iframe because it runs in the extension origin (chrome-extension://...), which is isolated from the web page by the Same-Origin Policy. The page cannot directly access the iframe's DOM, JavaScript context, or extension data.
