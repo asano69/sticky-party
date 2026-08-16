@@ -2,11 +2,13 @@ import { createSignal, Show } from 'solid-js';
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import NotebookTabs from 'lucide-solid/icons/notebook-tabs';
 import SettingsIcon from 'lucide-solid/icons/settings';
+import RefreshCw from 'lucide-solid/icons/refresh-cw';
 import { Button } from '@kobalte/core/button';
 import './App.css';
 import Home from './Home';
 import Settings from './Settings';
 import Targets from './Targets';
+import { fullSyncTargets } from '../../lib/targets';
 
 // Three-screen popup. Home (create an annotation) is the default view;
 // Targets (cached URL list) and Settings are reached via the header
@@ -15,6 +17,22 @@ type View = 'home' | 'settings' | 'targets';
 
 function App() {
   const [view, setView] = createSignal<View>('home');
+  const [syncing, setSyncing] = createSignal(false);
+
+  // Manual full sync (fetch every target from PocketBase, overwrite the
+  // local cache) on top of the automatic write-through/periodic sync.
+  // Lives here (rather than in Targets.tsx) since it's a global action,
+  // not specific to the cached-URLs view.
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await fullSyncTargets();
+    } catch (err) {
+      console.error('[web-anno] full sync failed', err);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div class="popup">
@@ -33,6 +51,14 @@ function App() {
           }
         >
           <div class="header-actions">
+            <Button
+              class="icon-btn"
+              onClick={handleSync}
+              disabled={syncing()}
+              aria-label="Sync from server"
+            >
+              <RefreshCw size={18} class={syncing() ? 'spin' : ''} />
+            </Button>
             <Button
               class="icon-btn"
               onClick={() => setView('targets')}

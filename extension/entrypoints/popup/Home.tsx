@@ -1,6 +1,7 @@
 import { createSignal, onMount } from 'solid-js';
 import { TextField } from '@kobalte/core/text-field';
 import { Button } from '@kobalte/core/button';
+import CircleCheckBig from 'lucide-solid/icons/circle-check-big';
 
 import { getAuthedPb } from '../../lib/pb';
 import { CHECK_ANNOTATION_MESSAGE, type CheckAnnotationMessage } from '../../lib/messages';
@@ -89,9 +90,11 @@ export default function Home() {
 
       {error() && <p class="saved-hint">{error()}</p>}
 
-      <Button type="submit" class="btn" disabled={saving()}>
-        {saving() ? 'Saving…' : 'Save'}
-      </Button>
+      <div style={{ display: 'flex', 'justify-content': 'center' }}>
+        <Button type="submit" class="icon-btn" disabled={saving()} aria-label="Save">
+          <CircleCheckBig size={20} class={saving() ? 'spin' : ''} />
+        </Button>
+      </div>
     </form>
   );
 }
