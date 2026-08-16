@@ -3,7 +3,7 @@ import { TextField } from '@kobalte/core/text-field';
 import { Button } from '@kobalte/core/button';
 
 import { getAuthedPb } from '../../lib/pb';
-import { addCachedTarget } from '../../lib/targets';
+import { addCachedTarget, normalizeTarget } from '../../lib/targets';
 
 // Form for creating a new annotation on the current page. Saving writes
 // the annotation to PocketBase, then mirrors its target into the local
@@ -35,11 +35,14 @@ export default function Home() {
     setSaving(true);
     try {
       const pb = await getAuthedPb();
+      // Normalize once so the value written to the DB and the value
+      // mirrored into the local cache (write-through) are identical.
+      const target = normalizeTarget(url());
       await pb.collection('annotations').create({
-        target: url(),
+        target,
         body: note(),
       });
-      await addCachedTarget(url());
+      await addCachedTarget(target);
       setNote('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save.');

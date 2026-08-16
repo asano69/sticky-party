@@ -5,7 +5,7 @@ import {
   HIDE_ANNOTATION_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
 } from '../lib/messages';
-import { fullSyncTargets, getCachedTargets, isTargetMatch } from '../lib/targets';
+import { fullSyncTargets, getCachedTargets, isTargetMatch, normalizeTarget } from '../lib/targets';
 
 export default defineBackground(() => {
   // Full sync: pull the current target list from PocketBase and
@@ -38,7 +38,10 @@ export default defineBackground(() => {
   browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
     if (!changeInfo.url) return;
 
-    const url = changeInfo.url;
+    // Normalize once here so both the cache lookup below and the exact-
+    // match DB query in fetchAnnotationBody line up with the normalized
+    // target values written by the popup (see lib/targets.ts).
+    const url = normalizeTarget(changeInfo.url);
     const targets = await getCachedTargets();
 
     if (!isTargetMatch(url, targets)) {
