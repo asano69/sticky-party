@@ -1,9 +1,10 @@
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import Trash from "lucide-solid/icons/trash";
 import X from "lucide-solid/icons/x";
 import { TextField } from "@kobalte/core/text-field";
 
 import { deleteAnnotation, updateAnnotationBody } from "../../lib/annotations";
+import { fetchPosition, savePosition } from "../../lib/positions";
 import type { AnnotationData } from "../../lib/messages";
 
 // Sticky-note yellow, light and dark variants. Content scripts render
@@ -93,6 +94,69 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   const [zIndex, setZIndex] = createSignal(props.index);
   const bringToFront = () => setZIndex(props.nextZ());
 
+  // Persisted position/size for this device (see lib/positions.ts).
+  // Size is intentionally not held in Solid state: it's written to the
+  // DOM directly (imperative style) when a saved position loads, and
+  // read directly from the DOM when saving. That keeps it out of the
+  // way of the native CSS `resize` handle and of the textarea's
+  // auto-grow-while-editing behavior below, neither of which go through
+  // Solid's reactivity.
+  let noteRef: HTMLDivElement | undefined;
+  let positionRecordId: string | undefined;
+
+  const persistPosition = async () => {
+    if (!noteRef) return;
+    try {
+      positionRecordId = await savePosition(
+        props.annotation.id,
+        { ...pos(), width: noteRef.offsetWidth, height: noteRef.offsetHeight },
+        positionRecordId,
+      );
+    } catch (err) {
+      console.error("[web-anno] failed to save position", err);
+    }
+  };
+
+  // The native CSS `resize` handle -- and content growth while editing
+  // (see resizeTextarea) -- change the note's box size without firing
+  // any dedicated JS event. This just uses that as a trigger to persist
+  // the current size, debounced so a drag doesn't spam writes; the
+  // first observation (on mount/load) is skipped since it isn't a
+  // resize.
+  let skipNextResizeSave = true;
+  let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
+  const resizeObserver = new ResizeObserver(() => {
+    if (skipNextResizeSave) {
+      skipNextResizeSave = false;
+      return;
+    }
+    clearTimeout(resizeSaveTimer);
+    resizeSaveTimer = setTimeout(persistPosition, 300);
+  });
+
+  onMount(async () => {
+    if (noteRef) resizeObserver.observe(noteRef);
+
+    try {
+      const saved = await fetchPosition(props.annotation.id);
+      if (saved) {
+        positionRecordId = saved.id;
+        setPos({ top: saved.top, left: saved.left });
+        if (noteRef) {
+          noteRef.style.width = `${saved.width}px`;
+          noteRef.style.height = `${saved.height}px`;
+        }
+      }
+    } catch (err) {
+      console.error("[web-anno] failed to load position", err);
+    }
+  });
+
+  onCleanup(() => {
+    resizeObserver.disconnect();
+    clearTimeout(resizeSaveTimer);
+  });
+
   let dragStart: { x: number; y: number; top: number; left: number } | null = null;
 
   const startDrag = (e: PointerEvent) => {
@@ -114,6 +178,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   };
 
   const endDrag = () => {
+    if (dragStart) persistPosition();
     dragStart = null;
   };
 
@@ -188,6 +253,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   return (
     <Show when={!hidden()}>
       <div
+        ref={(el) => (noteRef = el)}
         onPointerDown={bringToFront}
         style={{
           position: "fixed",
