@@ -40,4 +40,4 @@
 - kobalte v0.13+
 - tailwind v4
 
-[^1]: We use an extension page iframe because it runs in the extension origin (chrome-extension://...), which is isolated from the web page by the Same-Origin Policy. The page cannot directly access the iframe's DOM, JavaScript context, or extension data.
+[^1]: We use an extension page iframe because it runs in the extension's own origin (for example, `chrome-extension://...` in Chromium-based browsers and `moz-extension://...` in Firefox), which is isolated from the web page by the Same-Origin Policy. The page cannot directly access the iframe's DOM, JavaScript context, or extension data.
