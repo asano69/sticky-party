@@ -35,7 +35,10 @@ export async function fullSyncTargets(): Promise<string[]> {
   const records = await pb.collection('annotations').getFullList<{ target: string }>({
     fields: 'target',
   });
-  const targets = records.map((record) => record.target).filter(Boolean);
+  // Multiple annotations can share the same target URL, so dedupe here;
+  // otherwise the cached list grows noisy and the match check does
+  // redundant work for no benefit.
+  const targets = [...new Set(records.map((record) => record.target).filter(Boolean))];
   await setCachedTargets(targets);
   return targets;
 }
