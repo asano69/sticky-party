@@ -17,6 +17,7 @@
   "dependencies": {
     "@kobalte/core": "^0.13.12",
     "lucide-solid": "^1.24.0",
+    "pocketbase": "^0.27.0",
     "solid-js": "^1.9.11"
   },
   "devDependencies": {

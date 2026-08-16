@@ -2,22 +2,7 @@ import { createSignal, onMount } from 'solid-js';
 import { TextField } from '@kobalte/core/text-field';
 import { Button } from '@kobalte/core/button';
 
-// All persisted settings live under a single storage key. fingerprint
-// identifies this device/install and is generated once; it is never
-// shown or edited in the UI.
-const STORAGE_KEY = 'settings';
-
-interface StoredSettings {
-  username: string;
-  password: string;
-  backendUrl: string;
-  fingerprint: string;
-}
-
-async function loadSettings(): Promise<StoredSettings | undefined> {
-  const result = await browser.storage.local.get(STORAGE_KEY);
-  return result[STORAGE_KEY] as StoredSettings | undefined;
-}
+import { getSettings, saveSettings, ensureFingerprint } from '../../lib/settings';
 
 export default function Settings() {
   const [username, setUsername] = createSignal('');
@@ -26,7 +11,7 @@ export default function Settings() {
   const [saved, setSaved] = createSignal(false);
 
   onMount(async () => {
-    const settings = await loadSettings();
+    const settings = await getSettings();
 
     if (settings) {
       setUsername(settings.username);
@@ -36,26 +21,16 @@ export default function Settings() {
 
     // Ensure a fingerprint exists as soon as the popup is opened, even if
     // the user never touches the form.
-    if (!settings?.fingerprint) {
-      await browser.storage.local.set({
-        [STORAGE_KEY]: { ...settings, fingerprint: crypto.randomUUID() },
-      });
-    }
+    await ensureFingerprint();
   });
 
   const handleSave = async (e: Event) => {
     e.preventDefault();
 
-    const existing = await loadSettings();
-    const fingerprint = existing?.fingerprint ?? crypto.randomUUID();
-
-    await browser.storage.local.set({
-      [STORAGE_KEY]: {
-        username: username(),
-        password: password(),
-        backendUrl: backendUrl(),
-        fingerprint,
-      } satisfies StoredSettings,
+    await saveSettings({
+      username: username(),
+      password: password(),
+      backendUrl: backendUrl(),
     });
 
     setSaved(true);

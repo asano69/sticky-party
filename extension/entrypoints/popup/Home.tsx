@@ -2,11 +2,19 @@ import { createSignal, onMount } from 'solid-js';
 import { TextField } from '@kobalte/core/text-field';
 import { Button } from '@kobalte/core/button';
 
-// Form for creating a new annotation on the current page. Saving is not
-// wired up yet; this only establishes the layout and fields.
+import { getAuthedPb } from '../../lib/pb';
+import { addCachedTarget } from '../../lib/targets';
+
+// Form for creating a new annotation on the current page. Saving writes
+// the annotation to PocketBase, then mirrors its target into the local
+// cache the content script matches against (write-through; see
+// docs/architecture.md). Position data (x/y/width/height) is not
+// collected here -- that belongs to the future drag-placement flow.
 export default function Home() {
   const [url, setUrl] = createSignal('');
   const [note, setNote] = createSignal('');
+  const [error, setError] = createSignal('');
+  const [saving, setSaving] = createSignal(false);
 
   onMount(async () => {
     // Prefill with the active tab's URL so the common case (annotating
@@ -21,9 +29,20 @@ export default function Home() {
     }
   });
 
-  const handleSave = (e: Event) => {
+  const handleSave = async (e: Event) => {
     e.preventDefault();
-    // TODO: persist the annotation via the backend once the API is ready.
+    setError('');
+    setSaving(true);
+    try {
+      const pb = await getAuthedPb();
+      await pb.collection('annotations').create({ target: url(), body: note() });
+      await addCachedTarget(url());
+      setNote('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -46,8 +65,10 @@ export default function Home() {
         />
       </TextField>
 
-      <Button type="submit" class="btn">
-        Save
+      {error() && <p class="saved-hint">{error()}</p>}
+
+      <Button type="submit" class="btn" disabled={saving()}>
+        {saving() ? 'Saving…' : 'Save'}
       </Button>
     </form>
   );

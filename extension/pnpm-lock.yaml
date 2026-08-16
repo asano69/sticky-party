@@ -14,6 +14,9 @@ importers:
       lucide-solid:
         specifier: ^1.24.0
         version: 1.31.0(solid-js@1.9.14)
+      pocketbase:
+        specifier: ^0.27.0
+        version: 0.27.3
       solid-js:
         specifier: ^1.9.11
         version: 1.9.14
@@ -1586,6 +1589,9 @@ packages:
 
   pkg-types@2.3.1:
     resolution: {integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==}
+
+  pocketbase@0.27.3:
+    resolution: {integrity: sha512-n2rtQrg3kTF44066B+2eVvQdiYRGZ+RI7isIZqmAptfElLCSDIZrEKLhSrIQA2k5pvQM29Gx5JqGv5n+gtm6dg==}
 
   postcss@8.5.26:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
@@ -3676,6 +3682,8 @@ snapshots:
       confbox: 0.2.4
       exsolve: 1.1.1
       pathe: 2.0.3
+
+  pocketbase@0.27.3: {}
 
   postcss@8.5.26:
     dependencies:
