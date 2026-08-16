@@ -26,6 +26,14 @@ export async function setCachedTargets(targets: string[]): Promise<void> {
   await browser.storage.local.set({ [TARGETS_KEY]: targets });
 }
 
+// Whether `url` matches any cached target. Matching is exact-equality for
+// now, since that's how targets are written (the tab's URL as-is); see
+// docs/architecture.md's "未確定事項" for future match strategies
+// (prefix, pattern, etc.) if that turns out to be too strict.
+export function isTargetMatch(url: string, targets: string[]): boolean {
+  return targets.includes(url);
+}
+
 // Fetches only the `target` field from every annotation and overwrites
 // the local cache wholesale (full sync; see docs/architecture.md). Used
 // by the popup's manual refresh button and can be reused by the
