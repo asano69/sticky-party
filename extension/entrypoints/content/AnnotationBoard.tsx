@@ -1,4 +1,4 @@
-import { createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { X } from "lucide-solid";
 import { TextField } from "@kobalte/core/text-field";
 
@@ -64,12 +64,16 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
 
   // Cascade the default position so multiple notes don't all land on top
   // of each other; from there the user can drag each one independently.
+  // Anchored top/left (not top/right) so the native CSS `resize` handle
+  // -- which always grows from the bottom-right corner of the box --
+  // visually keeps the top-left corner fixed instead of appearing to
+  // grow from the top-right.
   const [pos, setPos] = createSignal({
     top: 12 + props.index * 24,
-    right: 12 + props.index * 24,
+    left: 12 + props.index * 24,
   });
 
-  let dragStart: { x: number; y: number; top: number; right: number } | null = null;
+  let dragStart: { x: number; y: number; top: number; left: number } | null = null;
 
   const startDrag = (e: PointerEvent) => {
     // Skip drag/capture when the pointerdown originated on a button
@@ -86,12 +90,32 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
     if (!dragStart) return;
     const dx = e.clientX - dragStart.x;
     const dy = e.clientY - dragStart.y;
-    setPos({ top: dragStart.top + dy, right: dragStart.right - dx });
+    setPos({ top: dragStart.top + dy, left: dragStart.left + dx });
   };
 
   const endDrag = () => {
     dragStart = null;
   };
+
+  let textareaRef: HTMLTextAreaElement | undefined;
+
+  // Grows the textarea to fit its content (no internal scrollbar, no
+  // fixed row count), so switching from the display div to the textarea
+  // never changes the note's height.
+  const resizeTextarea = () => {
+    const el = textareaRef;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  // Re-measure whenever the draft text changes (typing, or the initial
+  // value set by startEdit) and once editing mode actually mounts the
+  // textarea.
+  createEffect(() => {
+    draft();
+    if (editing()) resizeTextarea();
+  });
 
   const startEdit = () => {
     setDraft(body());
@@ -131,7 +155,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
         style={{
           position: "fixed",
           top: `${pos().top}px`,
-          right: `${pos().right}px`,
+          left: `${pos().left}px`,
           width: "280px",
           "min-width": "160px",
           "min-height": "80px",
@@ -179,8 +203,13 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
             <div style={{ padding: "10px 14px" }}>
               <TextField value={draft()} onChange={setDraft} disabled={saving()}>
                 <TextField.TextArea
-                  rows={4}
+                  ref={(el) => {
+                    textareaRef = el;
+                    resizeTextarea();
+                  }}
+                  rows={1}
                   autofocus
+                  onInput={resizeTextarea}
                   onKeyDown={onEditorKeyDown}
                   onFocusOut={saveEdit}
                   style={{
@@ -191,7 +220,9 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
                     border: "none",
                     "box-sizing": "border-box",
                     resize: "none",
+                    overflow: "hidden",
                     "font": "inherit",
+                    "line-height": "inherit",
                     background: "transparent",
                     color: palette().text,
                   }}
