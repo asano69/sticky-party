@@ -114,13 +114,20 @@ export default defineContentScript({
         position: "inline",
         anchor: "html",
         onMount: (wrapper, iframe) => {
+          // Floor height for a single-line note: TITLE_ROW_HEIGHT_PX
+          // (header) plus one line of body text with its vertical
+          // padding (main's py-1.5 = 12px + one 14px/1.4 line ~= 20px).
+          // Without this, main's flex-1 stretches to fill whatever
+          // extra space a larger min-height forces, showing up as a
+          // blank second line under single-line notes.
+          const MIN_CONTENT_HEIGHT_PX = 32;
           Object.assign(wrapper.style, {
             position: "fixed",
             top: `${top}px`,
             left: `${left}px`,
             width: savedWidth ? `${savedWidth}px` : "260px",
             minWidth: "160px",
-            minHeight: "90px",
+            minHeight: `${TITLE_ROW_HEIGHT_PX + MIN_CONTENT_HEIGHT_PX}px`,
             resize: "both",
             overflow: "hidden",
             boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
