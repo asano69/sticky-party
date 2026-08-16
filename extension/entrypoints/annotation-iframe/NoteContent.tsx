@@ -72,21 +72,32 @@ export default function NoteContent() {
 
   // Reports the note's full (unclipped) content height to the content
   // script so it can resize the wrapper element -- which lives in the
-  // host page's document, not this iframe -- to fit. contentRef's
-  // scrollHeight reflects the true content height even though it's
-  // styled overflow:auto, since scrollHeight always includes content
-  // that would otherwise be clipped/scrolled. Called continuously while
-  // editing (see the createEffect below), so the note's size tracks the
-  // textarea -- including its 4-line floor -- and simply keeps that size
-  // once editing ends, rather than being re-measured from the read-mode
-  // display.
+  // host page's document, not this iframe -- to fit.
+  //
+  // While editing, this deliberately does NOT read contentRef.scrollHeight:
+  // contentRef is a `flex-1` flex item, so its own box is stretched to
+  // fill whatever height the note currently has. Once the note has grown,
+  // contentRef's box stays that size even after the textarea inside it
+  // shrinks (no overflow means scrollHeight just reflects the box itself),
+  // so shrinking on line-delete would never be detected. Reading
+  // textareaRef's own height instead -- which resizeTextarea keeps
+  // accurate every keystroke -- avoids that trap and shrinks correctly.
+  // contentRef's vertical padding (py-1.5) is added back since it isn't
+  // part of the textarea's own box.
+  //
   // The footer (see the Show block below) is a flex sibling of
-  // contentRef, not something contentRef's own scrollHeight measures, so
-  // it never contributes to the note's required height -- only main's
-  // own content does. content.ts (which owns the wrapper element) is
-  // what temporarily adds the footer's height back in while editing.
+  // contentRef, not something measured here, so it never contributes to
+  // the note's required height -- only main's own content does.
+  // content.ts (which owns the wrapper element) is what temporarily adds
+  // the footer's height back in while editing.
   const reportContentHeight = () => {
-    const height = contentRef?.scrollHeight ?? 0;
+    let height = 0;
+    if (editing() && textareaRef && contentRef) {
+      const { paddingTop, paddingBottom } = getComputedStyle(contentRef);
+      height = textareaRef.offsetHeight + parseFloat(paddingTop) + parseFloat(paddingBottom);
+    } else {
+      height = contentRef?.scrollHeight ?? 0;
+    }
     window.parent.postMessage({ type: NOTE_CONTENT_RESIZE_MESSAGE, height }, "*");
   };
 
