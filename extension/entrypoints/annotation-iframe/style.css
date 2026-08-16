@@ -11,6 +11,26 @@ body {
   overflow: hidden;
 }
 
+/* Sticky-note yellow, light and dark variants. This iframe renders into
+ * its own document, so it can't rely on the host page's theme or CSS
+ * custom properties -- these are the source of truth for NoteContent.tsx's
+ * Tailwind classes below (e.g. bg-[color:var(--note-bg)]). Mirrors
+ * popup/style.css's palette, though the two are unrelated at runtime
+ * since each is a separate document. */
+:root {
+  --note-bg: #fff8b8;
+  --note-border: rgba(0, 0, 0, 0.25);
+  --note-text: #3a3520;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --note-bg: #4a4420;
+    --note-border: rgba(255, 255, 255, 0.3);
+    --note-text: #f5efc9;
+  }
+}
+
 /* Draws the bullet marker for lines parsed as bullets by lib/markup
  * (see AnnotationBody.tsx). currentColor keeps it matching the note's
  * text color in both the light and dark palettes. */

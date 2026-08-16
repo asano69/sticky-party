@@ -20,22 +20,11 @@ import {
 import type { AnnotationData } from "../../lib/messages";
 import AnnotationBody from "./AnnotationBody";
 
-// Sticky-note yellow, light and dark variants. This iframe renders into
-// its own document, so it can't rely on the host page's theme or CSS
-// custom properties -- prefers-color-scheme is queried directly.
-const PALETTE = {
-  light: { bg: "#fff8b8", text: "#3a3520", border: "rgba(0, 0, 0, 0.25)" },
-  dark: { bg: "#4a4420", text: "#f5efc9", border: "rgba(255, 255, 255, 0.3)" },
-};
-
-function useIsDarkMode() {
-  const query = matchMedia("(prefers-color-scheme: dark)");
-  const [isDark, setIsDark] = createSignal(query.matches);
-  const listener = (e: MediaQueryListEvent) => setIsDark(e.matches);
-  query.addEventListener("change", listener);
-  onCleanup(() => query.removeEventListener("change", listener));
-  return isDark;
-}
+// Sticky-note colors (light/dark) come from the --note-bg/--note-border/
+// --note-text CSS variables in style.css, applied below via Tailwind's
+// arbitrary-value syntax (e.g. bg-[color:var(--note-bg)]). Letting CSS
+// handle prefers-color-scheme means this component doesn't need its own
+// dark-mode signal or a palette object to switch between.
 
 // Renders a single sticky note's title, body, and edit/delete controls.
 // Dragging, resizing, position persistence, and the Dismiss button live
@@ -58,9 +47,6 @@ export default function NoteContent() {
   let titleInputRef: HTMLInputElement | undefined;
   let textareaRef: HTMLTextAreaElement | undefined;
   let contentRef: HTMLDivElement | undefined;
-
-  const isDark = useIsDarkMode();
-  const palette = () => (isDark() ? PALETTE.dark : PALETTE.light);
 
   const startEdit = (field: "title" | "body" = "body") => {
     const current = annotation();
@@ -210,43 +196,23 @@ export default function NoteContent() {
           // explicitly to let the content script bring this note to
           // the front of the stack.
           onPointerDown={() => window.parent.postMessage({ type: NOTE_FOCUS_MESSAGE }, "*")}
-          style={{
-            display: "flex",
-            "flex-direction": "column",
-            height: "100%",
-            "box-sizing": "border-box",
-            background: palette().bg,
-            color: palette().text,
-            "font-family": "system-ui, -apple-system, sans-serif",
-            "font-size": "14px",
-            "line-height": "1.4",
-          }}
+          class="flex h-full flex-col box-border bg-[color:var(--note-bg)] text-[color:var(--note-text)] font-[system-ui,-apple-system,sans-serif] text-[14px] leading-[1.4]"
         >
           {/* Sits directly under the content script's transparent drag
               header (see content.ts), which is exactly
               TITLE_ROW_HEIGHT_PX tall and overlays the Dismiss button on
               top of this row -- that's why the title text stops short of
-              the row's right edge (padding-right below). */}
+              the row's right edge (padding-right below). Background is
+              omitted here since it's already flat-opaque from the
+              wrapper above. */}
           <div
-            // Kept as plain inline style rather than Tailwind utility
-            // classes, since these values (palette, TITLE_ROW_HEIGHT_PX)
-            // are computed at runtime, not fixed design tokens.
-            // Height matches TITLE_ROW_HEIGHT_PX so this row (rendered
-            // inside the iframe) lines up pixel-for-pixel with the
-            // content script's transparent drag-header overlay (see
-            // content.ts). Right padding leaves room for that overlay's
-            // (larger) Dismiss button.
-            style={{
-              height: `${TITLE_ROW_HEIGHT_PX}px`,
-              "flex-shrink": "0",
-              "box-sizing": "border-box",
-              display: "flex",
-              "align-items": "center",
-              padding: "0 32px 0 8px",
-              "font-weight": "700",
-              background: palette().bg,
-              "border-bottom": `1px solid ${palette().border}`,
-            }}
+            // Height stays inline (not a Tailwind class) since it must
+            // stay tied to the TITLE_ROW_HEIGHT_PX constant -- a
+            // hardcoded class here would be a second source of truth
+            // that could drift from content.ts's drag-header overlay,
+            // which this row has to line up with pixel-for-pixel.
+            style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
+            class="flex shrink-0 items-center box-border pl-2 pr-8 font-bold border-b border-[color:var(--note-border)]"
           >
             <Show
               when={!editing()}
@@ -255,39 +221,23 @@ export default function NoteContent() {
                   value={draftTitle()}
                   onChange={setDraftTitle}
                   disabled={saving()}
-                  style={{ flex: "1", "min-width": "0" }}
+                  class="flex-1 min-w-0"
                 >
                   <TextField.Input
                     ref={(el) => (titleInputRef = el)}
                     onKeyDown={onEditorKeyDown}
-                    style={{
-                      width: "100%",
-                      "box-sizing": "border-box",
-                      border: "none",
-                      background: "transparent",
-                      font: "inherit",
-                      "font-weight": "700",
-                      color: palette().text,
-                    }}
+                    class="w-full box-border border-none bg-transparent font-[inherit] font-bold text-[color:var(--note-text)]"
                   />
                 </TextField>
               }
             >
-              <div
-                style={{
-                  width: "100%",
-                  "min-width": "0",
-                  overflow: "hidden",
-                  "text-overflow": "ellipsis",
-                  "white-space": "nowrap",
-                }}
-              >
+              <div class="w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                 {note().title}
               </div>
             </Show>
           </div>
 
-          <div ref={(el) => (contentRef = el)} style={{ flex: "1", overflow: "auto", padding: "6px 10px" }}>
+          <div ref={(el) => (contentRef = el)} class="flex-1 overflow-auto px-2.5 py-1.5">
             <Show
               when={!editing()}
               fallback={
@@ -300,33 +250,22 @@ export default function NoteContent() {
                     rows={1}
                     onInput={resizeTextarea}
                     onKeyDown={onEditorKeyDown}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      // Fills the main area even when the draft is short,
-                      // instead of shrinking to hug just the text.
-                      "min-height": "100%",
-                      "box-sizing": "border-box",
-                      border: "none",
-                      resize: "none",
-                      overflow: "hidden",
-                      background: "transparent",
-                      font: "inherit",
-                      color: palette().text,
-                    }}
+                    // min-h-full fills the main area even when the draft
+                    // is short, instead of shrinking to hug just the text.
+                    class="block w-full min-h-full box-border border-none resize-none overflow-hidden bg-transparent font-[inherit] text-[color:var(--note-text)]"
                   />
                 </TextField>
               }
             >
-              {/* min-height 100% makes this fill the whole main area
-                  (not just wrap the text), so double-clicking any blank
-                  space below a short body still starts editing. */}
+              {/* min-h-full makes this fill the whole main area (not
+                  just wrap the text), so double-clicking any blank space
+                  below a short body still starts editing. */}
               <div
                 onDblClick={(e) => {
                   e.preventDefault();
                   startEdit("body");
                 }}
-                style={{ "min-height": "100%" }}
+                class="min-h-full"
               >
                 <AnnotationBody body={note().body} />
               </div>
@@ -340,36 +279,22 @@ export default function NoteContent() {
               TITLE_ROW_HEIGHT_PX while editing to make room for it, and
               reportContentHeight above never includes it, so the note's
               saved/resting size is unaffected either way. */}
+          {/* Background is omitted here too, for the same reason as the
+              title row above -- it's already flat-opaque from the
+              wrapper. */}
           <Show when={editing()}>
             <div
-              style={{
-                "flex-shrink": "0",
-                height: `${TITLE_ROW_HEIGHT_PX}px`,
-                "box-sizing": "border-box",
-                display: "flex",
-                "align-items": "center",
-                "justify-content": "flex-start",
-                padding: "0 8px",
-                background: palette().bg,
-                "border-top": `1px solid ${palette().border}`,
-              }}
+              // Height stays inline for the same reason as the title
+              // row above: it must stay tied to TITLE_ROW_HEIGHT_PX.
+              style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
+              class="flex shrink-0 items-center justify-start box-border px-2 border-t border-[color:var(--note-border)]"
             >
               <Button
-                class="sticky-party-icon-btn"
+                class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
                 onMouseDown={(e: MouseEvent) => e.preventDefault()}
                 onClick={handleDelete}
                 disabled={deleting()}
                 aria-label={confirmDelete() ? "Confirm delete" : "Delete"}
-                style={{
-                  display: "flex",
-                  "align-items": "center",
-                  "justify-content": "center",
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  padding: "6px 8px",
-                  "border-radius": "4px",
-                }}
               >
                 <Show when={confirmDelete()} fallback={<Trash size={16} />}>
                   <Shredder size={16} />
