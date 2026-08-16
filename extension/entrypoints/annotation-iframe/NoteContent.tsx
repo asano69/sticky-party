@@ -220,7 +220,7 @@ export default function NoteContent() {
               the row's right edge (padding-right below). Background is
               omitted here since it's already flat-opaque from the
               wrapper above. */}
-          <div
+          <header
             // Height stays inline (not a Tailwind class) since it must
             // stay tied to the TITLE_ROW_HEIGHT_PX constant -- a
             // hardcoded class here would be a second source of truth
@@ -250,9 +250,9 @@ export default function NoteContent() {
                 {note().title}
               </div>
             </Show>
-          </div>
+          </header>
 
-          <div ref={(el) => (contentRef = el)} class="flex-1 overflow-auto px-2.5 py-1.5">
+          <main ref={(el) => (contentRef = el)} class="flex-1 overflow-auto px-2.5 py-1.5">
             <Show
               when={!editing()}
               fallback={
@@ -293,7 +293,7 @@ export default function NoteContent() {
                 <AnnotationBody body={note().body} />
               </div>
             </Show>
-          </div>
+          </main>
 
           {/* Footer only appears while editing, so a casual click can
               never delete data by accident. It's a normal flex item
@@ -306,7 +306,7 @@ export default function NoteContent() {
               title row above -- it's already flat-opaque from the
               wrapper. */}
           <Show when={editing()}>
-            <div
+            <footer
               // Height stays inline for the same reason as the title
               // row above: it must stay tied to TITLE_ROW_HEIGHT_PX.
               style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
@@ -323,7 +323,7 @@ export default function NoteContent() {
                   <Shredder size={16} />
                 </Show>
               </Button>
-            </div>
+            </footer>
           </Show>
         </div>
       )}
