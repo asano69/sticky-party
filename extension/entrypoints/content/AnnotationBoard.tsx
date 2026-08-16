@@ -228,6 +228,11 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   const startEdit = () => {
     setDraft(body());
     setEditing(true);
+    // Release any fixed height (from a saved/resized size) so the note
+    // grows/shrinks to hug the textarea's content instead of scrolling
+    // inside a stale box size. Width stays as-is -- only height should
+    // track the text.
+    if (noteRef) noteRef.style.height = "";
   };
 
   const cancelEdit = () => setEditing(false);

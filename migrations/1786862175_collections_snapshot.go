@@ -973,8 +973,8 @@ func init() {
 				"viewRule": ""
 			},
 			{
-				"createRule": null,
-				"deleteRule": null,
+				"createRule": "",
+				"deleteRule": "",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -992,7 +992,7 @@ func init() {
 						"type": "text"
 					},
 					{
-						"cascadeDelete": false,
+						"cascadeDelete": true,
 						"collectionId": "pbc_2353526682",
 						"help": "",
 						"hidden": false,
@@ -1073,6 +1073,19 @@ func init() {
 						"type": "number"
 					},
 					{
+						"help": "",
+						"hidden": false,
+						"id": "number1657960367",
+						"max": null,
+						"min": null,
+						"name": "z",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
 						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
@@ -1094,13 +1107,15 @@ func init() {
 					}
 				],
 				"id": "pbc_2998141924",
-				"indexes": [],
-				"listRule": null,
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `idx_5tpj9cvacu` + "`" + ` ON ` + "`" + `positions` + "`" + ` (\n  ` + "`" + `annotation` + "`" + `,\n  ` + "`" + `device` + "`" + `\n)"
+				],
+				"listRule": "",
 				"name": "positions",
 				"system": false,
 				"type": "base",
-				"updateRule": null,
-				"viewRule": null
+				"updateRule": "",
+				"viewRule": ""
 			}
 		]`
 
