@@ -35,6 +35,27 @@ build-frontend: frontend-deps
 build: build-frontend
 	go build -o $(BINARY) ./cmd/$(BINARY)
 
+.PHONY: extension-deps
+extension-deps:
+	cd extension && pnpm install
+
+# MV3 build, unpacked (for loading via chrome://extensions "Load unpacked").
+.PHONY: build-extension
+build-extension: extension-deps
+	cd extension && pnpm run build
+
+# MV3 build packaged as a distributable .zip (dist-zip: extension/.output).
+.PHONY: zip-extension
+zip-extension: extension-deps
+	cd extension && pnpm run zip
+
+# Firefox defaults to MV2 (see extension/README.md); this project's
+# background.ts relies on MV3 service-worker semantics (browser.alarms
+# waking it after inactivity kill), so build Firefox as MV3 too to match.
+.PHONY: zip-extension-firefox
+zip-extension-firefox: extension-deps
+	cd extension && pnpm exec wxt zip -b firefox --mv3
+
 .PHONY: kill-ports
 kill-ports:
 	@for port in $(PORTS); do \
