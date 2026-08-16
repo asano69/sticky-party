@@ -12,6 +12,14 @@ import { ClientResponseError } from "pocketbase";
 import { getAuthedPb } from "./pb";
 import { ensureFingerprint, getSettings } from "./settings";
 
+// Combines the browser fingerprint with this display's resolution, so a
+// dual-monitor setup keeps a separate saved layout per screen instead of
+// two monitors fighting over the same stored position (e.g. a laptop
+// docked to an external display with a different resolution).
+function deviceKey(fingerprint: string): string {
+  return `${fingerprint}@${screen.width}x${screen.height}`;
+}
+
 interface PositionRecord {
   id: string;
   x: number;
@@ -70,7 +78,7 @@ export async function fetchPosition(annotationId: string): Promise<StoredPositio
     const record = await pb.collection("positions").getFirstListItem<PositionRecord>(
       pb.filter("annotation = {:annotation} && device = {:device}", {
         annotation: annotationId,
-        device: settings?.fingerprint,
+        device: deviceKey(settings!.fingerprint),
       }),
     );
     return { id: record.id, ...fromRatio(record) };
@@ -95,7 +103,7 @@ export async function savePosition(
   const pb = await getAuthedPb();
   const data = {
     annotation: annotationId,
-    device: settings?.fingerprint,
+    device: deviceKey(settings!.fingerprint),
     ...toRatio(pos),
   };
 
