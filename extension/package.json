@@ -17,11 +17,11 @@
   },
   "dependencies": {
     "@kobalte/core": "^0.13.12",
-    "@tailwindcss/postcss": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.2",
     "lucide-solid": "^1.24.0",
     "pocketbase": "^0.27.0",
     "solid-js": "^1.9.11",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.2"
   },
   "devDependencies": {
     "@wxt-dev/module-solid": "^1.1.4",
