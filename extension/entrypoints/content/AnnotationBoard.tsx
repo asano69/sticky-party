@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import Trash from "lucide-solid/icons/trash";
+import Shredder from "lucide-solid/icons/shredder";
 import X from "lucide-solid/icons/x";
 import { TextField } from "@kobalte/core/text-field";
 
@@ -90,6 +91,11 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   const [draft, setDraft] = createSignal(props.annotation.body);
   const [saving, setSaving] = createSignal(false);
   const [deleting, setDeleting] = createSignal(false);
+  // Two-step delete: the first click on the trash button only arms it
+  // (icon swaps to a shredder as a "are you sure" cue); the actual
+  // delete only fires on a second click while armed. Prevents an
+  // accidental single click from destroying data.
+  const [confirmDelete, setConfirmDelete] = createSignal(false);
 
   // Cascade the default position so multiple notes don't all land on top
   // of each other; from there the user can drag each one independently.
@@ -229,6 +235,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   const startEdit = () => {
     setDraft(body());
     setEditing(true);
+    setConfirmDelete(false);
     // Release any fixed height (from a saved/resized size) so the note
     // grows/shrinks to hug the textarea's content instead of scrolling
     // inside a stale box size. Width stays as-is -- only height should
@@ -236,7 +243,10 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
     if (noteRef) noteRef.style.height = "";
   };
 
-  const cancelEdit = () => setEditing(false);
+  const cancelEdit = () => {
+    setEditing(false);
+    setConfirmDelete(false);
+  };
 
   const saveEdit = async () => {
     setSaving(true);
@@ -267,13 +277,20 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   // local cached target list (lib/targets.ts) is deliberately left
   // alone: other annotations may still share the same target, so
   // pruning it here could hide notes that are still valid.
+  // First click arms confirmDelete (icon becomes a shredder); the
+  // second click, while armed, performs the actual delete.
   const handleDelete = async () => {
+    if (!confirmDelete()) {
+      setConfirmDelete(true);
+      return;
+    }
     setDeleting(true);
     try {
       await deleteAnnotation(props.annotation.id);
       setHidden(true);
     } catch (err) {
       console.error("[web-anno] failed to delete annotation", err);
+      setConfirmDelete(false);
     } finally {
       setDeleting(false);
     }
@@ -313,28 +330,23 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
           onPointerDown={startDrag}
           onPointerMove={onDrag}
           onPointerUp={endDrag}
+          onDblClick={(e) => {
+            // Same guard as the body's dblclick handler below: don't
+            // start editing when the double-click landed on a button
+            // (e.g. the Dismiss button).
+            if ((e.target as HTMLElement).closest("button")) return;
+            e.preventDefault();
+            startEdit();
+          }}
           style={{
             display: "flex",
-            "justify-content": editing() ? "space-between" : "flex-end",
+            "justify-content": "flex-end",
             gap: "4px",
             padding: "4px 8px",
             cursor: "grab",
             "border-bottom": `1px solid ${palette().headerBorder}`,
           }}
         >
-          {/* Only shown while editing, opposite the close button, so a
-              casual dismiss click can never delete data by accident. */}
-          <Show when={editing()}>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting()}
-              aria-label="Delete"
-              style={iconButtonStyle}
-            >
-              <Trash size={16} />
-            </button>
-          </Show>
           <button
             type="button"
             onClick={() => setHidden(true)}
@@ -402,6 +414,37 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
             style={{ padding: "10px 14px" }}
           >
             <AnnotationBody body={body()} />
+          </div>
+        </Show>
+
+        {/* Footer only appears while editing, so a casual dismiss click
+            can never delete data by accident. */}
+        <Show when={editing()}>
+          <div
+            style={{
+              display: "flex",
+              "justify-content": "flex-start",
+              padding: "4px 8px",
+              "border-top": `1px solid ${palette().headerBorder}`,
+            }}
+          >
+            <button
+              type="button"
+              // Prevent the textarea from losing focus on click: without
+              // this, the pointerdown's default focus shift fires the
+              // textarea's onFocusOut (saveEdit) first, which exits
+              // editing mode and unmounts this button before its own
+              // onClick can run -- so a click could never register.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleDelete}
+              disabled={deleting()}
+              aria-label={confirmDelete() ? "Confirm delete" : "Delete"}
+              style={iconButtonStyle}
+            >
+              <Show when={confirmDelete()} fallback={<Trash size={16} />}>
+                <Shredder size={16} />
+              </Show>
+            </button>
           </div>
         </Show>
       </div>
