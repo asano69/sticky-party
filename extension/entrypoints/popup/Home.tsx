@@ -36,6 +36,15 @@ export default function Home() {
     setTabId(activeTab?.id);
   });
 
+  // Lets Ctrl/Cmd+Enter submit from any field, without needing to tab to
+  // the Save button first (mirrors AnnotationBoard.tsx's editor shortcut).
+  const onFormKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSave(e);
+    }
+  };
+
   const handleSave = async (e: Event) => {
     e.preventDefault();
     setError('');
@@ -69,7 +78,7 @@ export default function Home() {
   };
 
   return (
-    <form class="card" onSubmit={handleSave}>
+    <form class="card" onSubmit={handleSave} onKeyDown={onFormKeyDown}>
       <TextField class="field" value={url()} onChange={setUrl}>
         <TextField.Label class="field-label">URL</TextField.Label>
         <TextField.Input

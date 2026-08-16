@@ -25,6 +25,15 @@ export default function Settings() {
     await ensureFingerprint();
   });
 
+  // Lets Ctrl/Cmd+Enter submit from any field, without needing to tab to
+  // the Save button first (mirrors AnnotationBoard.tsx's editor shortcut).
+  const onFormKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSave(e);
+    }
+  };
+
   const handleSave = async (e: Event) => {
     e.preventDefault();
 
@@ -39,7 +48,7 @@ export default function Settings() {
   };
 
   return (
-    <form class="card" onSubmit={handleSave}>
+    <form class="card" onSubmit={handleSave} onKeyDown={onFormKeyDown}>
       <TextField class="field" value={email()} onChange={setEmail}>
         <TextField.Label class="field-label">Email</TextField.Label>
         <TextField.Input class="field-input" type="email" />
