@@ -6,7 +6,7 @@ set -euo pipefail
 # settings
 ########################################
 
-VERSION_FILE="cmd/web-anno/main.go"
+VERSION_FILE="cmd/sticky-party/main.go"
 REMOTE="origin"
 BRANCH="main"
 COMMIT_PREFIX="release:"

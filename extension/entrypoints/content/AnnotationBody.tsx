@@ -1,5 +1,5 @@
 // Renders a parsed annotation body: bullet lines get the CSS-drawn
-// bullet defined in content.ts (.web-anno-bullet), and http(s) URLs
+// bullet defined in content.ts (.sticky-party-bullet), and http(s) URLs
 // become clickable links. Kept separate from AnnotationBoard.tsx since
 // it's only used in read (non-editing) mode.
 
@@ -12,7 +12,7 @@ export default function AnnotationBody(props: { body: string }) {
     <For each={parseLines(props.body)}>
       {(line) => (
         <div
-          class={line.bullet ? "web-anno-bullet" : undefined}
+          class={line.bullet ? "sticky-party-bullet" : undefined}
           style={{ "white-space": "pre-wrap", "overflow-wrap": "break-word" }}
         >
           <For each={line.tokens}>

@@ -28,7 +28,7 @@ function App() {
     try {
       await fullSyncTargets();
     } catch (err) {
-      console.error('[web-anno] full sync failed', err);
+      console.error('[sticky-party] full sync failed', err);
     } finally {
       setSyncing(false);
     }

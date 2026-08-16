@@ -144,7 +144,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
         positionRecordId,
       );
     } catch (err) {
-      console.error("[web-anno] failed to save position", err);
+      console.error("[sticky-party] failed to save position", err);
     }
   };
 
@@ -184,7 +184,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
         noteRef.style.height = `${saved.height}px`;
       }
     } catch (err) {
-      console.error("[web-anno] failed to load position", err);
+      console.error("[sticky-party] failed to load position", err);
       setPositionLoaded(true);
     }
   });
@@ -267,7 +267,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
       setBody(draft());
       setEditing(false);
     } catch (err) {
-      console.error("[web-anno] failed to save annotation", err);
+      console.error("[sticky-party] failed to save annotation", err);
     } finally {
       setSaving(false);
     }
@@ -301,7 +301,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
       await deleteAnnotation(props.annotation.id);
       setHidden(true);
     } catch (err) {
-      console.error("[web-anno] failed to delete annotation", err);
+      console.error("[sticky-party] failed to delete annotation", err);
       setConfirmDelete(false);
     } finally {
       setDeleting(false);
@@ -430,7 +430,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
           </Show>
 
           <Button
-            class="web-anno-icon-btn"
+            class="sticky-party-icon-btn"
             onClick={() => setHidden(true)}
             aria-label="Dismiss"
             style={iconButtonStyle}
@@ -516,7 +516,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
             }}
           >
             <Button
-              class="web-anno-icon-btn"
+              class="sticky-party-icon-btn"
               // Prevent the textarea from losing focus on click: without
               // this, the pointerdown's default focus shift fires the
               // textarea's onFocusOut (saveEdit) first, which exits
@@ -539,7 +539,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   );
 }
 
-// Background lives in the ".web-anno-icon-btn" rule injected by
+// Background lives in the ".sticky-party-icon-btn" rule injected by
 // content.ts, not here, since an inline "background" would always win
 // over the CSS ":hover" darkening rule regardless of source order.
 const iconButtonStyle = {

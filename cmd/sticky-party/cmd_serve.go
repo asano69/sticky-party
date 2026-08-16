@@ -6,11 +6,11 @@ import (
 	"github.com/pocketbase/pocketbase"
 	"github.com/spf13/cobra"
 
-	"github.com/asano69/web-anno/internal/config"
-	"github.com/asano69/web-anno/internal/serve"
+	"github.com/asano69/sticky-party/internal/config"
+	"github.com/asano69/sticky-party/internal/serve"
 )
 
-// serveCmd defines the "web-anno serve" cobra command. RunE stays a thin
+// serveCmd defines the "sticky-party serve" cobra command. RunE stays a thin
 // wrapper: load config, then delegate to internal/serve for the actual
 // server implementation.
 func serveCmd(app *pocketbase.PocketBase) *cobra.Command {

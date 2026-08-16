@@ -11,8 +11,8 @@ import (
 
 	"log/slog"
 
-	"github.com/asano69/web-anno/internal/config"
-	"github.com/asano69/web-anno/internal/static"
+	"github.com/asano69/sticky-party/internal/config"
+	"github.com/asano69/sticky-party/internal/static"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"

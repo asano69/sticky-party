@@ -1,4 +1,4 @@
-module github.com/asano69/web-anno
+module github.com/asano69/sticky-party
 
 go 1.25.9
 

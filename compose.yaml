@@ -1,25 +1,25 @@
 services:
-  web-anno:
-    image: ghcr.io/asano69/web-anno:latest
-    container_name: web-anno
+  sticky-party:
+    image: ghcr.io/asano69/sticky-party:latest
+    container_name: sticky-party
     restart: unless-stopped
     ports:
       - "3000:3000"
     env_file:
-      - web-anno.env
+      - sticky-party.env
     volumes:
-      - ./data:/web-anno/data
+      - ./data:/sticky-party/data
         #- /etc/ssl/certs/root_ca.crt:/certs/root_ca.crt:ro # optional
     environment:
       - TZ=Etc/UTC
       #
-      - WEB-ANNO_SERVER_HOST=0.0.0.0
-      - WEB-ANNO_SERVER_PORT=3000
+      - STICKYPARTY_SERVER_HOST=0.0.0.0
+      - STICKYPARTY_SERVER_PORT=3000
       #networks:
     #  - traefik_net
     #labels:
     #  - traefik.enable=true
-    #  - traefik.http.routers.web-anno.rule=Host(`web-anno.app.internal`)
+    #  - traefik.http.routers.sticky-party.rule=Host(`sticky-party.app.internal`)
 #volumes:
 #  data:
 

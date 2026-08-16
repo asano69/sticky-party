@@ -8,7 +8,7 @@ tmp_dir = "tmp"
 [build]
 args_bin = ["serve", "--dir=./pb_data", "--dev"]
 bin = "./tmp/main"
-cmd = "go build -o ./tmp/main ./cmd/web-anno"
+cmd = "go build -o ./tmp/main ./cmd/sticky-party"
 clean_on_exit = true
 delay = 1000
 entrypoint = ["./tmp/main"]

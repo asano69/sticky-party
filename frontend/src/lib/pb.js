@@ -1,6 +1,6 @@
 import PocketBase from "pocketbase";
 
-// Single shared PocketBase client, used to call web-anno' custom API routes
+// Single shared PocketBase client, used to call sticky-party' custom API routes
 // (e.g. POST /api/admin/jobs/rescan) from the frontend.
 const pb = new PocketBase("/");
 

@@ -15,7 +15,7 @@ export default function Logo(props) {
       <Image class="h-12 w-12">
         <Image.Img src={logoUrl} alt="" />
       </Image>
-      <div class="logo text-4xl font-serif">web-anno</div>
+      <div class="logo text-4xl font-serif">sticky-party</div>
     </>
   );
 

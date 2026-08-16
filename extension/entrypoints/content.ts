@@ -30,7 +30,7 @@ export default defineContentScript({
     let currentAnnotations: AnnotationData[] = [];
 
     const ui = await createShadowRootUi(ctx, {
-      name: "web-anno-overlay",
+      name: "sticky-party-overlay",
       position: "inline",
       anchor: "html",
       onMount(container) {
@@ -39,20 +39,20 @@ export default defineContentScript({
         // since every note in this overlay shares the same style scope.
         const style = document.createElement("style");
         style.textContent = `
-          .web-anno-bullet {
+          .sticky-party-bullet {
             position: relative;
             padding-left: 14px;
           }
-          .web-anno-bullet::before {
+          .sticky-party-bullet::before {
             content: "\u2022";
             position: absolute;
             left: 0;
             color: #000;
           }
-          .web-anno-icon-btn {
+          .sticky-party-icon-btn {
             background: transparent;
           }
-          .web-anno-icon-btn:hover {
+          .sticky-party-icon-btn:hover {
             background-color: rgba(0, 0, 0, 0.15);
           }
         `;

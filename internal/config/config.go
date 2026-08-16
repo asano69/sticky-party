@@ -1,4 +1,4 @@
-// Package config loads the configuration for web-anno serve from
+// Package config loads the configuration for sticky-party serve from
 // environment variables.
 package config
 
@@ -23,17 +23,17 @@ type Config struct {
 //
 // Recognised variables:
 //
-//	WEB-ANNO_SERVER_HOST         default "0.0.0.0"
-//	WEB-ANNO_SERVER_PORT         default 3000
+//	STICKYPARTY_SERVER_HOST         default "0.0.0.0"
+//	STICKYPARTY_SERVER_PORT         default 3000
 func Load() (*Config, error) {
-	port, err := envInt("WEB-ANNO_SERVER_PORT", 3000)
+	port, err := envInt("STICKYPARTY_SERVER_PORT", 3000)
 	if err != nil {
 		return nil, err
 	}
 
 	cfg := &Config{
 		Server: ServerConfig{
-			Host: envString("WEB-ANNO_SERVER_HOST", "0.0.0.0"),
+			Host: envString("STICKYPARTY_SERVER_HOST", "0.0.0.0"),
 			Port: port,
 		},
 	}

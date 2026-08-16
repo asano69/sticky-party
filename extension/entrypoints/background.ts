@@ -18,7 +18,7 @@ export default defineBackground(() => {
     } catch (err) {
       // Most commonly missing/invalid credentials in Settings; the popup
       // surfaces that separately, so just log here.
-      console.error('[web-anno] full sync failed', err);
+      console.error('[sticky-party] full sync failed', err);
     }
   };
 
@@ -61,7 +61,7 @@ export default defineBackground(() => {
       if (annotations.length === 0) return;
       await browser.tabs.sendMessage(tabId, { type: SHOW_ANNOTATION_MESSAGE, annotations });
     } catch (err) {
-      console.error('[web-anno] failed to fetch annotation', err);
+      console.error('[sticky-party] failed to fetch annotation', err);
     }
   };
 

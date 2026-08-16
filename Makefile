@@ -1,9 +1,9 @@
 .PHONY: lint
 
-include web-anno.env
+include sticky-party.env
 export
 
-BINARY := web-anno
+BINARY := sticky-party
 
 # Ports used by the dev servers (frontend, backend, and PocketBase-style API)
 PORTS := 3000 3001
@@ -15,12 +15,12 @@ all: kill-ports frontend## (*) Build frontend assets and start the server
 
 
 init:
-	fastmod --hidden web-anno $(notdir $(CURDIR)) --glob '!Makefile'
+	fastmod --hidden sticky-party $(notdir $(CURDIR)) --glob '!Makefile'
 	fastmod --hidden MYAPP $(shell echo '$(notdir $(CURDIR))' | tr '[:lower:]' '[:upper:]') --glob '!Makefile'
-	find . -depth \( -type f -o -type d \) -name '*web-anno*' | while read -r f; do \
-		mv -- "$$f" "$$(dirname "$$f")/$$(basename "$$f" | sed 's/web-anno/$(notdir $(CURDIR))/g')"; \
+	find . -depth \( -type f -o -type d \) -name '*sticky-party*' | while read -r f; do \
+		mv -- "$$f" "$$(dirname "$$f")/$$(basename "$$f" | sed 's/sticky-party/$(notdir $(CURDIR))/g')"; \
 	done
-	fastmod web-anno $(notdir $(CURDIR))
+	fastmod sticky-party $(notdir $(CURDIR))
 
 
 .PHONY: frontend-deps
@@ -48,7 +48,7 @@ kill-ports:
 
 .PHONY: server
 server: kill-ports
-	#./web-anno migrate up --dir=pb_data
+	#./sticky-party migrate up --dir=pb_data
 	./$(BINARY) superuser upsert admin@mail.internal password --dir=pb_data
 	./$(BINARY) serve --dev
 
@@ -89,5 +89,5 @@ format:
 # 本番では、後方互換性のために残しておいたほうが良いかも。
 migrate-collections:
 	ls -1 migrations/*.go | sort | head -n -1 | xargs rm -f
-	yes | go run ./cmd/web-anno migrate collections
+	yes | go run ./cmd/sticky-party migrate collections
 	ls -1 migrations/*.go | sort | head -n -1 | xargs rm -f
