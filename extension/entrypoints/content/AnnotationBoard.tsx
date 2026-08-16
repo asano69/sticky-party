@@ -45,14 +45,25 @@ function useIsDarkMode() {
 // showAnnotations() runs (see entrypoints/content.ts) -- persistence is
 // a later step.
 export default function AnnotationBoard(props: { annotations: AnnotationData[] }) {
+  // Shared stacking counter: initial z-index follows mount order (oldest
+  // first, so the most recently edited note starts on top -- see
+  // fetchAnnotations' `sort: 'updated'`), but after mount any note the
+  // user interacts with (click, drag, edit) should jump above the rest.
+  // A plain mutable counter (not a signal) is enough here since only
+  // its next value is ever read, on demand, inside an event handler.
+  let zCounter = props.annotations.length;
+  const nextZ = () => ++zCounter;
+
   return (
     <For each={props.annotations}>
-      {(annotation, index) => <StickyNote annotation={annotation} index={index()} />}
+      {(annotation, index) => (
+        <StickyNote annotation={annotation} index={index()} nextZ={nextZ} />
+      )}
     </For>
   );
 }
 
-function StickyNote(props: { annotation: AnnotationData; index: number }) {
+function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: () => number }) {
   const isDark = useIsDarkMode();
   const palette = () => (isDark() ? PALETTE.dark : PALETTE.light);
 
@@ -73,6 +84,13 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
     top: 12 + props.index * 24,
     left: 12 + props.index * 24,
   });
+
+  // Own stacking position, seeded from mount order. Any interaction with
+  // this note (see bringToFront, wired to the note's onPointerDown below)
+  // pulls a fresh, higher value from the shared counter so it visually
+  // sits above every other note from then on.
+  const [zIndex, setZIndex] = createSignal(props.index);
+  const bringToFront = () => setZIndex(props.nextZ());
 
   let dragStart: { x: number; y: number; top: number; left: number } | null = null;
 
@@ -169,6 +187,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
   return (
     <Show when={!hidden()}>
       <div
+        onPointerDown={bringToFront}
         style={{
           position: "fixed",
           top: `${pos().top}px`,
@@ -185,7 +204,10 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
           "line-height": "1.4",
           "border-radius": "8px",
           "box-shadow": "0 2px 8px rgba(0, 0, 0, 0.25)",
-          "z-index": "2147483647",
+          // Base offset keeps every note comfortably above host-page
+          // content while leaving headroom below the int32 max, so
+          // zIndex can keep counting up as notes are brought to front.
+          "z-index": `${2147480000 + zIndex()}`,
         }}
       >
         <div
@@ -238,8 +260,12 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
                     resizeTextarea();
                     // Focus explicitly: the textarea only mounts when edit
                     // mode starts (not on initial page load), so the native
-                    // `autofocus` attribute is unreliable here.
-                    el.focus();
+                    // `autofocus` attribute is unreliable here. Deferred to
+                    // a microtask so it runs after the dblclick's native
+                    // "select word" default action settles; otherwise that
+                    // default action can steal focus back, requiring a
+                    // second click before typing actually works.
+                    queueMicrotask(() => el.focus());
                   }}
                   rows={1}
                   onInput={resizeTextarea}
@@ -265,7 +291,13 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
           }
         >
           <div
-            onDblClick={startEdit}
+            onDblClick={(e) => {
+              // Prevent the native double-click "select word" behavior,
+              // which otherwise runs after this handler and can steal
+              // focus back from the textarea we're about to create.
+              e.preventDefault();
+              startEdit();
+            }}
             style={{ padding: "10px 14px", "white-space": "pre-wrap" }}
           >
             {body()}
