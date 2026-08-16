@@ -5,9 +5,11 @@
 // entrypoints/background.ts); this script only renders what it's told.
 
 import {
+  CHECK_ANNOTATION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type AnnotationMessage,
+  type CheckAnnotationMessage,
 } from "../lib/messages";
 
 export default defineContentScript({
@@ -68,5 +70,16 @@ export default defineContentScript({
         hideOverlay();
       }
     });
+
+    // Ask the background script to check this page as soon as this
+    // script starts. tabs.onUpdated in entrypoints/background.ts already
+    // checks on navigation, but it can fire before this script finishes
+    // injecting, and a message sent to a tab with no listener yet is
+    // silently dropped. Without this ping, that race meant a matching
+    // page's annotation only ever showed up after a second navigation.
+    browser.runtime.sendMessage({
+      type: CHECK_ANNOTATION_MESSAGE,
+      url: location.href,
+    } satisfies CheckAnnotationMessage);
   },
 });
