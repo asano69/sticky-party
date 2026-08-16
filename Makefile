@@ -9,7 +9,7 @@ BINARY := sticky-party
 PORTS := 3000
 
 .PHONY: all
-all: kill-ports ## (*) Build the server binary and start it
+all: 
 	go run ./cmd/$(BINARY) superuser upsert admin@mail.internal password --dir=pb_data
 	go run ./cmd/$(BINARY) serve
 

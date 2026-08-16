@@ -4,6 +4,7 @@ import { Button } from '@kobalte/core/button';
 import CircleCheckBig from 'lucide-solid/icons/circle-check-big';
 
 import { getSettings, saveSettings, ensureFingerprint } from '../../lib/settings';
+import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, ICON_BTN, SAVED_HINT } from './classes';
 
 export default function Settings() {
   const [email, setEmail] = createSignal('');
@@ -48,32 +49,28 @@ export default function Settings() {
   };
 
   return (
-    <form class="card" onSubmit={handleSave} onKeyDown={onFormKeyDown}>
-      <TextField class="field" value={email()} onChange={setEmail}>
-        <TextField.Label class="field-label">Email</TextField.Label>
-        <TextField.Input class="field-input" type="email" />
+    <form class={CARD} onSubmit={handleSave} onKeyDown={onFormKeyDown}>
+      <TextField class={FIELD} value={email()} onChange={setEmail}>
+        <TextField.Label class={FIELD_LABEL}>Email</TextField.Label>
+        <TextField.Input class={FIELD_INPUT} type="email" />
       </TextField>
 
-      <TextField class="field" value={password()} onChange={setPassword}>
-        <TextField.Label class="field-label">Password</TextField.Label>
-        <TextField.Input class="field-input" type="password" />
+      <TextField class={FIELD} value={password()} onChange={setPassword}>
+        <TextField.Label class={FIELD_LABEL}>Password</TextField.Label>
+        <TextField.Input class={FIELD_INPUT} type="password" />
       </TextField>
 
-      <TextField class="field" value={backendUrl()} onChange={setBackendUrl}>
-        <TextField.Label class="field-label">Backend URL</TextField.Label>
-        <TextField.Input
-          class="field-input"
-          type="url"
-          placeholder="https://example.com"
-        />
+      <TextField class={FIELD} value={backendUrl()} onChange={setBackendUrl}>
+        <TextField.Label class={FIELD_LABEL}>Backend URL</TextField.Label>
+        <TextField.Input class={FIELD_INPUT} type="url" placeholder="https://example.com" />
       </TextField>
 
-      <div style={{ display: 'flex', 'justify-content': 'center' }}>
-        <Button type="submit" class="icon-btn" aria-label="Save">
+      <div class="flex justify-center">
+        <Button type="submit" class={ICON_BTN} aria-label="Save">
           <CircleCheckBig size={20} />
         </Button>
       </div>
-      {saved() && <p class="saved-hint">Saved.</p>}
+      {saved() && <p class={SAVED_HINT}>Saved.</p>}
     </form>
   );
 }

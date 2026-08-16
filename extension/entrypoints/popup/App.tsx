@@ -4,10 +4,10 @@ import NotebookTabs from 'lucide-solid/icons/notebook-tabs';
 import SettingsIcon from 'lucide-solid/icons/settings';
 import RefreshCw from 'lucide-solid/icons/refresh-cw';
 import { Button } from '@kobalte/core/button';
-import './App.css';
 import Home from './Home';
 import Settings from './Settings';
 import Targets from './Targets';
+import { ICON_BTN } from './classes';
 import { fullSyncTargets } from '../../lib/targets';
 
 // Three-screen popup. Home (create an annotation) is the default view;
@@ -35,42 +35,30 @@ function App() {
   };
 
   return (
-    <div class="popup">
-      <header class="popup-header">
-        <h1>Note</h1>
+    <div class="w-[260px]">
+      <header class="flex items-center justify-between px-3 pt-3">
+        <h1 class="m-0 text-[1.1em] leading-tight">Note</h1>
         <Show
           when={view() === 'home'}
           fallback={
-            <Button
-              class="icon-btn"
-              onClick={() => setView('home')}
-              aria-label="Back"
-            >
+            <Button class={ICON_BTN} onClick={() => setView('home')} aria-label="Back">
               <ArrowLeft size={18} />
             </Button>
           }
         >
-          <div class="header-actions">
+          <div class="flex gap-1">
             <Button
-              class="icon-btn"
+              class={ICON_BTN}
               onClick={handleSync}
               disabled={syncing()}
               aria-label="Sync from server"
             >
-              <RefreshCw size={18} class={syncing() ? 'spin' : ''} />
+              <RefreshCw size={18} class={syncing() ? 'animate-spin' : ''} />
             </Button>
-            <Button
-              class="icon-btn"
-              onClick={() => setView('targets')}
-              aria-label="Cached URLs"
-            >
+            <Button class={ICON_BTN} onClick={() => setView('targets')} aria-label="Cached URLs">
               <NotebookTabs size={18} />
             </Button>
-            <Button
-              class="icon-btn"
-              onClick={() => setView('settings')}
-              aria-label="Settings"
-            >
+            <Button class={ICON_BTN} onClick={() => setView('settings')} aria-label="Settings">
               <SettingsIcon size={18} />
             </Button>
           </div>

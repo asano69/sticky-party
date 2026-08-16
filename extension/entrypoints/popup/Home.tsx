@@ -6,6 +6,7 @@ import CircleCheckBig from 'lucide-solid/icons/circle-check-big';
 import { getAuthedPb } from '../../lib/pb';
 import { CHECK_ANNOTATION_MESSAGE, type CheckAnnotationMessage } from '../../lib/messages';
 import { addCachedTarget, normalizeTarget } from '../../lib/targets';
+import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, FIELD_TEXTAREA, ICON_BTN, SAVED_HINT } from './classes';
 
 // Form for creating a new annotation on the current page. Saving writes
 // the annotation to PocketBase, then mirrors its target into the local
@@ -78,30 +79,22 @@ export default function Home() {
   };
 
   return (
-    <form class="card" onSubmit={handleSave} onKeyDown={onFormKeyDown}>
-      <TextField class="field" value={url()} onChange={setUrl}>
-        <TextField.Label class="field-label">URL</TextField.Label>
-        <TextField.Input
-          class="field-input"
-          type="url"
-          placeholder="https://example.com"
-        />
+    <form class={CARD} onSubmit={handleSave} onKeyDown={onFormKeyDown}>
+      <TextField class={FIELD} value={url()} onChange={setUrl}>
+        <TextField.Label class={FIELD_LABEL}>URL</TextField.Label>
+        <TextField.Input class={FIELD_INPUT} type="url" placeholder="https://example.com" />
       </TextField>
 
-      <TextField class="field" value={note()} onChange={setNote}>
-        <TextField.Label class="field-label">Note</TextField.Label>
-        <TextField.TextArea
-          class="field-input field-textarea"
-          rows={4}
-          placeholder="Write a note for this page…"
-        />
+      <TextField class={FIELD} value={note()} onChange={setNote}>
+        <TextField.Label class={FIELD_LABEL}>Note</TextField.Label>
+        <TextField.TextArea class={FIELD_TEXTAREA} rows={4} placeholder="Write a note for this page…" />
       </TextField>
 
-      {error() && <p class="saved-hint">{error()}</p>}
+      {error() && <p class={SAVED_HINT}>{error()}</p>}
 
-      <div style={{ display: 'flex', 'justify-content': 'center' }}>
-        <Button type="submit" class="icon-btn" disabled={saving()} aria-label="Save">
-          <CircleCheckBig size={20} class={saving() ? 'spin' : ''} />
+      <div class="flex justify-center">
+        <Button type="submit" class={ICON_BTN} disabled={saving()} aria-label="Save">
+          <CircleCheckBig size={20} class={saving() ? 'animate-spin' : ''} />
         </Button>
       </div>
     </form>
