@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import Trash from "lucide-solid/icons/trash";
 import Shredder from "lucide-solid/icons/shredder";
 import { TextField } from "@kobalte/core/text-field";
@@ -7,6 +7,7 @@ import { Button } from "@kobalte/core/button";
 import { deleteAnnotation, updateAnnotation } from "../../lib/annotations";
 import {
   INIT_NOTE_MESSAGE,
+  NOTE_CONTENT_RESIZE_MESSAGE,
   NOTE_DELETED_MESSAGE,
   NOTE_FOCUS_MESSAGE,
   NOTE_READY_MESSAGE,
@@ -51,19 +52,53 @@ export default function NoteContent() {
   const [confirmDelete, setConfirmDelete] = createSignal(false);
 
   let titleInputRef: HTMLInputElement | undefined;
+  let textareaRef: HTMLTextAreaElement | undefined;
+  let contentRef: HTMLDivElement | undefined;
+  let footerRef: HTMLDivElement | undefined;
 
   const isDark = useIsDarkMode();
   const palette = () => (isDark() ? PALETTE.dark : PALETTE.light);
 
-  const startEdit = () => {
+  const startEdit = (field: "title" | "body" = "body") => {
     const current = annotation();
     if (!current) return;
     setDraftTitle(current.title);
     setDraft(current.body);
     setConfirmDelete(false);
     setEditing(true);
-    queueMicrotask(() => titleInputRef?.focus());
+    queueMicrotask(() => (field === "title" ? titleInputRef : textareaRef)?.focus());
   };
+
+  // Grows the textarea to fit its content instead of scrolling inside a
+  // fixed number of rows.
+  const resizeTextarea = () => {
+    const el = textareaRef;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  // Reports the note's full (unclipped) content height to the content
+  // script so it can grow the wrapper element -- which lives in the
+  // host page's document, not this iframe -- to fit. contentRef's
+  // scrollHeight reflects the true content height even though it's
+  // styled overflow:auto, since scrollHeight always includes content
+  // that would otherwise be clipped/scrolled.
+  const reportContentHeight = () => {
+    if (!editing()) return;
+    const height = (contentRef?.scrollHeight ?? 0) + (footerRef?.offsetHeight ?? 0);
+    window.parent.postMessage({ type: NOTE_CONTENT_RESIZE_MESSAGE, height }, "*");
+  };
+
+  // Re-measure whenever the draft text/title changes or editing mode
+  // toggles, so the wrapper keeps growing as the user types.
+  createEffect(() => {
+    draft();
+    draftTitle();
+    if (!editing()) return;
+    resizeTextarea();
+    queueMicrotask(reportContentHeight);
+  });
 
   const cancelEdit = () => {
     setEditing(false);
@@ -157,7 +192,7 @@ export default function NoteContent() {
             "line-height": "1.4",
           }}
         >
-          <div style={{ flex: "1", overflow: "auto", padding: "6px 10px" }}>
+          <div ref={(el) => (contentRef = el)} style={{ flex: "1", overflow: "auto", padding: "6px 10px" }}>
             <Show
               when={!editing()}
               fallback={
@@ -179,13 +214,20 @@ export default function NoteContent() {
                   </TextField>
                   <TextField value={draft()} onChange={setDraft} disabled={saving()}>
                     <TextField.TextArea
-                      rows={4}
+                      ref={(el) => {
+                        textareaRef = el;
+                        resizeTextarea();
+                      }}
+                      rows={1}
+                      onInput={resizeTextarea}
                       onKeyDown={onEditorKeyDown}
                       style={{
+                        display: "block",
                         width: "100%",
                         "box-sizing": "border-box",
                         border: "none",
                         resize: "none",
+                        overflow: "hidden",
                         background: "transparent",
                         font: "inherit",
                         color: palette().text,
@@ -195,10 +237,13 @@ export default function NoteContent() {
                 </div>
               }
             >
-              <div onDblClick={startEdit} style={{ "font-weight": "700", "margin-bottom": "4px" }}>
+              <div
+                onDblClick={() => startEdit("title")}
+                style={{ "font-weight": "700", "margin-bottom": "4px" }}
+              >
                 {note().title}
               </div>
-              <div onDblClick={startEdit}>
+              <div onDblClick={() => startEdit("body")}>
                 <AnnotationBody body={note().body} />
               </div>
             </Show>
@@ -208,6 +253,7 @@ export default function NoteContent() {
               never delete data by accident. */}
           <Show when={editing()}>
             <div
+              ref={(el) => (footerRef = el)}
               style={{
                 display: "flex",
                 "justify-content": "flex-start",

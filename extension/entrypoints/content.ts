@@ -28,6 +28,7 @@ import {
 } from "../lib/messages";
 import {
   INIT_NOTE_MESSAGE,
+  NOTE_CONTENT_RESIZE_MESSAGE,
   NOTE_DELETED_MESSAGE,
   NOTE_FOCUS_MESSAGE,
   NOTE_READY_MESSAGE,
@@ -39,6 +40,11 @@ const IFRAME_PAGE = "/annotation-iframe.html";
 // z-index base kept well above host-page content but below the int32
 // max, so it can keep counting up as notes are brought to front.
 const Z_BASE = 2147480000;
+
+// Height of the drag-handle header below, in px. Shared with the
+// content-resize handler so a growing note's wrapper height always
+// accounts for the header on top of the iframe's own content height.
+const HEADER_HEIGHT_PX = 22;
 
 export default defineContentScript({
   matches: ["*://*/*"],
@@ -109,7 +115,7 @@ export default defineContentScript({
             display: "flex",
             justifyContent: "flex-end",
             alignItems: "center",
-            height: "22px",
+            height: `${HEADER_HEIGHT_PX}px`,
             flexShrink: "0",
             cursor: "grab",
             background: "rgba(127, 127, 127, 0.25)",
@@ -216,6 +222,15 @@ export default defineContentScript({
               ui.remove();
             } else if (e.data?.type === NOTE_FOCUS_MESSAGE) {
               bringToFront();
+            } else if (e.data?.type === NOTE_CONTENT_RESIZE_MESSAGE) {
+              // Grow the wrapper to fit the iframe's content while
+              // editing, restoring the old Shadow DOM version's
+              // auto-growing textarea. The iframe fills the wrapper via
+              // flex:1, so resizing the wrapper resizes the iframe to
+              // match; this also feeds the ResizeObserver below, which
+              // persists the new size the same way a manual drag-resize
+              // would.
+              wrapper.style.height = `${HEADER_HEIGHT_PX + e.data.height}px`;
             }
           };
           window.addEventListener("message", onMessage);

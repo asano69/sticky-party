@@ -39,5 +39,21 @@ export interface NoteDeletedMessage {
   type: typeof NOTE_DELETED_MESSAGE;
 }
 
+// iframe -> content script, sent while editing whenever the note's
+// content height changes (e.g. the body textarea grows to fit its
+// text), so the content script can grow the wrapper to match. This
+// restores the old Shadow DOM version's auto-growing textarea, which
+// an iframe can't reproduce on its own since the wrapper element lives
+// in a different document.
+export const NOTE_CONTENT_RESIZE_MESSAGE = "sticky-party:note-content-resize";
+export interface NoteContentResizeMessage {
+  type: typeof NOTE_CONTENT_RESIZE_MESSAGE;
+  height: number;
+}
+
 export type ParentToNoteMessage = InitNoteMessage;
-export type NoteToParentMessage = NoteReadyMessage | NoteFocusMessage | NoteDeletedMessage;
+export type NoteToParentMessage =
+  | NoteReadyMessage
+  | NoteFocusMessage
+  | NoteDeletedMessage
+  | NoteContentResizeMessage;

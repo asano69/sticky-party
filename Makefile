@@ -47,7 +47,7 @@ kill-ports:
 
 
 .PHONY: server
-server: kill-ports
+server:
 	#./sticky-party migrate up --dir=pb_data
 	./$(BINARY) superuser upsert admin@mail.internal password --dir=pb_data
 	./$(BINARY) serve --dev
