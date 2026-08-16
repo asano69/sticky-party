@@ -2,7 +2,7 @@
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/asano69/sticky-party)
 
-<img src="frontend/public/favicon.svg" width="100" align="right" />
+<img src="extension/assets/sticky-party.svg" width="100" align="right" />
 
 - 個人またはチームで使用することのできるシンプルな付箋アプリです。
 - 任意のWebサイトにシンプルな付箋を貼ることができます。
