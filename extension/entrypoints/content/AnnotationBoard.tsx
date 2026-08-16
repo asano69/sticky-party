@@ -1,5 +1,5 @@
 import { createSignal, For, onCleanup, Show } from "solid-js";
-import { Check, RotateCcw, SquarePen, X } from "lucide-solid";
+import { X } from "lucide-solid";
 import { TextField } from "@kobalte/core/text-field";
 
 import { updateAnnotationBody } from "../../lib/annotations";
@@ -98,6 +98,8 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
     setEditing(true);
   };
 
+  const cancelEdit = () => setEditing(false);
+
   const saveEdit = async () => {
     setSaving(true);
     try {
@@ -108,6 +110,18 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
       console.error("[web-anno] failed to save annotation", err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Ctrl/Cmd+Enter saves, Esc cancels -- mirrors common textarea
+  // conventions instead of dedicated Save/Cancel buttons.
+  const onEditorKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
     }
   };
 
@@ -146,9 +160,6 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
             "border-bottom": `1px solid ${palette().headerBorder}`,
           }}
         >
-          <button type="button" onClick={startEdit} aria-label="Edit" style={iconButtonStyle}>
-            <SquarePen size={14} />
-          </button>
           <button
             type="button"
             onClick={() => setHidden(true)}
@@ -162,47 +173,39 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
         <Show
           when={!editing()}
           fallback={
-            <div style={{ padding: "10px 14px", display: "flex", "flex-direction": "column", gap: "8px" }}>
-              <TextField value={draft()} onChange={setDraft}>
+            // Padding/margin/border here must exactly match the display
+            // div below (and its content-mode style prop) -- any
+            // difference shifts the text when toggling edit mode.
+            <div style={{ padding: "10px 14px" }}>
+              <TextField value={draft()} onChange={setDraft} disabled={saving()}>
                 <TextField.TextArea
                   rows={4}
+                  autofocus
+                  onKeyDown={onEditorKeyDown}
+                  onFocusOut={saveEdit}
                   style={{
+                    display: "block",
                     width: "100%",
+                    margin: "0",
+                    padding: "0",
+                    border: "none",
                     "box-sizing": "border-box",
                     resize: "none",
-                    "font-family": "inherit",
-                    background: palette().bg,
+                    "font": "inherit",
+                    background: "transparent",
                     color: palette().text,
-                    border: "1px solid transparent",
-                    "border-radius": "4px",
-                    margin: "0 4px",
-                    padding: "6px 8px",
                   }}
                 />
               </TextField>
-              <div style={{ display: "flex", "justify-content": "flex-end", gap: "6px" }}>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  aria-label="Cancel"
-                  style={{ ...iconButtonStyle, border: `1px solid ${palette().buttonBorder}` }}
-                >
-                  <RotateCcw size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={saveEdit}
-                  disabled={saving()}
-                  aria-label="Save"
-                  style={{ ...iconButtonStyle, border: `1px solid ${palette().buttonBorder}` }}
-                >
-                  <Check size={14} />
-                </button>
-              </div>
             </div>
           }
         >
-          <div style={{ padding: "10px 14px", "white-space": "pre-wrap" }}>{body()}</div>
+          <div
+            onDblClick={startEdit}
+            style={{ padding: "10px 14px", "white-space": "pre-wrap" }}
+          >
+            {body()}
+          </div>
         </Show>
       </div>
     </Show>
