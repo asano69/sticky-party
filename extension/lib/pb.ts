@@ -3,9 +3,9 @@ import PocketBase from "pocketbase";
 import { getSettings } from "./settings";
 
 // Returns a PocketBase client authenticated as a regular `users` record
-// (not a superuser). Each install is expected to log in as its own user
-// account, so collection rules can scope every read/write to
-// `user = @request.auth.id` instead of granting blanket superuser access.
+// (not a superuser). Annotations are shared across all users, so this
+// login only gates write access to the backend; it does not scope which
+// annotations a user can see.
 //
 // Re-authenticating on every call keeps this simple: the popup is
 // short-lived, so there is no long-running session worth caching.
