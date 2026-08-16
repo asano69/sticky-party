@@ -331,7 +331,9 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
           left: `${pos().left}px`,
           width: "260px",
           "min-width": "160px",
-          "min-height": "80px",
+          // 80px assumed a 2-line body; lowered to fit a single-line
+          // body (header ~27px + body padding 20px + 1 line ~18px).
+          "min-height": "66px",
           resize: "both",
           overflow: "auto",
           background: palette().bg,
