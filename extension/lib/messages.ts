@@ -15,6 +15,7 @@ export const CHECK_ANNOTATION_MESSAGE = 'web-anno:check-annotation';
 // fetchAnnotations in lib/annotations.ts).
 export interface AnnotationData {
   id: string;
+  title: string;
   body: string;
   updated: string;
 }

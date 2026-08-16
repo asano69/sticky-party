@@ -19,14 +19,19 @@ export async function fetchAnnotations(url: string): Promise<AnnotationData[]> {
     // last and sits on top when notes overlap (see AnnotationData.updated).
     sort: 'updated',
   });
-  return records.filter((record) => record.body);
+  // Keep annotations with a title even if the body is empty, since a
+  // title alone is now enough content to be worth showing.
+  return records.filter((record) => record.body || record.title);
 }
 
-// Saves an edited annotation body back to PocketBase. Used by the
-// content script's sticky-note Edit/Save flow.
-export async function updateAnnotationBody(id: string, body: string): Promise<void> {
+// Saves an edited annotation's title and body back to PocketBase. Used
+// by the content script's sticky-note Edit/Save flow.
+export async function updateAnnotation(
+  id: string,
+  data: { title: string; body: string },
+): Promise<void> {
   const pb = await getAuthedPb();
-  await pb.collection('annotations').update(id, { body });
+  await pb.collection('annotations').update(id, data);
 }
 
 // Deletes an annotation from PocketBase. Used by the sticky note's trash

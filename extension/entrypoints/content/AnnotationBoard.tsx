@@ -4,7 +4,7 @@ import Shredder from "lucide-solid/icons/shredder";
 import X from "lucide-solid/icons/x";
 import { TextField } from "@kobalte/core/text-field";
 
-import { deleteAnnotation, updateAnnotationBody } from "../../lib/annotations";
+import { deleteAnnotation, updateAnnotation } from "../../lib/annotations";
 import { fetchPosition, savePosition } from "../../lib/positions";
 import type { AnnotationData } from "../../lib/messages";
 import AnnotationBody from "./AnnotationBody";
@@ -87,6 +87,8 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   // forever.
   const [positionLoaded, setPositionLoaded] = createSignal(false);
   const [editing, setEditing] = createSignal(false);
+  const [title, setTitle] = createSignal(props.annotation.title);
+  const [draftTitle, setDraftTitle] = createSignal(props.annotation.title);
   const [body, setBody] = createSignal(props.annotation.body);
   const [draft, setDraft] = createSignal(props.annotation.body);
   const [saving, setSaving] = createSignal(false);
@@ -96,6 +98,9 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   // delete only fires on a second click while armed. Prevents an
   // accidental single click from destroying data.
   const [confirmDelete, setConfirmDelete] = createSignal(false);
+  // Tracks which field a double-click should focus once edit mode
+  // mounts: the header (title) or the body textarea.
+  const [focusField, setFocusField] = createSignal<"title" | "body">("body");
 
   // Cascade the default position so multiple notes don't all land on top
   // of each other; from there the user can drag each one independently.
@@ -126,6 +131,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   // auto-grow-while-editing behavior below, neither of which go through
   // Solid's reactivity.
   let noteRef: HTMLDivElement | undefined;
+  let titleInputRef: HTMLInputElement | undefined;
   let positionRecordId: string | undefined;
 
   const persistPosition = async () => {
@@ -191,11 +197,13 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
 
   const startDrag = (e: PointerEvent) => {
     // Skip drag/capture when the pointerdown originated on a button
-    // (Edit/Check). Once this element captures the pointer, subsequent
-    // pointer events -- and the mouseup/click events the browser derives
-    // from them -- are redirected here too, so a captured header would
-    // silently swallow clicks on its child buttons.
-    if ((e.target as HTMLElement).closest("button")) return;
+    // (Edit/Check) or the title input, so clicking into the title to
+    // position the cursor doesn't start a drag. Once this element
+    // captures the pointer, subsequent pointer events -- and the
+    // mouseup/click events the browser derives from them -- are
+    // redirected here too, so a captured header would silently swallow
+    // clicks on its child controls.
+    if ((e.target as HTMLElement).closest("button, input, textarea")) return;
     dragStart = { x: e.clientX, y: e.clientY, ...pos() };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
@@ -232,8 +240,10 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
     if (editing()) resizeTextarea();
   });
 
-  const startEdit = () => {
+  const startEdit = (field: "title" | "body" = "body") => {
+    setDraftTitle(title());
     setDraft(body());
+    setFocusField(field);
     setEditing(true);
     setConfirmDelete(false);
     // Release any fixed height (from a saved/resized size) so the note
@@ -251,7 +261,8 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   const saveEdit = async () => {
     setSaving(true);
     try {
-      await updateAnnotationBody(props.annotation.id, draft());
+      await updateAnnotation(props.annotation.id, { title: draftTitle(), body: draft() });
+      setTitle(draftTitle());
       setBody(draft());
       setEditing(false);
     } catch (err) {
@@ -304,6 +315,15 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
           resizeObserver.observe(el);
         }}
         onPointerDown={bringToFront}
+        onFocusOut={(e) => {
+          // Only save/exit once focus actually leaves the note (e.g.
+          // clicking elsewhere on the page), not when it moves between
+          // the title input and the body textarea within the same note.
+          if (!editing()) return;
+          const next = e.relatedTarget as Node | null;
+          if (noteRef && next && noteRef.contains(next)) return;
+          saveEdit();
+        }}
         style={{
           position: "fixed",
           top: `${pos().top}px`,
@@ -336,17 +356,71 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
             // (e.g. the Dismiss button).
             if ((e.target as HTMLElement).closest("button")) return;
             e.preventDefault();
-            startEdit();
+            startEdit("title");
           }}
           style={{
             display: "flex",
-            "justify-content": "flex-end",
-            gap: "4px",
+            "align-items": "center",
+            "justify-content": "space-between",
+            gap: "8px",
             padding: "4px 8px",
             cursor: "grab",
             "border-bottom": `1px solid ${palette().headerBorder}`,
           }}
         >
+          <Show
+            when={!editing()}
+            fallback={
+              <TextField
+                value={draftTitle()}
+                onChange={setDraftTitle}
+                disabled={saving()}
+                // Same shrink-to-fit constraint as the reading-mode title
+                // div below, so the wrapper (not just the inner input)
+                // yields space to the Close button instead of pushing it
+                // out of the header.
+                style={{ flex: "1", "min-width": "0" }}
+              >
+                <TextField.Input
+                  ref={(el) => {
+                    titleInputRef = el;
+                    // Only auto-focus the title input when the header
+                    // (not the body) is what triggered edit mode.
+                    if (focusField() === "title") {
+                      queueMicrotask(() => el.focus());
+                    }
+                  }}
+                  onKeyDown={onEditorKeyDown}
+                  placeholder=""
+                  style={{
+                    width: "100%",
+                    margin: "0",
+                    padding: "0",
+                    border: "none",
+                    "box-sizing": "border-box",
+                    font: "inherit",
+                    "font-weight": "700",
+                    background: "transparent",
+                    color: palette().text,
+                  }}
+                />
+              </TextField>
+            }
+          >
+            <div
+              style={{
+                flex: "1",
+                "min-width": "0",
+                "font-weight": "700",
+                overflow: "hidden",
+                "text-overflow": "ellipsis",
+                "white-space": "nowrap",
+              }}
+            >
+              {title()}
+            </div>
+          </Show>
+
           <button
             type="button"
             onClick={() => setHidden(true)}
@@ -375,13 +449,16 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
                     // a microtask so it runs after the dblclick's native
                     // "select word" default action settles; otherwise that
                     // default action can steal focus back, requiring a
-                    // second click before typing actually works.
-                    queueMicrotask(() => el.focus());
+                    // second click before typing actually works. Only do
+                    // this when the body (not the title) is the field
+                    // that should receive focus.
+                    if (focusField() === "body") {
+                      queueMicrotask(() => el.focus());
+                    }
                   }}
                   rows={1}
                   onInput={resizeTextarea}
                   onKeyDown={onEditorKeyDown}
-                  onFocusOut={saveEdit}
                   style={{
                     display: "block",
                     width: "100%",
@@ -409,7 +486,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
               // which otherwise runs after this handler and can steal
               // focus back from the textarea we're about to create.
               e.preventDefault();
-              startEdit();
+              startEdit("body");
             }}
             style={{ padding: "10px 14px" }}
           >
@@ -462,5 +539,9 @@ const iconButtonStyle = {
   cursor: "pointer",
   padding: "2px",
   "border-radius": "4px",
+  // Prevents this button from shrinking alongside the title
+  // input/text in the header flex row, so it can never be squeezed
+  // out of view.
+  "flex-shrink": "0",
 };
 
