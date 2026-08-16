@@ -15,6 +15,11 @@
   margin: 0;
 }
 
+.header-actions {
+  display: flex;
+  gap: 4px;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -93,11 +98,35 @@
   color: #888;
 }
 
+/* Cached target list: capped height so a large cache doesn't blow up the
+ * popup, with its own scrollbar instead. */
+.target-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.target-item {
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.8em;
+  word-break: break-all;
+}
+
 @media (prefers-color-scheme: light) {
   .field-input {
     border-color: #ccc;
   }
   .btn {
     background-color: #f9f9f9;
+  }
+  .target-item {
+    border-color: #ccc;
   }
 }
