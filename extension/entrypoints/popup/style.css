@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* Sticky-note palette, matching entrypoints/content/AnnotationBoard.tsx
  * so the popup and the on-page notes look like the same product. Kept
  * as CSS variables (rather than duplicated hex values in App.css) so

@@ -228,8 +228,9 @@ export default function NoteContent() {
               top of this row -- that's why the title text stops short of
               the row's right edge (padding-right below). */}
           <div
-            // Extension doesn't wire up a Tailwind build (see wxt.config.ts),
-            // so this stays plain inline style rather than utility classes.
+            // Kept as plain inline style rather than Tailwind utility
+            // classes, since these values (palette, TITLE_ROW_HEIGHT_PX)
+            // are computed at runtime, not fixed design tokens.
             // Height matches TITLE_ROW_HEIGHT_PX so this row (rendered
             // inside the iframe) lines up pixel-for-pixel with the
             // content script's transparent drag-header overlay (see

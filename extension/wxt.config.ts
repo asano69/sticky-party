@@ -1,8 +1,17 @@
 import { defineConfig } from 'wxt';
+import tailwindcss from '@tailwindcss/vite';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-solid'],
+  // Tailwind v4 needs no PostCSS setup, just its own Vite plugin (same
+  // pattern as frontend/vite.config.js). Each bundle (popup,
+  // annotation-iframe) pulls it in via `@import "tailwindcss";` in its
+  // own style.css; content.ts renders no CSS of its own, so it needs no
+  // import here.
+  vite: () => ({
+    plugins: [tailwindcss()],
+  }),
   // "storage" permission is required to persist settings via
   // browser.storage.local (see entrypoints/popup/App.tsx) and the cached
   // target list (see lib/targets.ts).
