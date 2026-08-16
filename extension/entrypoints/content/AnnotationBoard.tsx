@@ -311,7 +311,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
             display: "flex",
             "justify-content": editing() ? "space-between" : "flex-end",
             gap: "4px",
-            padding: "6px 8px",
+            padding: "2px 8px",
             cursor: "grab",
             "border-bottom": `1px solid ${palette().headerBorder}`,
           }}
