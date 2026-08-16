@@ -1,5 +1,5 @@
 import { createResource, createSignal, For, Show } from 'solid-js';
-import { RefreshCw } from 'lucide-solid';
+import RefreshCw from "lucide-solid/icons/refresh-cw";
 import { getCachedTargets, fullSyncTargets } from '../../lib/targets';
 
 // Read-only view of the local target cache (see docs/architecture.md).

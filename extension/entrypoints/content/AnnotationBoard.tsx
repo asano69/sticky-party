@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
-import { Trash, X } from "lucide-solid";
+import Trash from "lucide-solid/icons/trash";
+import X from "lucide-solid/icons/x";
 import { TextField } from "@kobalte/core/text-field";
 
 import { deleteAnnotation, updateAnnotationBody } from "../../lib/annotations";

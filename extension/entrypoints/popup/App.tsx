@@ -1,5 +1,7 @@
 import { createSignal, Show } from 'solid-js';
-import { ArrowLeft, NotebookTabs, Settings as SettingsIcon } from 'lucide-solid';
+import ArrowLeft from 'lucide-solid/icons/arrow-left';
+import NotebookTabs from 'lucide-solid/icons/notebook-tabs';
+import SettingsIcon from 'lucide-solid/icons/settings';
 import './App.css';
 import Home from './Home';
 import Settings from './Settings';
