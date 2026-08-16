@@ -95,6 +95,16 @@ export default defineContentScript({
         z = nextZ();
       }
 
+      // Tracks the note's "resting" (non-editing) content height, as
+      // last reported by the iframe via NOTE_CONTENT_RESIZE_MESSAGE (or
+      // recovered from a manual drag-resize -- see the ResizeObserver
+      // below). This, not the wrapper's current on-screen size, is what
+      // gets persisted, so temporarily growing the wrapper for the
+      // edit-mode footer (see applyWrapperHeight below) never changes
+      // the note's saved size.
+      let contentHeight = savedHeight ? savedHeight - TITLE_ROW_HEIGHT_PX : 0;
+      let isEditingNote = false;
+
       let resizeObserver: ResizeObserver | undefined;
       let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
       let onMessage: ((e: MessageEvent) => void) | undefined;
@@ -116,7 +126,18 @@ export default defineContentScript({
             boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
             zIndex: `${Z_BASE + z}`,
           });
-          if (savedHeight) wrapper.style.height = `${savedHeight}px`;
+
+          // Sets the wrapper's total height from contentHeight, plus
+          // TITLE_ROW_HEIGHT_PX for the edit-mode footer whenever the
+          // note is being edited (see NOTE_EDITING_MESSAGE below). The
+          // footer's extra space is purely visual -- persistPosition
+          // never includes it (see below) -- so entering/leaving edit
+          // mode never changes the note's saved size.
+          const applyWrapperHeight = () => {
+            const footer = isEditingNote ? TITLE_ROW_HEIGHT_PX : 0;
+            wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + contentHeight + footer}px`;
+          };
+          applyWrapperHeight();
 
           const bringToFront = () => {
             z = nextZ();
@@ -126,11 +147,22 @@ export default defineContentScript({
           const persistPosition = () => {
             savePosition(
               annotation.id,
-              { top, left, width: wrapper.offsetWidth, height: wrapper.offsetHeight, z },
+              // Use contentHeight (the resting/non-editing size), not
+              // wrapper.offsetHeight -- the wrapper is temporarily taller
+              // than that while editing (see applyWrapperHeight above).
+              {
+                top,
+                left,
+                width: wrapper.offsetWidth,
+                height: TITLE_ROW_HEIGHT_PX + contentHeight,
+                z,
+              },
               positionRecordId,
             )
               .then((id) => (positionRecordId = id))
-              .catch((err) => console.error("[sticky-party] failed to save position", err));
+              .catch((err) =>
+                console.error("[sticky-party] failed to save position", err),
+              );
           };
 
           // Transparent overlay pinned to the title row that
@@ -206,7 +238,12 @@ export default defineContentScript({
           // the iframe), so pointer capture keeps working even if the
           // cursor briefly outruns the note during a fast drag -- an
           // iframe boundary would otherwise interrupt it.
-          let dragStart: { x: number; y: number; top: number; left: number } | null = null;
+          let dragStart: {
+            x: number;
+            y: number;
+            top: number;
+            left: number;
+          } | null = null;
           header.addEventListener("pointerdown", (e) => {
             // Skip drag/capture when the pointerdown landed on the
             // Dismiss button: setPointerCapture below redirects all
@@ -239,7 +276,10 @@ export default defineContentScript({
           // gesture -- NoteContent.tsx does the actual editing.
           header.addEventListener("dblclick", (e) => {
             if ((e.target as HTMLElement).closest("button")) return;
-            iframe.contentWindow?.postMessage({ type: START_EDIT_TITLE_MESSAGE }, iframeOrigin);
+            iframe.contentWindow?.postMessage(
+              { type: START_EDIT_TITLE_MESSAGE },
+              iframeOrigin,
+            );
           });
 
           // Resizing: the native CSS `resize: both` handle on `wrapper`
@@ -253,6 +293,16 @@ export default defineContentScript({
               skipNextResizeSave = false;
               return;
             }
+            // Re-derive contentHeight from the wrapper's actual size, so
+            // a manual drag-resize (which sets the wrapper's height
+            // directly, bypassing applyWrapperHeight) updates what gets
+            // persisted -- minus the edit-mode footer, if currently
+            // editing, so the resting size stays footer-free either way.
+            const footer = isEditingNote ? TITLE_ROW_HEIGHT_PX : 0;
+            contentHeight = Math.max(
+              0,
+              wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX - footer,
+            );
             clearTimeout(resizeSaveTimer);
             resizeSaveTimer = setTimeout(persistPosition, 300);
           });
@@ -274,15 +324,19 @@ export default defineContentScript({
             } else if (e.data?.type === NOTE_FOCUS_MESSAGE) {
               bringToFront();
             } else if (e.data?.type === NOTE_CONTENT_RESIZE_MESSAGE) {
-              // Grow (or shrink back, once editing ends) the wrapper to
-              // fit the iframe's content, restoring the old Shadow DOM
-              // version's auto-growing textarea. The iframe fills the
-              // wrapper, so resizing the wrapper resizes the iframe to
-              // match; this also feeds the ResizeObserver below, which
-              // persists the new size the same way a manual drag-resize
-              // would.
-              wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + e.data.height}px`;
+              // Grow (or shrink back) the wrapper to fit the iframe's
+              // main content, restoring the old Shadow DOM version's
+              // auto-growing textarea. contentHeight (not the footer) is
+              // what applyWrapperHeight and persistPosition build on.
+              contentHeight = e.data.height;
+              applyWrapperHeight();
             } else if (e.data?.type === NOTE_EDITING_MESSAGE) {
+              isEditingNote = e.data.editing;
+              // Grows the wrapper by the footer's height while editing
+              // (see applyWrapperHeight above), without touching
+              // contentHeight -- so the note's saved size stays the same
+              // whether or not the footer is currently showing.
+              applyWrapperHeight();
               // Stop the header from intercepting pointer events while
               // editing, so clicks reach the title input inside the
               // iframe (see the header comment above).

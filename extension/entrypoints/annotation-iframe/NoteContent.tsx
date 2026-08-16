@@ -90,9 +90,11 @@ export default function NoteContent() {
   // ends, so the wrapper shrinks back down instead of staying inflated
   // by the footer's height (footerRef?.offsetHeight is 0 once the
   // footer unmounts).
-  // The footer is an absolutely-positioned overlay (see the Show block
-  // below), not part of the flex layout, so it never contributes to the
-  // note's required height -- only contentRef's own scroll height does.
+  // The footer (see the Show block below) is a flex sibling of
+  // contentRef, not something contentRef's own scrollHeight measures, so
+  // it never contributes to the note's required height -- only main's
+  // own content does. content.ts (which owns the wrapper element) is
+  // what temporarily adds the footer's height back in while editing.
   const reportContentHeight = () => {
     const height = contentRef?.scrollHeight ?? 0;
     window.parent.postMessage({ type: NOTE_CONTENT_RESIZE_MESSAGE, height }, "*");
@@ -213,8 +215,6 @@ export default function NoteContent() {
             "flex-direction": "column",
             height: "100%",
             "box-sizing": "border-box",
-            // Anchors the footer overlay (see below) to this box.
-            position: "relative",
             background: palette().bg,
             color: palette().text,
             "font-family": "system-ui, -apple-system, sans-serif",
@@ -333,17 +333,16 @@ export default function NoteContent() {
           </div>
 
           {/* Footer only appears while editing, so a casual click can
-              never delete data by accident. It's an absolutely-positioned
-              overlay (same height as the header, TITLE_ROW_HEIGHT_PX)
-              rather than a layout row, so showing/hiding it never changes
-              the note's height (see reportContentHeight above). */}
+              never delete data by accident. It's a normal flex item
+              appended below main, not counted in main's own height:
+              content.ts temporarily grows the note's wrapper by exactly
+              TITLE_ROW_HEIGHT_PX while editing to make room for it, and
+              reportContentHeight above never includes it, so the note's
+              saved/resting size is unaffected either way. */}
           <Show when={editing()}>
             <div
               style={{
-                position: "absolute",
-                left: "0",
-                right: "0",
-                bottom: "0",
+                "flex-shrink": "0",
                 height: `${TITLE_ROW_HEIGHT_PX}px`,
                 "box-sizing": "border-box",
                 display: "flex",
