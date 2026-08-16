@@ -9,8 +9,12 @@ import {
   INIT_NOTE_MESSAGE,
   NOTE_CONTENT_RESIZE_MESSAGE,
   NOTE_DELETED_MESSAGE,
+  NOTE_EDITING_MESSAGE,
   NOTE_FOCUS_MESSAGE,
   NOTE_READY_MESSAGE,
+  START_EDIT_TITLE_MESSAGE,
+  TITLE_ROW_HEIGHT_PX,
+  type NoteEditingMessage,
   type ParentToNoteMessage,
 } from "../../lib/iframe-messages";
 import type { AnnotationData } from "../../lib/messages";
@@ -79,25 +83,44 @@ export default function NoteContent() {
   };
 
   // Reports the note's full (unclipped) content height to the content
-  // script so it can grow the wrapper element -- which lives in the
+  // script so it can resize the wrapper element -- which lives in the
   // host page's document, not this iframe -- to fit. contentRef's
   // scrollHeight reflects the true content height even though it's
   // styled overflow:auto, since scrollHeight always includes content
-  // that would otherwise be clipped/scrolled.
+  // that would otherwise be clipped/scrolled. Also used once editing
+  // ends, so the wrapper shrinks back down instead of staying inflated
+  // by the footer's height (footerRef?.offsetHeight is 0 once the
+  // footer unmounts).
   const reportContentHeight = () => {
-    if (!editing()) return;
     const height = (contentRef?.scrollHeight ?? 0) + (footerRef?.offsetHeight ?? 0);
     window.parent.postMessage({ type: NOTE_CONTENT_RESIZE_MESSAGE, height }, "*");
   };
 
-  // Re-measure whenever the draft text/title changes or editing mode
-  // toggles, so the wrapper keeps growing as the user types.
+  // Re-measure whenever the draft text/title changes while editing, so
+  // the wrapper keeps growing as the user types.
   createEffect(() => {
     draft();
     draftTitle();
     if (!editing()) return;
     resizeTextarea();
     queueMicrotask(reportContentHeight);
+  });
+
+  // Tell the content script whenever edit mode toggles, so its drag
+  // header (see content.ts) can stop intercepting pointer events while
+  // editing -- otherwise clicks could never reach the title input,
+  // since that header overlays this iframe from a separate document.
+  // Also re-report the content height once editing ends, so the
+  // wrapper shrinks back down now that the footer is gone.
+  let wasEditing = editing();
+  createEffect(() => {
+    const nowEditing = editing();
+    window.parent.postMessage(
+      { type: NOTE_EDITING_MESSAGE, editing: nowEditing } satisfies NoteEditingMessage,
+      "*",
+    );
+    if (wasEditing && !nowEditing) queueMicrotask(reportContentHeight);
+    wasEditing = nowEditing;
   });
 
   const cancelEdit = () => {
@@ -149,10 +172,13 @@ export default function NoteContent() {
     }
   };
 
-  // Receive the annotation to render from the content script.
+  // Receive the annotation to render, or a request to start editing the
+  // title (relayed from a double-click on the content script's drag
+  // header -- see content.ts), from the content script.
   const onMessage = (e: MessageEvent<ParentToNoteMessage>) => {
     if (e.source !== window.parent) return;
     if (e.data?.type === INIT_NOTE_MESSAGE) setAnnotation(e.data.annotation);
+    else if (e.data?.type === START_EDIT_TITLE_MESSAGE) startEdit("title");
   };
   window.addEventListener("message", onMessage);
   onCleanup(() => window.removeEventListener("message", onMessage));
@@ -192,64 +218,91 @@ export default function NoteContent() {
             "line-height": "1.4",
           }}
         >
+          {/* Sits directly under the content script's transparent drag
+              header (see content.ts), which is exactly
+              TITLE_ROW_HEIGHT_PX tall and overlays the Dismiss button on
+              top of this row -- that's why the title text stops short of
+              the row's right edge (padding-right below). */}
+          <div
+            style={{
+              height: `${TITLE_ROW_HEIGHT_PX}px`,
+              "flex-shrink": "0",
+              "box-sizing": "border-box",
+              display: "flex",
+              "align-items": "center",
+              padding: "0 28px 0 8px",
+              "font-weight": "700",
+              background: palette().bg,
+              "border-bottom": `1px solid ${palette().border}`,
+            }}
+          >
+            <Show
+              when={!editing()}
+              fallback={
+                <TextField
+                  value={draftTitle()}
+                  onChange={setDraftTitle}
+                  disabled={saving()}
+                  style={{ flex: "1", "min-width": "0" }}
+                >
+                  <TextField.Input
+                    ref={(el) => (titleInputRef = el)}
+                    onKeyDown={onEditorKeyDown}
+                    style={{
+                      width: "100%",
+                      "box-sizing": "border-box",
+                      border: "none",
+                      background: "transparent",
+                      font: "inherit",
+                      "font-weight": "700",
+                      color: palette().text,
+                    }}
+                  />
+                </TextField>
+              }
+            >
+              <div
+                style={{
+                  width: "100%",
+                  "min-width": "0",
+                  overflow: "hidden",
+                  "text-overflow": "ellipsis",
+                  "white-space": "nowrap",
+                }}
+              >
+                {note().title}
+              </div>
+            </Show>
+          </div>
+
           <div ref={(el) => (contentRef = el)} style={{ flex: "1", overflow: "auto", padding: "6px 10px" }}>
             <Show
               when={!editing()}
               fallback={
-                <div style={{ display: "flex", "flex-direction": "column", gap: "4px" }}>
-                  <TextField value={draftTitle()} onChange={setDraftTitle} disabled={saving()}>
-                    <TextField.Input
-                      ref={(el) => (titleInputRef = el)}
-                      onKeyDown={onEditorKeyDown}
-                      style={{
-                        width: "100%",
-                        "box-sizing": "border-box",
-                        border: "none",
-                        background: "transparent",
-                        font: "inherit",
-                        "font-weight": "700",
-                        color: palette().text,
-                      }}
-                    />
-                  </TextField>
-                  <TextField value={draft()} onChange={setDraft} disabled={saving()}>
-                    <TextField.TextArea
-                      ref={(el) => {
-                        textareaRef = el;
-                        resizeTextarea();
-                      }}
-                      rows={1}
-                      onInput={resizeTextarea}
-                      onKeyDown={onEditorKeyDown}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        "box-sizing": "border-box",
-                        border: "none",
-                        resize: "none",
-                        overflow: "hidden",
-                        background: "transparent",
-                        font: "inherit",
-                        color: palette().text,
-                      }}
-                    />
-                  </TextField>
-                </div>
+                <TextField value={draft()} onChange={setDraft} disabled={saving()}>
+                  <TextField.TextArea
+                    ref={(el) => {
+                      textareaRef = el;
+                      resizeTextarea();
+                    }}
+                    rows={1}
+                    onInput={resizeTextarea}
+                    onKeyDown={onEditorKeyDown}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      "box-sizing": "border-box",
+                      border: "none",
+                      resize: "none",
+                      overflow: "hidden",
+                      background: "transparent",
+                      font: "inherit",
+                      color: palette().text,
+                    }}
+                  />
+                </TextField>
               }
             >
-              <div
-                onDblClick={(e) => {
-                  // Prevent the native double-click "select word"
-                  // behavior, which otherwise runs after this handler
-                  // and can steal focus back from the input we're
-                  // about to create.
-                  e.preventDefault();
-                  startEdit("title");
-                }}
-                style={{ "font-weight": "700", "margin-bottom": "4px" }}
-              >
-                {note().title}
-              </div>
               <div
                 onDblClick={(e) => {
                   e.preventDefault();

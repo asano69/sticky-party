@@ -51,9 +51,38 @@ export interface NoteContentResizeMessage {
   height: number;
 }
 
-export type ParentToNoteMessage = InitNoteMessage;
+// content script -> iframe, sent when the user double-clicks the drag
+// header outside the Dismiss button (see entrypoints/content.ts), so
+// the iframe can start editing the title. The header lives in the
+// content script's document and never touches note content itself, so
+// it can't start editing directly -- it only knows a double-click
+// landed somewhere in the title row and asks the iframe to act on it.
+export const START_EDIT_TITLE_MESSAGE = "sticky-party:start-edit-title";
+export interface StartEditTitleMessage {
+  type: typeof START_EDIT_TITLE_MESSAGE;
+}
+
+// iframe -> content script, sent whenever edit mode toggles, so the
+// content script's drag header can stop intercepting pointer events
+// while editing -- letting clicks reach the title input inside the
+// iframe -- and resume intercepting once editing ends.
+export const NOTE_EDITING_MESSAGE = "sticky-party:note-editing";
+export interface NoteEditingMessage {
+  type: typeof NOTE_EDITING_MESSAGE;
+  editing: boolean;
+}
+
+// Height (in px) of the note's title row. The row itself is rendered
+// inside the iframe (see NoteContent.tsx), since it displays the title
+// text, but the content script's transparent drag-header overlay (see
+// content.ts) must be exactly this tall too, so the two documents'
+// header regions line up pixel-for-pixel.
+export const TITLE_ROW_HEIGHT_PX = 22;
+
+export type ParentToNoteMessage = InitNoteMessage | StartEditTitleMessage;
 export type NoteToParentMessage =
   | NoteReadyMessage
   | NoteFocusMessage
   | NoteDeletedMessage
-  | NoteContentResizeMessage;
+  | NoteContentResizeMessage
+  | NoteEditingMessage;

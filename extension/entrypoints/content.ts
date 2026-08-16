@@ -30,8 +30,11 @@ import {
   INIT_NOTE_MESSAGE,
   NOTE_CONTENT_RESIZE_MESSAGE,
   NOTE_DELETED_MESSAGE,
+  NOTE_EDITING_MESSAGE,
   NOTE_FOCUS_MESSAGE,
   NOTE_READY_MESSAGE,
+  START_EDIT_TITLE_MESSAGE,
+  TITLE_ROW_HEIGHT_PX,
 } from "../lib/iframe-messages";
 import { fetchPosition, savePosition } from "../lib/positions";
 
@@ -40,22 +43,6 @@ const IFRAME_PAGE = "/annotation-iframe.html";
 // z-index base kept well above host-page content but below the int32
 // max, so it can keep counting up as notes are brought to front.
 const Z_BASE = 2147480000;
-
-// Height of the drag-handle header below, in px. Shared with the
-// content-resize handler so a growing note's wrapper height always
-// accounts for the header on top of the iframe's own content height.
-const HEADER_HEIGHT_PX = 22;
-
-// Sticky-note yellow, light and dark variants -- must match
-// entrypoints/annotation-iframe/NoteContent.tsx's PALETTE. The drag
-// header lives in this document (not the iframe) so it can capture
-// pointer events reliably during a drag, but it still needs to look
-// like the top of the same note, so it borrows the note's colors
-// instead of a neutral gray.
-const PALETTE = {
-  light: { bg: "#fff8b8", border: "rgba(0, 0, 0, 0.12)" },
-  dark: { bg: "#4a4420", border: "rgba(255, 255, 255, 0.15)" },
-};
 
 export default defineContentScript({
   matches: ["*://*/*"],
@@ -109,7 +96,6 @@ export default defineContentScript({
       let resizeObserver: ResizeObserver | undefined;
       let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
       let onMessage: ((e: MessageEvent) => void) | undefined;
-      let removeDarkModeListener: (() => void) | undefined;
 
       const ui = createIframeUi(ctx, {
         page: IFRAME_PAGE,
@@ -123,8 +109,6 @@ export default defineContentScript({
             width: savedWidth ? `${savedWidth}px` : "260px",
             minWidth: "160px",
             minHeight: "90px",
-            display: "flex",
-            flexDirection: "column",
             resize: "both",
             overflow: "hidden",
             boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
@@ -147,33 +131,31 @@ export default defineContentScript({
               .catch((err) => console.error("[sticky-party] failed to save position", err));
           };
 
-          // A plain drag handle with a Dismiss button -- deliberately
-          // free of any note text, since it lives in this document (see
-          // the file-level comment for why note content stays inside
-          // the iframe). Styled with the note's own palette so it reads
-          // as one continuous header together with the title row that
-          // NoteContent.tsx renders just below it inside the iframe.
+          // Transparent overlay pinned to the title row that
+          // NoteContent.tsx renders inside the iframe (see
+          // TITLE_ROW_HEIGHT_PX): it carries no note text of its own --
+          // see the file-level comment above for why -- but sits on top
+          // of the iframe so it can capture the drag and the header
+          // double-click (relayed to the iframe as
+          // START_EDIT_TITLE_MESSAGE below) while the title text shows
+          // through from underneath. It's set pointer-events:none while
+          // editing so clicks reach the title input inside the iframe
+          // instead (see the NOTE_EDITING_MESSAGE handler below).
           const header = document.createElement("div");
-          const darkModeQuery = matchMedia("(prefers-color-scheme: dark)");
-          const applyHeaderPalette = () => {
-            const palette = darkModeQuery.matches ? PALETTE.dark : PALETTE.light;
-            header.style.background = palette.bg;
-            header.style.borderBottom = `1px solid ${palette.border}`;
-          };
           Object.assign(header.style, {
+            position: "absolute",
+            top: "0",
+            left: "0",
+            right: "0",
+            height: `${TITLE_ROW_HEIGHT_PX}px`,
             display: "flex",
             justifyContent: "flex-end",
             alignItems: "center",
-            height: `${HEADER_HEIGHT_PX}px`,
-            flexShrink: "0",
             padding: "0 8px",
             boxSizing: "border-box",
             cursor: "grab",
+            zIndex: "1",
           });
-          applyHeaderPalette();
-          darkModeQuery.addEventListener("change", applyHeaderPalette);
-          removeDarkModeListener = () =>
-            darkModeQuery.removeEventListener("change", applyHeaderPalette);
 
           const dismissBtn = document.createElement("button");
           dismissBtn.type = "button";
@@ -186,6 +168,10 @@ export default defineContentScript({
             font: "inherit",
             lineHeight: "1",
             padding: "2px 6px",
+            // Stays clickable even while the header above is
+            // pointer-events:none during editing -- a child's own
+            // pointer-events setting overrides its parent's.
+            pointerEvents: "auto",
           });
           dismissBtn.addEventListener("mouseenter", () => {
             dismissBtn.style.background = "rgba(127, 127, 127, 0.35)";
@@ -195,13 +181,15 @@ export default defineContentScript({
           });
           dismissBtn.addEventListener("click", () => ui.remove());
           header.append(dismissBtn);
-          wrapper.prepend(header);
+          wrapper.append(header);
 
           Object.assign(iframe.style, {
             border: "none",
+            position: "absolute",
+            top: "0",
+            left: "0",
             width: "100%",
-            flex: "1",
-            minHeight: "0",
+            height: "100%",
           });
 
           // Dragging is tracked entirely in this document (never inside
@@ -235,6 +223,15 @@ export default defineContentScript({
           header.addEventListener("pointerup", endDrag);
           header.addEventListener("pointercancel", endDrag);
 
+          // Double-clicking the header outside the Dismiss button edits
+          // the title. The title text itself lives inside the iframe
+          // (see the file-level comment), so this only relays the
+          // gesture -- NoteContent.tsx does the actual editing.
+          header.addEventListener("dblclick", (e) => {
+            if ((e.target as HTMLElement).closest("button")) return;
+            iframe.contentWindow?.postMessage({ type: START_EDIT_TITLE_MESSAGE }, iframeOrigin);
+          });
+
           // Resizing: the native CSS `resize: both` handle on `wrapper`
           // changes its size without firing a dedicated event, so a
           // ResizeObserver is used as the trigger instead, debounced so
@@ -267,14 +264,19 @@ export default defineContentScript({
             } else if (e.data?.type === NOTE_FOCUS_MESSAGE) {
               bringToFront();
             } else if (e.data?.type === NOTE_CONTENT_RESIZE_MESSAGE) {
-              // Grow the wrapper to fit the iframe's content while
-              // editing, restoring the old Shadow DOM version's
-              // auto-growing textarea. The iframe fills the wrapper via
-              // flex:1, so resizing the wrapper resizes the iframe to
+              // Grow (or shrink back, once editing ends) the wrapper to
+              // fit the iframe's content, restoring the old Shadow DOM
+              // version's auto-growing textarea. The iframe fills the
+              // wrapper, so resizing the wrapper resizes the iframe to
               // match; this also feeds the ResizeObserver below, which
               // persists the new size the same way a manual drag-resize
               // would.
-              wrapper.style.height = `${HEADER_HEIGHT_PX + e.data.height}px`;
+              wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + e.data.height}px`;
+            } else if (e.data?.type === NOTE_EDITING_MESSAGE) {
+              // Stop the header from intercepting pointer events while
+              // editing, so clicks reach the title input inside the
+              // iframe (see the header comment above).
+              header.style.pointerEvents = e.data.editing ? "none" : "auto";
             }
           };
           window.addEventListener("message", onMessage);
@@ -283,7 +285,6 @@ export default defineContentScript({
           if (onMessage) window.removeEventListener("message", onMessage);
           resizeObserver?.disconnect();
           clearTimeout(resizeSaveTimer);
-          removeDarkModeListener?.();
         },
       });
 
