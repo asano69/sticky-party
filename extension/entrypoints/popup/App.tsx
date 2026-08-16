@@ -18,7 +18,7 @@ function App() {
   return (
     <div class="popup">
       <header class="popup-header">
-        <h1>web-anno</h1>
+        <h1>Note</h1>
         <Show
           when={view() === 'home'}
           fallback={
