@@ -3,6 +3,7 @@ import Trash from "lucide-solid/icons/trash";
 import Shredder from "lucide-solid/icons/shredder";
 import X from "lucide-solid/icons/x";
 import { TextField } from "@kobalte/core/text-field";
+import { Button } from "@kobalte/core/button";
 
 import { deleteAnnotation, updateAnnotation } from "../../lib/annotations";
 import { fetchPosition, savePosition } from "../../lib/positions";
@@ -421,14 +422,14 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
             </div>
           </Show>
 
-          <button
-            type="button"
+          <Button
+            class="web-anno-icon-btn"
             onClick={() => setHidden(true)}
             aria-label="Dismiss"
             style={iconButtonStyle}
           >
             <X size={16} />
-          </button>
+          </Button>
         </div>
 
         <Show
@@ -505,8 +506,8 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
               "border-top": `1px solid ${palette().headerBorder}`,
             }}
           >
-            <button
-              type="button"
+            <Button
+              class="web-anno-icon-btn"
               // Prevent the textarea from losing focus on click: without
               // this, the pointerdown's default focus shift fires the
               // textarea's onFocusOut (saveEdit) first, which exits
@@ -521,7 +522,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
               <Show when={confirmDelete()} fallback={<Trash size={16} />}>
                 <Shredder size={16} />
               </Show>
-            </button>
+            </Button>
           </div>
         </Show>
       </div>
@@ -529,12 +530,14 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   );
 }
 
+// Background lives in the ".web-anno-icon-btn" rule injected by
+// content.ts, not here, since an inline "background" would always win
+// over the CSS ":hover" darkening rule regardless of source order.
 const iconButtonStyle = {
   display: "inline-flex",
   "align-items": "center",
   "justify-content": "center",
   border: "none",
-  background: "transparent",
   color: "inherit",
   cursor: "pointer",
   padding: "2px",

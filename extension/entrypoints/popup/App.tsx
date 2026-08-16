@@ -2,6 +2,7 @@ import { createSignal, Show } from 'solid-js';
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import NotebookTabs from 'lucide-solid/icons/notebook-tabs';
 import SettingsIcon from 'lucide-solid/icons/settings';
+import { Button } from '@kobalte/core/button';
 import './App.css';
 import Home from './Home';
 import Settings from './Settings';
@@ -22,33 +23,30 @@ function App() {
         <Show
           when={view() === 'home'}
           fallback={
-            <button
-              type="button"
+            <Button
               class="icon-btn"
               onClick={() => setView('home')}
               aria-label="Back"
             >
               <ArrowLeft size={18} />
-            </button>
+            </Button>
           }
         >
           <div class="header-actions">
-            <button
-              type="button"
+            <Button
               class="icon-btn"
               onClick={() => setView('targets')}
               aria-label="Cached URLs"
             >
               <NotebookTabs size={18} />
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               class="icon-btn"
               onClick={() => setView('settings')}
               aria-label="Settings"
             >
               <SettingsIcon size={18} />
-            </button>
+            </Button>
           </div>
         </Show>
       </header>

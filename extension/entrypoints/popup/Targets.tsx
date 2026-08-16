@@ -1,5 +1,6 @@
 import { createResource, createSignal, For, Show } from 'solid-js';
 import RefreshCw from "lucide-solid/icons/refresh-cw";
+import { Button } from '@kobalte/core/button';
 import { getCachedTargets, fullSyncTargets } from '../../lib/targets';
 
 // Read-only view of the local target cache (see docs/architecture.md).
@@ -27,15 +28,14 @@ export default function Targets() {
 
   return (
     <div class="card">
-      <button
-        type="button"
+      <Button
         class="icon-btn"
         onClick={handleRefresh}
         disabled={syncing()}
         aria-label="Sync from server"
       >
         <RefreshCw size={16} class={syncing() ? 'spin' : ''} />
-      </button>
+      </Button>
 
       {error() && <p class="saved-hint">{error()}</p>}
 

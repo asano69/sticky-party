@@ -48,6 +48,12 @@ export default defineContentScript({
           left: 0;
           color: #000;
         }
+        .web-anno-icon-btn {
+          background: transparent;
+        }
+        .web-anno-icon-btn:hover {
+          background-color: rgba(0, 0, 0, 0.15);
+        }
       `;
       container.appendChild(style);
 
