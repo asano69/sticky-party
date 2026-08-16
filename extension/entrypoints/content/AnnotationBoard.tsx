@@ -290,7 +290,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
           position: "fixed",
           top: `${pos().top}px`,
           left: `${pos().left}px`,
-          width: "280px",
+          width: "260px",
           "min-width": "160px",
           "min-height": "80px",
           resize: "both",
@@ -316,7 +316,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
             display: "flex",
             "justify-content": editing() ? "space-between" : "flex-end",
             gap: "4px",
-            padding: "2px 8px",
+            padding: "4px 8px",
             cursor: "grab",
             "border-bottom": `1px solid ${palette().headerBorder}`,
           }}
@@ -378,6 +378,8 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
                     "box-sizing": "border-box",
                     resize: "none",
                     overflow: "hidden",
+                    "white-space": "pre-wrap",
+                    "overflow-wrap": "break-word",
                     "font": "inherit",
                     "line-height": "inherit",
                     background: "transparent",
@@ -396,7 +398,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
               e.preventDefault();
               startEdit();
             }}
-            style={{ padding: "10px 14px", "white-space": "pre-wrap" }}
+            style={{ padding: "10px 14px", "white-space": "pre-wrap", "overflow-wrap": "break-word" }}
           >
             {body()}
           </div>
