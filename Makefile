@@ -69,6 +69,9 @@ dev-back: clean
 dev-ext:
 	cd extension && pnpm dev:firefox
 
+icons:
+	cd extension && pnpm run icons
+
 .PHONY: test
 test:
 	#cd frontend && pnpm test

@@ -1,5 +1,5 @@
 {
-  "name": "wxt-solid-starter",
+  "name": "web-anno",
   "description": "manifest.json description",
   "private": true,
   "version": "0.0.0",
@@ -12,7 +12,8 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "icons": "node scripts/generate-icons.js"
   },
   "dependencies": {
     "@kobalte/core": "^0.13.12",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@wxt-dev/module-solid": "^1.1.4",
+    "sharp": "^0.35.3",
     "typescript": "^5.9.3",
     "vite": "^8.1.5",
     "web-ext": "^10.5.0",
