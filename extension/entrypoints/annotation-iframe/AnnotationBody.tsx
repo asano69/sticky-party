@@ -12,7 +12,15 @@ export default function AnnotationBody(props: { body: string }) {
       {(line) => (
         <div
           class={line.bullet ? "sticky-party-bullet" : undefined}
-          style={{ "white-space": "pre-wrap", "overflow-wrap": "break-word" }}
+          style={{
+            "white-space": "pre-wrap",
+            "overflow-wrap": "break-word",
+            // Without an explicit min-height, a blank line collapses to
+            // zero height: an empty <div> has no text node to
+            // establish a line box, so a run of blank lines the user
+            // typed to separate paragraphs visually disappears.
+            "min-height": "1.4em",
+          }}
         >
           <For each={line.tokens}>
             {(token) =>

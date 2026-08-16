@@ -46,6 +46,17 @@ const Z_BASE = 2147480000;
 // accounts for the header on top of the iframe's own content height.
 const HEADER_HEIGHT_PX = 22;
 
+// Sticky-note yellow, light and dark variants -- must match
+// entrypoints/annotation-iframe/NoteContent.tsx's PALETTE. The drag
+// header lives in this document (not the iframe) so it can capture
+// pointer events reliably during a drag, but it still needs to look
+// like the top of the same note, so it borrows the note's colors
+// instead of a neutral gray.
+const PALETTE = {
+  light: { bg: "#fff8b8", border: "rgba(0, 0, 0, 0.12)" },
+  dark: { bg: "#4a4420", border: "rgba(255, 255, 255, 0.15)" },
+};
+
 export default defineContentScript({
   matches: ["*://*/*"],
   async main(ctx) {
@@ -63,15 +74,42 @@ export default defineContentScript({
     let zCounter = 0;
     const nextZ = () => ++zCounter;
 
-    function mountNote(annotation: AnnotationData, index: number) {
+    async function mountNote(annotation: AnnotationData, index: number) {
+      // Cascade defaults, used only if this device has no saved
+      // position yet. Resolved before the iframe UI is created below,
+      // so the note appears directly at its saved spot instead of
+      // flashing at the cascade position and then jumping once
+      // fetchPosition resolves (this mirrors old-arch's
+      // `positionLoaded` gate, adapted for the iframe split).
       let top = 12 + index * 24;
       let left = 12 + index * 24;
-      let z = nextZ();
+      let z: number;
       let positionRecordId: string | undefined;
+      let savedWidth: number | undefined;
+      let savedHeight: number | undefined;
+
+      try {
+        const saved = await fetchPosition(annotation.id);
+        if (saved) {
+          positionRecordId = saved.id;
+          top = saved.top;
+          left = saved.left;
+          z = saved.z;
+          savedWidth = saved.width;
+          savedHeight = saved.height;
+          if (z > zCounter) zCounter = z;
+        } else {
+          z = nextZ();
+        }
+      } catch (err) {
+        console.error("[sticky-party] failed to load position", err);
+        z = nextZ();
+      }
 
       let resizeObserver: ResizeObserver | undefined;
       let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
       let onMessage: ((e: MessageEvent) => void) | undefined;
+      let removeDarkModeListener: (() => void) | undefined;
 
       const ui = createIframeUi(ctx, {
         page: IFRAME_PAGE,
@@ -82,7 +120,7 @@ export default defineContentScript({
             position: "fixed",
             top: `${top}px`,
             left: `${left}px`,
-            width: "260px",
+            width: savedWidth ? `${savedWidth}px` : "260px",
             minWidth: "160px",
             minHeight: "90px",
             display: "flex",
@@ -92,6 +130,7 @@ export default defineContentScript({
             boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
             zIndex: `${Z_BASE + z}`,
           });
+          if (savedHeight) wrapper.style.height = `${savedHeight}px`;
 
           const bringToFront = () => {
             z = nextZ();
@@ -109,17 +148,32 @@ export default defineContentScript({
           };
 
           // A plain drag handle with a Dismiss button -- deliberately
-          // free of any note text, since it lives in this document.
+          // free of any note text, since it lives in this document (see
+          // the file-level comment for why note content stays inside
+          // the iframe). Styled with the note's own palette so it reads
+          // as one continuous header together with the title row that
+          // NoteContent.tsx renders just below it inside the iframe.
           const header = document.createElement("div");
+          const darkModeQuery = matchMedia("(prefers-color-scheme: dark)");
+          const applyHeaderPalette = () => {
+            const palette = darkModeQuery.matches ? PALETTE.dark : PALETTE.light;
+            header.style.background = palette.bg;
+            header.style.borderBottom = `1px solid ${palette.border}`;
+          };
           Object.assign(header.style, {
             display: "flex",
             justifyContent: "flex-end",
             alignItems: "center",
             height: `${HEADER_HEIGHT_PX}px`,
             flexShrink: "0",
+            padding: "0 8px",
+            boxSizing: "border-box",
             cursor: "grab",
-            background: "rgba(127, 127, 127, 0.25)",
           });
+          applyHeaderPalette();
+          darkModeQuery.addEventListener("change", applyHeaderPalette);
+          removeDarkModeListener = () =>
+            darkModeQuery.removeEventListener("change", applyHeaderPalette);
 
           const dismissBtn = document.createElement("button");
           dismissBtn.type = "button";
@@ -156,6 +210,12 @@ export default defineContentScript({
           // iframe boundary would otherwise interrupt it.
           let dragStart: { x: number; y: number; top: number; left: number } | null = null;
           header.addEventListener("pointerdown", (e) => {
+            // Skip drag/capture when the pointerdown landed on the
+            // Dismiss button: setPointerCapture below redirects all
+            // subsequent pointer events (including the click derived
+            // from pointerup) to the header, which otherwise silently
+            // swallows the button's own click handler.
+            if ((e.target as HTMLElement).closest("button")) return;
             bringToFront();
             dragStart = { x: e.clientX, y: e.clientY, top, left };
             header.setPointerCapture(e.pointerId);
@@ -191,22 +251,6 @@ export default defineContentScript({
           });
           resizeObserver.observe(wrapper);
 
-          // Restore this device's saved position/size, if any.
-          fetchPosition(annotation.id)
-            .then((saved) => {
-              if (!saved) return;
-              positionRecordId = saved.id;
-              top = saved.top;
-              left = saved.left;
-              z = saved.z;
-              wrapper.style.top = `${top}px`;
-              wrapper.style.left = `${left}px`;
-              wrapper.style.width = `${saved.width}px`;
-              wrapper.style.height = `${saved.height}px`;
-              wrapper.style.zIndex = `${Z_BASE + z}`;
-            })
-            .catch((err) => console.error("[sticky-party] failed to load position", err));
-
           // Hand the annotation to the iframe once it reports itself
           // ready, rather than on the iframe's 'load' event -- 'load'
           // can fire before the iframe's own script has registered its
@@ -239,6 +283,7 @@ export default defineContentScript({
           if (onMessage) window.removeEventListener("message", onMessage);
           resizeObserver?.disconnect();
           clearTimeout(resizeSaveTimer);
+          removeDarkModeListener?.();
         },
       });
 
@@ -246,12 +291,29 @@ export default defineContentScript({
       return ui;
     }
 
+    // Bumped on every showAnnotations/hideOverlay call so a mountNote()
+    // that resolves after a newer call has already run (e.g. the user
+    // navigated away while its position fetch was in flight) can detect
+    // it's stale and remove itself instead of appearing for the wrong
+    // page.
+    let showGeneration = 0;
+
     function showAnnotations(annotations: AnnotationData[]) {
       hideOverlay();
-      mountedNotes = annotations.map((annotation, index) => mountNote(annotation, index));
+      const generation = ++showGeneration;
+      for (const [index, annotation] of annotations.entries()) {
+        mountNote(annotation, index).then((ui) => {
+          if (generation !== showGeneration) {
+            ui.remove();
+            return;
+          }
+          mountedNotes.push(ui);
+        });
+      }
     }
 
     function hideOverlay() {
+      showGeneration++;
       for (const ui of mountedNotes) ui.remove();
       mountedNotes = [];
     }

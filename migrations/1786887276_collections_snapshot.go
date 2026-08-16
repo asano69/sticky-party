@@ -931,6 +931,21 @@ func init() {
 						"autogeneratePattern": "",
 						"help": "",
 						"hidden": false,
+						"id": "text724990059",
+						"max": 0,
+						"min": 0,
+						"name": "title",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"help": "",
+						"hidden": false,
 						"id": "text3685223346",
 						"max": 0,
 						"min": 0,
@@ -941,6 +956,31 @@ func init() {
 						"required": false,
 						"system": false,
 						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"help": "",
+						"hidden": false,
+						"id": "text1716930793",
+						"max": 0,
+						"min": 0,
+						"name": "color",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"help": "",
+						"hidden": false,
+						"id": "bool2761542443",
+						"name": "hide",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					},
 					{
 						"hidden": false,

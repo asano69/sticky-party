@@ -238,12 +238,24 @@ export default function NoteContent() {
               }
             >
               <div
-                onDblClick={() => startEdit("title")}
+                onDblClick={(e) => {
+                  // Prevent the native double-click "select word"
+                  // behavior, which otherwise runs after this handler
+                  // and can steal focus back from the input we're
+                  // about to create.
+                  e.preventDefault();
+                  startEdit("title");
+                }}
                 style={{ "font-weight": "700", "margin-bottom": "4px" }}
               >
                 {note().title}
               </div>
-              <div onDblClick={() => startEdit("body")}>
+              <div
+                onDblClick={(e) => {
+                  e.preventDefault();
+                  startEdit("body");
+                }}
+              >
                 <AnnotationBody body={note().body} />
               </div>
             </Show>
