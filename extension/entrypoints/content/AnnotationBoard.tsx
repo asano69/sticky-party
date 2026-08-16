@@ -6,6 +6,7 @@ import { TextField } from "@kobalte/core/text-field";
 import { deleteAnnotation, updateAnnotationBody } from "../../lib/annotations";
 import { fetchPosition, savePosition } from "../../lib/positions";
 import type { AnnotationData } from "../../lib/messages";
+import AnnotationBody from "./AnnotationBody";
 
 // Sticky-note yellow, light and dark variants. Content scripts render
 // into whatever page they're injected into, so they can't rely on the
@@ -398,9 +399,9 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
               e.preventDefault();
               startEdit();
             }}
-            style={{ padding: "10px 14px", "white-space": "pre-wrap", "overflow-wrap": "break-word" }}
+            style={{ padding: "10px 14px" }}
           >
-            {body()}
+            <AnnotationBody body={body()} />
           </div>
         </Show>
       </div>

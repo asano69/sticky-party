@@ -31,6 +31,26 @@ export default defineContentScript({
       container = document.createElement("div");
       container.id = "web-anno-overlay";
       document.documentElement.appendChild(container);
+
+      // Draws the bullet marker for lines parsed as bullets by
+      // lib/markup (see AnnotationBody.tsx). Injected once per overlay
+      // mount rather than once per note, since every note in this
+      // overlay shares the same style scope.
+      const style = document.createElement("style");
+      style.textContent = `
+        .web-anno-bullet {
+          position: relative;
+          padding-left: 14px;
+        }
+        .web-anno-bullet::before {
+          content: "\u2022";
+          position: absolute;
+          left: 0;
+          color: #000;
+        }
+      `;
+      container.appendChild(style);
+
       dispose = render(() => AnnotationBoard({ annotations }), container);
     }
 
