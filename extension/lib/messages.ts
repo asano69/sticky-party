@@ -7,7 +7,10 @@ export const HIDE_ANNOTATION_MESSAGE = 'web-anno:hide-annotation';
 
 export interface ShowAnnotationMessage {
   type: typeof SHOW_ANNOTATION_MESSAGE;
-  body: string;
+  // One or more annotation bodies matching the current page. Kept as a
+  // list (not merged into one string) so the content script can show
+  // them one at a time instead of concatenating unrelated notes.
+  bodies: string[];
 }
 
 export interface HideAnnotationMessage {
