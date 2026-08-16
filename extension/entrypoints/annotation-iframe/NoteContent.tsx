@@ -334,18 +334,24 @@ export default function NoteContent() {
 
           {/* Footer only appears while editing, so a casual click can
               never delete data by accident. It's an absolutely-positioned
-              overlay rather than a layout row, so showing/hiding it never
-              changes the note's height (see reportContentHeight above). */}
+              overlay (same height as the header, TITLE_ROW_HEIGHT_PX)
+              rather than a layout row, so showing/hiding it never changes
+              the note's height (see reportContentHeight above). */}
           <Show when={editing()}>
             <div
               style={{
                 position: "absolute",
-                left: "4px",
-                bottom: "4px",
+                left: "0",
+                right: "0",
+                bottom: "0",
+                height: `${TITLE_ROW_HEIGHT_PX}px`,
+                "box-sizing": "border-box",
                 display: "flex",
+                "align-items": "center",
+                "justify-content": "flex-start",
+                padding: "0 8px",
                 background: palette().bg,
-                "border-radius": "4px",
-                "box-shadow": "0 1px 3px rgba(0, 0, 0, 0.25)",
+                "border-top": `1px solid ${palette().border}`,
               }}
             >
               <Button
@@ -354,7 +360,16 @@ export default function NoteContent() {
                 onClick={handleDelete}
                 disabled={deleting()}
                 aria-label={confirmDelete() ? "Confirm delete" : "Delete"}
-                style={{ border: "none", cursor: "pointer", padding: "2px", "border-radius": "4px" }}
+                style={{
+                  display: "flex",
+                  "align-items": "center",
+                  "justify-content": "center",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  padding: "6px 8px",
+                  "border-radius": "4px",
+                }}
               >
                 <Show when={confirmDelete()} fallback={<Trash size={16} />}>
                   <Shredder size={16} />
