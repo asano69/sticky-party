@@ -56,14 +56,14 @@
 
 .field-input {
   border-radius: 6px;
-  border: 1px solid #444;
+  border: 1px solid var(--note-button-border);
   background: transparent;
   color: inherit;
   padding: 4px 8px;
   font-size: 0.9em;
 }
 .field-input:focus {
-  outline: 2px solid #646cff;
+  outline: 2px solid var(--note-border);
   outline-offset: -1px;
 }
 
@@ -75,21 +75,23 @@
 .btn {
   margin-top: 4px;
   border-radius: 6px;
-  border: 1px solid transparent;
+  border: 1px solid var(--note-button-border);
   padding: 6px 10px;
   font-size: 0.9em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--note-bg);
+  color: inherit;
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: background-color 0.15s;
 }
 .btn:hover {
-  border-color: #646cff;
+  background-color: color-mix(in srgb, var(--note-border) 35%, var(--note-bg));
 }
 .btn:focus,
 .btn:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid var(--note-border);
+  outline-offset: -1px;
 }
 
 .saved-hint {
@@ -125,21 +127,9 @@
 }
 
 .target-item {
-  border: 1px solid #444;
+  border: 1px solid var(--note-button-border);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 0.8em;
   word-break: break-all;
-}
-
-@media (prefers-color-scheme: light) {
-  .field-input {
-    border-color: #ccc;
-  }
-  .btn {
-    background-color: #f9f9f9;
-  }
-  .target-item {
-    border-color: #ccc;
-  }
 }
