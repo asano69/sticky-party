@@ -63,6 +63,24 @@ export default defineContentScript({
     let zCounter = 0;
     const nextZ = () => ++zCounter;
 
+    // Notes render at raw pixel offsets, but their saved position is a
+    // ratio of the window's size (see lib/positions.ts's toRatio), so a
+    // manual browser resize should keep each note in the same relative
+    // spot instead of leaving it pinned to its old pixel offset.
+    // Rescaling top/left by the window's size delta on every resize
+    // keeps position/windowSize constant -- equivalent to reapplying
+    // the original saved ratio -- so no DB round trip is needed here.
+    const repositionOnResize = new Set<(scaleX: number, scaleY: number) => void>();
+    let prevWindowWidth = window.innerWidth;
+    let prevWindowHeight = window.innerHeight;
+    window.addEventListener("resize", () => {
+      const scaleX = window.innerWidth / prevWindowWidth;
+      const scaleY = window.innerHeight / prevWindowHeight;
+      prevWindowWidth = window.innerWidth;
+      prevWindowHeight = window.innerHeight;
+      for (const reposition of repositionOnResize) reposition(scaleX, scaleY);
+    });
+
     async function mountNote(annotation: AnnotationData, index: number) {
       // Cascade defaults, used only if this device has no saved
       // position yet. Resolved before the iframe UI is created below,
@@ -108,6 +126,7 @@ export default defineContentScript({
       let resizeObserver: ResizeObserver | undefined;
       let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
       let onMessage: ((e: MessageEvent) => void) | undefined;
+      let reposition: ((scaleX: number, scaleY: number) => void) | undefined;
 
       const ui = createIframeUi(ctx, {
         page: IFRAME_PAGE,
@@ -145,6 +164,20 @@ export default defineContentScript({
             wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + contentHeight + footer}px`;
           };
           applyWrapperHeight();
+
+          // Keeps this note's screen position proportional to the
+          // window when the browser window is resized (registered
+          // into repositionOnResize above).
+          reposition = (scaleX, scaleY) => {
+            top *= scaleY;
+            left *= scaleX;
+            // Clamp so shrinking the window can't strand the note off-screen.
+            top = Math.min(Math.max(top, 0), Math.max(window.innerHeight - wrapper.offsetHeight, 0));
+            left = Math.min(Math.max(left, 0), Math.max(window.innerWidth - wrapper.offsetWidth, 0));
+            wrapper.style.top = `${top}px`;
+            wrapper.style.left = `${left}px`;
+          };
+          repositionOnResize.add(reposition);
 
           const bringToFront = () => {
             z = nextZ();
@@ -354,6 +387,7 @@ export default defineContentScript({
         },
         onRemove: () => {
           if (onMessage) window.removeEventListener("message", onMessage);
+          if (reposition) repositionOnResize.delete(reposition);
           resizeObserver?.disconnect();
           clearTimeout(resizeSaveTimer);
         },
