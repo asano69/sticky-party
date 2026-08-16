@@ -437,8 +437,10 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
           fallback={
             // Padding/margin/border here must exactly match the display
             // div below (and its content-mode style prop) -- any
-            // difference shifts the text when toggling edit mode.
-            <div style={{ padding: "10px 14px" }}>
+            // difference shifts the text when toggling edit mode. Kept
+            // as tight as the header's padding (see the header div
+            // above) so the body isn't visually looser than the title.
+            <div style={{ padding: "6px 10px" }}>
               <TextField value={draft()} onChange={setDraft} disabled={saving()}>
                 <TextField.TextArea
                   ref={(el) => {
@@ -489,7 +491,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
               e.preventDefault();
               startEdit("body");
             }}
-            style={{ padding: "10px 14px" }}
+            style={{ padding: "6px 10px" }}
           >
             <AnnotationBody body={body()} />
           </div>
