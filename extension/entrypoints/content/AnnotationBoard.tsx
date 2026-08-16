@@ -70,6 +70,13 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   const palette = () => (isDark() ? PALETTE.dark : PALETTE.light);
 
   const [hidden, setHidden] = createSignal(false);
+  // Starts false so the note isn't rendered at its default (cascaded,
+  // top-left-ish) position while fetchPosition is still in flight in
+  // onMount below. Flipped to true once loading finishes -- whether or
+  // not a saved position was actually found -- so a note with no saved
+  // position still appears (at its default) instead of staying hidden
+  // forever.
+  const [positionLoaded, setPositionLoaded] = createSignal(false);
   const [editing, setEditing] = createSignal(false);
   const [body, setBody] = createSignal(props.annotation.body);
   const [draft, setDraft] = createSignal(props.annotation.body);
@@ -135,20 +142,24 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   });
 
   onMount(async () => {
-    if (noteRef) resizeObserver.observe(noteRef);
-
     try {
       const saved = await fetchPosition(props.annotation.id);
       if (saved) {
         positionRecordId = saved.id;
         setPos({ top: saved.top, left: saved.left });
-        if (noteRef) {
-          noteRef.style.width = `${saved.width}px`;
-          noteRef.style.height = `${saved.height}px`;
-        }
+      }
+      // Mount the note now (see the `Show` below): this synchronously
+      // inserts the DOM and fires the `ref` callback, so noteRef is only
+      // safe to touch directly (width/height are imperative, unlike the
+      // reactive `pos` signal set above) after this point.
+      setPositionLoaded(true);
+      if (saved && noteRef) {
+        noteRef.style.width = `${saved.width}px`;
+        noteRef.style.height = `${saved.height}px`;
       }
     } catch (err) {
       console.error("[web-anno] failed to load position", err);
+      setPositionLoaded(true);
     }
   });
 
@@ -251,9 +262,12 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   };
 
   return (
-    <Show when={!hidden()}>
+    <Show when={!hidden() && positionLoaded()}>
       <div
-        ref={(el) => (noteRef = el)}
+        ref={(el) => {
+          noteRef = el;
+          resizeObserver.observe(el);
+        }}
         onPointerDown={bringToFront}
         style={{
           position: "fixed",
