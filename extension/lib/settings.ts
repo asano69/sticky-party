@@ -6,7 +6,7 @@
 const STORAGE_KEY = "settings";
 
 export interface StoredSettings {
-  username: string;
+  email: string;
   password: string;
   backendUrl: string;
   fingerprint: string;

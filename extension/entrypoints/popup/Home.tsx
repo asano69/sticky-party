@@ -35,7 +35,13 @@ export default function Home() {
     setSaving(true);
     try {
       const pb = await getAuthedPb();
-      await pb.collection('annotations').create({ target: url(), body: note() });
+      // pb.authStore.record is the just-authenticated `users` record; its
+      // id must match the Create rule's `@request.body.user = @request.auth.id`.
+      await pb.collection('annotations').create({
+        target: url(),
+        body: note(),
+        user: pb.authStore.record?.id,
+      });
       await addCachedTarget(url());
       setNote('');
     } catch (err) {

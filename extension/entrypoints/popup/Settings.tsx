@@ -5,7 +5,7 @@ import { Button } from '@kobalte/core/button';
 import { getSettings, saveSettings, ensureFingerprint } from '../../lib/settings';
 
 export default function Settings() {
-  const [username, setUsername] = createSignal('');
+  const [email, setEmail] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [backendUrl, setBackendUrl] = createSignal('');
   const [saved, setSaved] = createSignal(false);
@@ -14,7 +14,7 @@ export default function Settings() {
     const settings = await getSettings();
 
     if (settings) {
-      setUsername(settings.username);
+      setEmail(settings.email);
       setPassword(settings.password);
       setBackendUrl(settings.backendUrl);
     }
@@ -28,7 +28,7 @@ export default function Settings() {
     e.preventDefault();
 
     await saveSettings({
-      username: username(),
+      email: email(),
       password: password(),
       backendUrl: backendUrl(),
     });
@@ -39,9 +39,9 @@ export default function Settings() {
 
   return (
     <form class="card" onSubmit={handleSave}>
-      <TextField class="field" value={username()} onChange={setUsername}>
-        <TextField.Label class="field-label">Username</TextField.Label>
-        <TextField.Input class="field-input" />
+      <TextField class="field" value={email()} onChange={setEmail}>
+        <TextField.Label class="field-label">Email</TextField.Label>
+        <TextField.Input class="field-input" type="email" />
       </TextField>
 
       <TextField class="field" value={password()} onChange={setPassword}>

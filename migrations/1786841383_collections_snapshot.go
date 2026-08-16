@@ -894,8 +894,8 @@ func init() {
 				"viewRule": null
 			},
 			{
-				"createRule": null,
-				"deleteRule": null,
+				"createRule": "",
+				"deleteRule": "",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -965,12 +965,12 @@ func init() {
 				],
 				"id": "pbc_2353526682",
 				"indexes": [],
-				"listRule": null,
+				"listRule": "",
 				"name": "annotations",
 				"system": false,
 				"type": "base",
-				"updateRule": null,
-				"viewRule": null
+				"updateRule": "",
+				"viewRule": ""
 			},
 			{
 				"createRule": null,
@@ -1006,18 +1006,19 @@ func init() {
 						"type": "relation"
 					},
 					{
-						"cascadeDelete": false,
-						"collectionId": "pbc_2153001328",
+						"autogeneratePattern": "",
 						"help": "",
 						"hidden": false,
-						"id": "relation154121870",
-						"maxSelect": 0,
-						"minSelect": 0,
+						"id": "text154121870",
+						"max": 0,
+						"min": 0,
 						"name": "device",
+						"pattern": "",
 						"presentable": false,
+						"primaryKey": false,
 						"required": false,
 						"system": false,
-						"type": "relation"
+						"type": "text"
 					},
 					{
 						"help": "",
@@ -1096,84 +1097,6 @@ func init() {
 				"indexes": [],
 				"listRule": null,
 				"name": "positions",
-				"system": false,
-				"type": "base",
-				"updateRule": null,
-				"viewRule": null
-			},
-			{
-				"createRule": null,
-				"deleteRule": null,
-				"fields": [
-					{
-						"autogeneratePattern": "[a-z0-9]{15}",
-						"help": "",
-						"hidden": false,
-						"id": "text3208210256",
-						"max": 15,
-						"min": 15,
-						"name": "id",
-						"pattern": "^[a-z0-9]+$",
-						"presentable": false,
-						"primaryKey": true,
-						"required": true,
-						"system": true,
-						"type": "text"
-					},
-					{
-						"cascadeDelete": false,
-						"collectionId": "_pb_users_auth_",
-						"help": "",
-						"hidden": false,
-						"id": "relation2375276105",
-						"maxSelect": 0,
-						"minSelect": 0,
-						"name": "user",
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "relation"
-					},
-					{
-						"autogeneratePattern": "",
-						"help": "",
-						"hidden": false,
-						"id": "text1597481275",
-						"max": 0,
-						"min": 0,
-						"name": "fingerprint",
-						"pattern": "",
-						"presentable": false,
-						"primaryKey": false,
-						"required": false,
-						"system": false,
-						"type": "text"
-					},
-					{
-						"hidden": false,
-						"id": "autodate2990389176",
-						"name": "created",
-						"onCreate": true,
-						"onUpdate": false,
-						"presentable": false,
-						"system": false,
-						"type": "autodate"
-					},
-					{
-						"hidden": false,
-						"id": "autodate3332085495",
-						"name": "updated",
-						"onCreate": true,
-						"onUpdate": true,
-						"presentable": false,
-						"system": false,
-						"type": "autodate"
-					}
-				],
-				"id": "pbc_2153001328",
-				"indexes": [],
-				"listRule": null,
-				"name": "devices",
 				"system": false,
 				"type": "base",
 				"updateRule": null,
