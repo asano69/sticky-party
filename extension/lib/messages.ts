@@ -8,12 +8,19 @@ export const HIDE_ANNOTATION_MESSAGE = 'web-anno:hide-annotation';
 // content -> background
 export const CHECK_ANNOTATION_MESSAGE = 'web-anno:check-annotation';
 
+// A single annotation's id (needed to save edits back to PocketBase)
+// and body text.
+export interface AnnotationData {
+  id: string;
+  body: string;
+}
+
 export interface ShowAnnotationMessage {
   type: typeof SHOW_ANNOTATION_MESSAGE;
-  // One or more annotation bodies matching the current page. Kept as a
-  // list (not merged into one string) so the content script can show
-  // them one at a time instead of concatenating unrelated notes.
-  bodies: string[];
+  // One or more annotations matching the current page. Kept as a list
+  // (not merged into one string) so the content script can show them as
+  // separate sticky notes instead of concatenating unrelated notes.
+  annotations: AnnotationData[];
 }
 
 export interface HideAnnotationMessage {

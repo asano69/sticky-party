@@ -1,0 +1,223 @@
+import { createSignal, For, onCleanup, Show } from "solid-js";
+import { Check, RotateCcw, SquarePen, X } from "lucide-solid";
+import { TextField } from "@kobalte/core/text-field";
+
+import { updateAnnotationBody } from "../../lib/annotations";
+import type { AnnotationData } from "../../lib/messages";
+
+// Sticky-note yellow, light and dark variants. Content scripts render
+// into whatever page they're injected into, so they can't rely on the
+// host page's own theme or CSS custom properties -- prefers-color-scheme
+// is queried directly instead (see useIsDarkMode below).
+const PALETTE = {
+  light: {
+    bg: "#fff8b8",
+    border: "#e6d97a",
+    text: "#3a3520",
+    headerBorder: "rgba(0, 0, 0, 0.12)",
+    buttonBorder: "rgba(0, 0, 0, 0.25)",
+  },
+  dark: {
+    bg: "#4a4420",
+    border: "#6b6230",
+    text: "#f5efc9",
+    headerBorder: "rgba(255, 255, 255, 0.15)",
+    buttonBorder: "rgba(255, 255, 255, 0.3)",
+  },
+};
+
+// Tracks prefers-color-scheme reactively so notes flip palette
+// immediately if the OS/browser theme changes while the page is open.
+function useIsDarkMode() {
+  const query = matchMedia("(prefers-color-scheme: dark)");
+  const [isDark, setIsDark] = createSignal(query.matches);
+  const listener = (e: MediaQueryListEvent) => setIsDark(e.matches);
+  query.addEventListener("change", listener);
+  onCleanup(() => query.removeEventListener("change", listener));
+  return isDark;
+}
+
+// Renders each matching annotation as an independent sticky note:
+// draggable via its header, resizable via the native CSS `resize`
+// handle, dismissible (Check) for the current page view, and editable
+// (Edit) with changes saved back to PocketBase. Position/size and the
+// dismissed state are session-only for now -- they reset the next time
+// showAnnotations() runs (see entrypoints/content.ts) -- persistence is
+// a later step.
+export default function AnnotationBoard(props: { annotations: AnnotationData[] }) {
+  return (
+    <For each={props.annotations}>
+      {(annotation, index) => <StickyNote annotation={annotation} index={index()} />}
+    </For>
+  );
+}
+
+function StickyNote(props: { annotation: AnnotationData; index: number }) {
+  const isDark = useIsDarkMode();
+  const palette = () => (isDark() ? PALETTE.dark : PALETTE.light);
+
+  const [hidden, setHidden] = createSignal(false);
+  const [editing, setEditing] = createSignal(false);
+  const [body, setBody] = createSignal(props.annotation.body);
+  const [draft, setDraft] = createSignal(props.annotation.body);
+  const [saving, setSaving] = createSignal(false);
+
+  // Cascade the default position so multiple notes don't all land on top
+  // of each other; from there the user can drag each one independently.
+  const [pos, setPos] = createSignal({
+    top: 12 + props.index * 24,
+    right: 12 + props.index * 24,
+  });
+
+  let dragStart: { x: number; y: number; top: number; right: number } | null = null;
+
+  const startDrag = (e: PointerEvent) => {
+    // Skip drag/capture when the pointerdown originated on a button
+    // (Edit/Check). Once this element captures the pointer, subsequent
+    // pointer events -- and the mouseup/click events the browser derives
+    // from them -- are redirected here too, so a captured header would
+    // silently swallow clicks on its child buttons.
+    if ((e.target as HTMLElement).closest("button")) return;
+    dragStart = { x: e.clientX, y: e.clientY, ...pos() };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onDrag = (e: PointerEvent) => {
+    if (!dragStart) return;
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    setPos({ top: dragStart.top + dy, right: dragStart.right - dx });
+  };
+
+  const endDrag = () => {
+    dragStart = null;
+  };
+
+  const startEdit = () => {
+    setDraft(body());
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    try {
+      await updateAnnotationBody(props.annotation.id, draft());
+      setBody(draft());
+      setEditing(false);
+    } catch (err) {
+      console.error("[web-anno] failed to save annotation", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Show when={!hidden()}>
+      <div
+        style={{
+          position: "fixed",
+          top: `${pos().top}px`,
+          right: `${pos().right}px`,
+          width: "280px",
+          "min-width": "160px",
+          "min-height": "80px",
+          resize: "both",
+          overflow: "auto",
+          background: palette().bg,
+          border: `1px solid ${palette().border}`,
+          color: palette().text,
+          "font-size": "13px",
+          "line-height": "1.4",
+          "border-radius": "8px",
+          "box-shadow": "0 2px 8px rgba(0, 0, 0, 0.25)",
+          "z-index": "2147483647",
+        }}
+      >
+        <div
+          onPointerDown={startDrag}
+          onPointerMove={onDrag}
+          onPointerUp={endDrag}
+          style={{
+            display: "flex",
+            "justify-content": "flex-end",
+            gap: "4px",
+            padding: "6px 8px",
+            cursor: "grab",
+            "border-bottom": `1px solid ${palette().headerBorder}`,
+          }}
+        >
+          <button type="button" onClick={startEdit} aria-label="Edit" style={iconButtonStyle}>
+            <SquarePen size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setHidden(true)}
+            aria-label="Dismiss"
+            style={iconButtonStyle}
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <Show
+          when={!editing()}
+          fallback={
+            <div style={{ padding: "10px 14px", display: "flex", "flex-direction": "column", gap: "8px" }}>
+              <TextField value={draft()} onChange={setDraft}>
+                <TextField.TextArea
+                  rows={4}
+                  style={{
+                    width: "100%",
+                    "box-sizing": "border-box",
+                    resize: "none",
+                    "font-family": "inherit",
+                    background: palette().bg,
+                    color: palette().text,
+                    border: "1px solid transparent",
+                    "border-radius": "4px",
+                    margin: "0 4px",
+                    padding: "6px 8px",
+                  }}
+                />
+              </TextField>
+              <div style={{ display: "flex", "justify-content": "flex-end", gap: "6px" }}>
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  aria-label="Cancel"
+                  style={{ ...iconButtonStyle, border: `1px solid ${palette().buttonBorder}` }}
+                >
+                  <RotateCcw size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={saveEdit}
+                  disabled={saving()}
+                  aria-label="Save"
+                  style={{ ...iconButtonStyle, border: `1px solid ${palette().buttonBorder}` }}
+                >
+                  <Check size={14} />
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <div style={{ padding: "10px 14px", "white-space": "pre-wrap" }}>{body()}</div>
+        </Show>
+      </div>
+    </Show>
+  );
+}
+
+const iconButtonStyle = {
+  display: "inline-flex",
+  "align-items": "center",
+  "justify-content": "center",
+  border: "none",
+  background: "transparent",
+  color: "inherit",
+  cursor: "pointer",
+  padding: "2px",
+  "border-radius": "4px",
+};
+

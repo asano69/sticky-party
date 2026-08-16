@@ -1,6 +1,6 @@
 // See docs/architecture.md for the full sync design this implements.
 
-import { fetchAnnotationBodies } from '../lib/annotations';
+import { fetchAnnotations } from '../lib/annotations';
 import {
   CHECK_ANNOTATION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
@@ -57,9 +57,9 @@ export default defineBackground(() => {
     }
 
     try {
-      const bodies = await fetchAnnotationBodies(url);
-      if (bodies.length === 0) return;
-      await browser.tabs.sendMessage(tabId, { type: SHOW_ANNOTATION_MESSAGE, bodies });
+      const annotations = await fetchAnnotations(url);
+      if (annotations.length === 0) return;
+      await browser.tabs.sendMessage(tabId, { type: SHOW_ANNOTATION_MESSAGE, annotations });
     } catch (err) {
       console.error('[web-anno] failed to fetch annotation', err);
     }
