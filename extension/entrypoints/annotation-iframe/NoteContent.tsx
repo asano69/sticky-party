@@ -13,6 +13,7 @@ import {
   NOTE_FOCUS_MESSAGE,
   NOTE_READY_MESSAGE,
   START_EDIT_TITLE_MESSAGE,
+  TITLE_ROW_HEIGHT_PX,
   type NoteEditingMessage,
   type ParentToNoteMessage,
 } from "../../lib/iframe-messages";
@@ -223,11 +224,21 @@ export default function NoteContent() {
               top of this row -- that's why the title text stops short of
               the row's right edge (padding-right below). */}
           <div
-            // h-8 (32px) matches TITLE_ROW_HEIGHT_PX; pr-7/pl-2 preserve
-            // the original 28px/8px padding (the right side leaves room
-            // for content.ts's Dismiss button, which overlays this row).
-            class="box-border flex h-8 shrink-0 items-center pr-7 pl-2 font-bold"
+            // Extension doesn't wire up a Tailwind build (see wxt.config.ts),
+            // so this stays plain inline style rather than utility classes.
+            // Height matches TITLE_ROW_HEIGHT_PX so this row (rendered
+            // inside the iframe) lines up pixel-for-pixel with the
+            // content script's transparent drag-header overlay (see
+            // content.ts). Right padding leaves room for that overlay's
+            // (larger) Dismiss button.
             style={{
+              height: `${TITLE_ROW_HEIGHT_PX}px`,
+              "flex-shrink": "0",
+              "box-sizing": "border-box",
+              display: "flex",
+              "align-items": "center",
+              padding: "0 32px 0 8px",
+              "font-weight": "700",
               background: palette().bg,
               "border-bottom": `1px solid ${palette().border}`,
             }}
