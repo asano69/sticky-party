@@ -1,8 +1,8 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
-import { X } from "lucide-solid";
+import { Trash, X } from "lucide-solid";
 import { TextField } from "@kobalte/core/text-field";
 
-import { updateAnnotationBody } from "../../lib/annotations";
+import { deleteAnnotation, updateAnnotationBody } from "../../lib/annotations";
 import type { AnnotationData } from "../../lib/messages";
 
 // Sticky-note yellow, light and dark variants. Content scripts render
@@ -61,6 +61,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
   const [body, setBody] = createSignal(props.annotation.body);
   const [draft, setDraft] = createSignal(props.annotation.body);
   const [saving, setSaving] = createSignal(false);
+  const [deleting, setDeleting] = createSignal(false);
 
   // Cascade the default position so multiple notes don't all land on top
   // of each other; from there the user can drag each one independently.
@@ -149,6 +150,22 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
     }
   };
 
+  // Deletes the annotation from PocketBase and hides this note. The
+  // local cached target list (lib/targets.ts) is deliberately left
+  // alone: other annotations may still share the same target, so
+  // pruning it here could hide notes that are still valid.
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteAnnotation(props.annotation.id);
+      setHidden(true);
+    } catch (err) {
+      console.error("[web-anno] failed to delete annotation", err);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Show when={!hidden()}>
       <div
@@ -177,20 +194,33 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
           onPointerUp={endDrag}
           style={{
             display: "flex",
-            "justify-content": "flex-end",
+            "justify-content": editing() ? "space-between" : "flex-end",
             gap: "4px",
             padding: "6px 8px",
             cursor: "grab",
             "border-bottom": `1px solid ${palette().headerBorder}`,
           }}
         >
+          {/* Only shown while editing, opposite the close button, so a
+              casual dismiss click can never delete data by accident. */}
+          <Show when={editing()}>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting()}
+              aria-label="Delete"
+              style={iconButtonStyle}
+            >
+              <Trash size={16} />
+            </button>
+          </Show>
           <button
             type="button"
             onClick={() => setHidden(true)}
             aria-label="Dismiss"
             style={iconButtonStyle}
           >
-            <X size={14} />
+            <X size={16} />
           </button>
         </div>
 
@@ -206,9 +236,12 @@ function StickyNote(props: { annotation: AnnotationData; index: number }) {
                   ref={(el) => {
                     textareaRef = el;
                     resizeTextarea();
+                    // Focus explicitly: the textarea only mounts when edit
+                    // mode starts (not on initial page load), so the native
+                    // `autofocus` attribute is unreliable here.
+                    el.focus();
                   }}
                   rows={1}
-                  autofocus
                   onInput={resizeTextarea}
                   onKeyDown={onEditorKeyDown}
                   onFocusOut={saveEdit}

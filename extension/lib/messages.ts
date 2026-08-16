@@ -8,11 +8,15 @@ export const HIDE_ANNOTATION_MESSAGE = 'web-anno:hide-annotation';
 // content -> background
 export const CHECK_ANNOTATION_MESSAGE = 'web-anno:check-annotation';
 
-// A single annotation's id (needed to save edits back to PocketBase)
-// and body text.
+// A single annotation's id (needed to save edits back to PocketBase),
+// body text, and last-updated timestamp. `updated` drives the stacking
+// order in AnnotationBoard: notes are sorted oldest-first so the most
+// recently edited one ends up last in the DOM and renders on top (see
+// fetchAnnotations in lib/annotations.ts).
 export interface AnnotationData {
   id: string;
   body: string;
+  updated: string;
 }
 
 export interface ShowAnnotationMessage {

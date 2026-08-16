@@ -15,6 +15,9 @@ export async function fetchAnnotations(url: string): Promise<AnnotationData[]> {
   const pb = await getAuthedPb();
   const records = await pb.collection('annotations').getFullList<AnnotationData>({
     filter: pb.filter('target = {:url}', { url }),
+    // Oldest first, so the most recently edited annotation is rendered
+    // last and sits on top when notes overlap (see AnnotationData.updated).
+    sort: 'updated',
   });
   return records.filter((record) => record.body);
 }
@@ -24,4 +27,14 @@ export async function fetchAnnotations(url: string): Promise<AnnotationData[]> {
 export async function updateAnnotationBody(id: string, body: string): Promise<void> {
   const pb = await getAuthedPb();
   await pb.collection('annotations').update(id, { body });
+}
+
+// Deletes an annotation from PocketBase. Used by the sticky note's trash
+// button, shown only while editing. The local target-list cache
+// (lib/targets.ts) is intentionally left untouched here: other
+// annotations may still share the same target, so removing it would
+// risk hiding notes that are still valid.
+export async function deleteAnnotation(id: string): Promise<void> {
+  const pb = await getAuthedPb();
+  await pb.collection('annotations').delete(id);
 }
