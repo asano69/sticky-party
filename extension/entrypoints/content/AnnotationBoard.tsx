@@ -55,11 +55,18 @@ export default function AnnotationBoard(props: { annotations: AnnotationData[] }
   // its next value is ever read, on demand, inside an event handler.
   let zCounter = props.annotations.length;
   const nextZ = () => ++zCounter;
+  // Called once a note's persisted z-index loads, so the shared counter
+  // never falls behind a value already restored from storage -- otherwise
+  // bringToFront's next() could hand out a z lower than a note that was
+  // already on top before reload.
+  const reportZ = (z: number) => {
+    if (z > zCounter) zCounter = z;
+  };
 
   return (
     <For each={props.annotations}>
       {(annotation, index) => (
-        <StickyNote annotation={annotation} index={index()} nextZ={nextZ} />
+        <StickyNote annotation={annotation} index={index()} nextZ={nextZ} reportZ={reportZ} />
       )}
     </For>
   );
@@ -99,7 +106,10 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
   // pulls a fresh, higher value from the shared counter so it visually
   // sits above every other note from then on.
   const [zIndex, setZIndex] = createSignal(props.index);
-  const bringToFront = () => setZIndex(props.nextZ());
+  const bringToFront = () => {
+    setZIndex(props.nextZ());
+    persistPosition();
+  };
 
   // Persisted position/size for this device (see lib/positions.ts).
   // Size is intentionally not held in Solid state: it's written to the
@@ -116,7 +126,7 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
     try {
       positionRecordId = await savePosition(
         props.annotation.id,
-        { ...pos(), width: noteRef.offsetWidth, height: noteRef.offsetHeight },
+        { ...pos(), width: noteRef.offsetWidth, height: noteRef.offsetHeight, z: zIndex() },
         positionRecordId,
       );
     } catch (err) {
@@ -147,6 +157,8 @@ function StickyNote(props: { annotation: AnnotationData; index: number; nextZ: (
       if (saved) {
         positionRecordId = saved.id;
         setPos({ top: saved.top, left: saved.left });
+        setZIndex(saved.z);
+        props.reportZ(saved.z);
       }
       // Mount the note now (see the `Show` below): this synchronously
       // inserts the DOM and fires the `ref` callback, so noteRef is only

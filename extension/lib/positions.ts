@@ -18,6 +18,7 @@ interface PositionRecord {
   y: number;
   width: number;
   height: number;
+  z: number;
 }
 
 export interface PositionData {
@@ -25,6 +26,7 @@ export interface PositionData {
   left: number;
   width: number;
   height: number;
+  z: number;
 }
 
 export interface StoredPosition extends PositionData {
@@ -37,6 +39,9 @@ function toRatio(pos: PositionData) {
     y: pos.top / window.innerHeight,
     width: pos.width,
     height: pos.height,
+    // z is a stacking order, not a screen coordinate, so it's stored
+    // and restored as-is rather than as a window-relative ratio.
+    z: pos.z,
   };
 }
 
@@ -51,6 +56,7 @@ function fromRatio(record: PositionRecord): PositionData {
     top: Math.min(Math.max(top, 0), Math.max(window.innerHeight - record.height, 0)),
     width: record.width,
     height: record.height,
+    z: record.z,
   };
 }
 
