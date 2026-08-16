@@ -62,11 +62,6 @@
   padding: 4px 8px;
   font-size: 0.9em;
 }
-.field-input:focus {
-  outline: 2px solid var(--note-border);
-  outline-offset: -1px;
-}
-
 .field-textarea {
   resize: vertical;
   font-family: inherit;
@@ -88,12 +83,6 @@
 .btn:hover {
   background-color: color-mix(in srgb, var(--note-border) 35%, var(--note-bg));
 }
-.btn:focus,
-.btn:focus-visible {
-  outline: 2px solid var(--note-border);
-  outline-offset: -1px;
-}
-
 .saved-hint {
   margin: 0;
   font-size: 0.8em;

@@ -1,6 +1,7 @@
 import { createSignal, onMount } from 'solid-js';
 import { TextField } from '@kobalte/core/text-field';
 import { Button } from '@kobalte/core/button';
+import CircleCheckBig from 'lucide-solid/icons/circle-check-big';
 
 import { getSettings, saveSettings, ensureFingerprint } from '../../lib/settings';
 
@@ -58,9 +59,11 @@ export default function Settings() {
         />
       </TextField>
 
-      <Button type="submit" class="btn">
-        Save
-      </Button>
+      <div style={{ display: 'flex', 'justify-content': 'center' }}>
+        <Button type="submit" class="icon-btn" aria-label="Save">
+          <CircleCheckBig size={20} />
+        </Button>
+      </div>
       {saved() && <p class="saved-hint">Saved.</p>}
     </form>
   );
