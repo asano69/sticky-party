@@ -3,6 +3,7 @@ import { TextField } from '@kobalte/core/text-field';
 import { Button } from '@kobalte/core/button';
 
 import { getAuthedPb } from '../../lib/pb';
+import { CHECK_ANNOTATION_MESSAGE, type CheckAnnotationMessage } from '../../lib/messages';
 import { addCachedTarget, normalizeTarget } from '../../lib/targets';
 
 // Form for creating a new annotation on the current page. Saving writes
@@ -15,6 +16,10 @@ export default function Home() {
   const [note, setNote] = createSignal('');
   const [error, setError] = createSignal('');
   const [saving, setSaving] = createSignal(false);
+  // Needed after save to ask the background script to re-check this tab
+  // (see handleSave below); captured once here since the popup has no
+  // sender.tab context of its own to fall back on.
+  const [tabId, setTabId] = createSignal<number>();
 
   onMount(async () => {
     // Prefill with the active tab's URL so the common case (annotating
@@ -27,6 +32,7 @@ export default function Home() {
     if (activeTab?.url) {
       setUrl(activeTab.url);
     }
+    setTabId(activeTab?.id);
   });
 
   const handleSave = async (e: Event) => {
@@ -43,6 +49,16 @@ export default function Home() {
         body: note(),
       });
       await addCachedTarget(target);
+      // Re-run content.ts's mount process for the current tab so the
+      // annotation just saved shows up immediately, instead of waiting
+      // for the next navigation or periodic full sync.
+      if (tabId() != null) {
+        browser.runtime.sendMessage({
+          type: CHECK_ANNOTATION_MESSAGE,
+          url: target,
+          tabId: tabId(),
+        } satisfies CheckAnnotationMessage);
+      }
       setNote('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save.');

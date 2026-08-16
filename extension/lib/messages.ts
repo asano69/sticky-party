@@ -39,4 +39,8 @@ export type AnnotationMessage = ShowAnnotationMessage | HideAnnotationMessage;
 export interface CheckAnnotationMessage {
   type: typeof CHECK_ANNOTATION_MESSAGE;
   url: string;
+  // Set explicitly when sent from the popup, which has no sender.tab
+  // context of its own. Content scripts omit this and rely on
+  // sender.tab.id instead (see background.ts's listener).
+  tabId?: number;
 }

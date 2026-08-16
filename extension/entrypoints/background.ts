@@ -73,13 +73,18 @@ export default defineBackground(() => {
     checkTab(tabId, changeInfo.url);
   });
 
-  // The content script sends this as soon as it starts running. This is
-  // what actually fixes the race above: even if tabs.onUpdated already
-  // fired before the content script was ready to receive its message,
-  // this ping re-checks the same URL once the content script exists.
+  // Two senders share this listener:
+  // - The content script, as soon as it starts running. This fixes the
+  //   race above: even if tabs.onUpdated already fired before the
+  //   content script was ready to receive its message, this ping
+  //   re-checks the same URL once the content script exists.
+  // - The popup, right after saving a new annotation, so the sticky
+  //   note appears immediately instead of waiting for the next
+  //   navigation or periodic full sync. The popup has no sender.tab of
+  //   its own, so it passes tabId explicitly.
   browser.runtime.onMessage.addListener((message: CheckAnnotationMessage, sender) => {
-    if (message?.type === CHECK_ANNOTATION_MESSAGE && sender.tab?.id != null) {
-      checkTab(sender.tab.id, message.url);
-    }
+    if (message?.type !== CHECK_ANNOTATION_MESSAGE) return;
+    const tabId = message.tabId ?? sender.tab?.id;
+    if (tabId != null) checkTab(tabId, message.url);
   });
 });
