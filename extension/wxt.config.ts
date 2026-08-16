@@ -13,7 +13,18 @@ export default defineConfig({
   // entrypoints/background.ts).
   // "alarms" wakes the MV3 service worker on a schedule for periodic
   // full sync even after it has been killed for inactivity.
+  // "web_accessible_resources" exposes annotation-iframe.html so content
+  // scripts can load it in an iframe (see entrypoints/content.ts). The
+  // iframe is what actually renders each note's title/body: since it's
+  // loaded from the extension's own origin rather than injected into the
+  // host page's DOM, the host page cannot read its content.
   manifest: {
     permissions: ['storage', 'activeTab', 'tabs', 'alarms'],
+    web_accessible_resources: [
+      {
+        resources: ['annotation-iframe.html'],
+        matches: ['*://*/*'],
+      },
+    ],
   },
 });
