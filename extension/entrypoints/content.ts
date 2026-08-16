@@ -18,6 +18,8 @@
 // Shadow Root UI could -- they talk over window.postMessage instead,
 // using the small protocol in lib/iframe-messages.ts.
 
+import X from "lucide-solid/icons/x";
+
 import {
   CHECK_ANNOTATION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
@@ -160,8 +162,10 @@ export default defineContentScript({
           const dismissBtn = document.createElement("button");
           dismissBtn.type = "button";
           dismissBtn.setAttribute("aria-label", "Dismiss");
-          dismissBtn.textContent = "\u2715";
           Object.assign(dismissBtn.style, {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             border: "none",
             background: "transparent",
             borderRadius: "4px",
@@ -176,6 +180,9 @@ export default defineContentScript({
             // pointer-events setting overrides its parent's.
             pointerEvents: "auto",
           });
+          // Solid components return a real DOM node when called directly
+          // (no JSX/render() needed here), same icon as old-arch used.
+          dismissBtn.appendChild(X({ size: 16 }) as unknown as Node);
           dismissBtn.addEventListener("mouseenter", () => {
             dismissBtn.style.background = "rgba(127, 127, 127, 0.35)";
           });

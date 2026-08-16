@@ -58,7 +58,6 @@ export default function NoteContent() {
   let titleInputRef: HTMLInputElement | undefined;
   let textareaRef: HTMLTextAreaElement | undefined;
   let contentRef: HTMLDivElement | undefined;
-  let footerRef: HTMLDivElement | undefined;
 
   const isDark = useIsDarkMode();
   const palette = () => (isDark() ? PALETTE.dark : PALETTE.light);
@@ -91,8 +90,11 @@ export default function NoteContent() {
   // ends, so the wrapper shrinks back down instead of staying inflated
   // by the footer's height (footerRef?.offsetHeight is 0 once the
   // footer unmounts).
+  // The footer is an absolutely-positioned overlay (see the Show block
+  // below), not part of the flex layout, so it never contributes to the
+  // note's required height -- only contentRef's own scroll height does.
   const reportContentHeight = () => {
-    const height = (contentRef?.scrollHeight ?? 0) + (footerRef?.offsetHeight ?? 0);
+    const height = contentRef?.scrollHeight ?? 0;
     window.parent.postMessage({ type: NOTE_CONTENT_RESIZE_MESSAGE, height }, "*");
   };
 
@@ -211,6 +213,8 @@ export default function NoteContent() {
             "flex-direction": "column",
             height: "100%",
             "box-sizing": "border-box",
+            // Anchors the footer overlay (see below) to this box.
+            position: "relative",
             background: palette().bg,
             color: palette().text,
             "font-family": "system-ui, -apple-system, sans-serif",
@@ -298,6 +302,9 @@ export default function NoteContent() {
                     style={{
                       display: "block",
                       width: "100%",
+                      // Fills the main area even when the draft is short,
+                      // instead of shrinking to hug just the text.
+                      "min-height": "100%",
                       "box-sizing": "border-box",
                       border: "none",
                       resize: "none",
@@ -310,11 +317,15 @@ export default function NoteContent() {
                 </TextField>
               }
             >
+              {/* min-height 100% makes this fill the whole main area
+                  (not just wrap the text), so double-clicking any blank
+                  space below a short body still starts editing. */}
               <div
                 onDblClick={(e) => {
                   e.preventDefault();
                   startEdit("body");
                 }}
+                style={{ "min-height": "100%" }}
               >
                 <AnnotationBody body={note().body} />
               </div>
@@ -322,15 +333,19 @@ export default function NoteContent() {
           </div>
 
           {/* Footer only appears while editing, so a casual click can
-              never delete data by accident. */}
+              never delete data by accident. It's an absolutely-positioned
+              overlay rather than a layout row, so showing/hiding it never
+              changes the note's height (see reportContentHeight above). */}
           <Show when={editing()}>
             <div
-              ref={(el) => (footerRef = el)}
               style={{
+                position: "absolute",
+                left: "4px",
+                bottom: "4px",
                 display: "flex",
-                "justify-content": "flex-start",
-                padding: "4px 8px",
-                "border-top": `1px solid ${palette().border}`,
+                background: palette().bg,
+                "border-radius": "4px",
+                "box-shadow": "0 1px 3px rgba(0, 0, 0, 0.25)",
               }}
             >
               <Button
