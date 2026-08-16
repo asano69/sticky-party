@@ -100,12 +100,12 @@ test:
 
 lint:
 	golangci-lint run
-	cd frontend && pnpm run lint
+	cd extension && pnpm run lint
 
 
 
 format:
-	cd frontend && pnpm exec prettier --write "src/**/*.{js,jsx,css}"
+	cd extension && pnpm exec prettier --write "src/**/*.{js,jsx,css}"
 
 # 本番では、後方互換性のために残しておいたほうが良いかも。
 migrate-collections:
