@@ -72,12 +72,15 @@ export interface NoteEditingMessage {
   editing: boolean;
 }
 
-// Height (in px) of the note's title row. The row itself is rendered
-// inside the iframe (see NoteContent.tsx), since it displays the title
-// text, but the content script's transparent drag-header overlay (see
-// content.ts) must be exactly this tall too, so the two documents'
-// header regions line up pixel-for-pixel.
-export const TITLE_ROW_HEIGHT_PX = 22;
+// Height (in px) of the note's title row -- matches Tailwind's h-8
+// (2rem) in NoteContent.tsx, and roughly matches the footer's height
+// (icon button + padding) so the header doesn't look squashed next to
+// the body/footer. The row itself is rendered inside the iframe (see
+// NoteContent.tsx), since it displays the title text, but the content
+// script's transparent drag-header overlay (see content.ts) must be
+// exactly this tall too, so the two documents' header regions line up
+// pixel-for-pixel.
+export const TITLE_ROW_HEIGHT_PX = 32;
 
 export type ParentToNoteMessage = InitNoteMessage | StartEditTitleMessage;
 export type NoteToParentMessage =

@@ -164,10 +164,13 @@ export default defineContentScript({
           Object.assign(dismissBtn.style, {
             border: "none",
             background: "transparent",
+            borderRadius: "4px",
             cursor: "pointer",
             font: "inherit",
             lineHeight: "1",
-            padding: "2px 6px",
+            // Bigger touch target so the button doesn't look cramped
+            // now that the header row is taller (TITLE_ROW_HEIGHT_PX).
+            padding: "6px 8px",
             // Stays clickable even while the header above is
             // pointer-events:none during editing -- a child's own
             // pointer-events setting overrides its parent's.
