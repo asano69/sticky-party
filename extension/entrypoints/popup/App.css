@@ -98,6 +98,19 @@
   color: #888;
 }
 
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Cached target list: capped height so a large cache doesn't blow up the
  * popup, with its own scrollbar instead. */
 .target-list {
