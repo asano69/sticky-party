@@ -49,6 +49,15 @@ const Z_BASE = 2147480000;
 export default defineContentScript({
   matches: ["*://*/*"],
   async main(ctx) {
+    // Guard against double-mounting: dev-mode HMR can re-run this script
+    // in the same page without a full reload, which would otherwise
+    // register duplicate listeners and mount duplicate sticky notes.
+    // The flag lives on `window` since that's the one object shared
+    // across re-injections into the same document.
+    const w = window as typeof window & { __stickyPartyContentLoaded?: boolean };
+    if (w.__stickyPartyContentLoaded) return;
+    w.__stickyPartyContentLoaded = true;
+
     // Extension pages only accept a postMessage whose targetOrigin
     // matches their own origin; every note's iframe shares this origin.
     const iframeOrigin = new URL(browser.runtime.getURL(IFRAME_PAGE)).origin;
