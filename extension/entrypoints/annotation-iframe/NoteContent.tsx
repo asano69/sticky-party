@@ -1,28 +1,12 @@
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-import Trash from "lucide-solid/icons/trash";
-import Shredder from "lucide-solid/icons/shredder";
-import Eye from "lucide-solid/icons/eye";
-import EyeOff from "lucide-solid/icons/eye-off";
-import Lock from "lucide-solid/icons/lock";
-import { TextField } from "@kobalte/core/text-field";
-import { Button } from "@kobalte/core/button";
-import { ToggleButton } from "@kobalte/core/toggle-button";
+import { createSignal, onCleanup, Show } from "solid-js";
 
 import { deleteAnnotation, setAnnotationHide, updateAnnotation } from "../../lib/annotations";
-import {
-  INIT_NOTE_MESSAGE,
-  NOTE_CONTENT_RESIZE_MESSAGE,
-  NOTE_DELETED_MESSAGE,
-  NOTE_EDITING_MESSAGE,
-  NOTE_FOCUS_MESSAGE,
-  NOTE_READY_MESSAGE,
-  START_EDIT_TITLE_MESSAGE,
-  TITLE_ROW_HEIGHT_PX,
-  type NoteEditingMessage,
-  type ParentToNoteMessage,
-} from "../../lib/iframe-messages";
 import type { AnnotationData } from "../../lib/messages";
-import AnnotationBody from "./AnnotationBody";
+import { useContentHeight } from "./useContentHeight";
+import { useParentMessaging } from "./useParentMessaging";
+import NoteHeader from "./NoteHeader";
+import NoteMain from "./NoteMain";
+import NoteFooter from "./NoteFooter";
 
 // Sticky-note colors (light/dark) come from the --note-bg/--note-border/
 // --note-text CSS variables in style.css, applied below via Tailwind's
@@ -64,8 +48,10 @@ export default function NoteContent() {
   let shakeTimer: ReturnType<typeof setTimeout> | undefined;
 
   let titleInputRef: HTMLInputElement | undefined;
-  let textareaRef: HTMLTextAreaElement | undefined;
-  let contentRef: HTMLDivElement | undefined;
+
+  // Textarea auto-resize + content-height reporting to content.ts; see
+  // useContentHeight.ts (and docs/note-sizing.md for the full spec).
+  const contentHeight = useContentHeight({ editing, draft, draftTitle });
 
   const startEdit = (field: "title" | "body" = "body") => {
     const current = annotation();
@@ -74,78 +60,25 @@ export default function NoteContent() {
     setDraft(current.body);
     setConfirmDelete(false);
     setEditing(true);
-    queueMicrotask(() => (field === "title" ? titleInputRef : textareaRef)?.focus());
+    queueMicrotask(() => {
+      if (field === "title") titleInputRef?.focus();
+      else contentHeight.focusTextarea();
+    });
   };
 
-  // Grows the textarea to fit its content, with a 4-line floor (see
-  // rows={4} below) so a short note still gets a comfortable minimum
-  // size. Setting height to "auto" first lets scrollHeight reflect that
-  // floor: with no CSS height set, a textarea's intrinsic height comes
-  // from `rows`, and scrollHeight can never be smaller than that box.
-  const resizeTextarea = () => {
-    const el = textareaRef;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  };
-
-  // Reports the note's full (unclipped) content height to the content
-  // script so it can resize the wrapper element -- which lives in the
-  // host page's document, not this iframe -- to fit.
-  //
-  // While editing, this deliberately does NOT read contentRef.scrollHeight:
-  // contentRef is a `flex-1` flex item, so its own box is stretched to
-  // fill whatever height the note currently has. Once the note has grown,
-  // contentRef's box stays that size even after the textarea inside it
-  // shrinks (no overflow means scrollHeight just reflects the box itself),
-  // so shrinking on line-delete would never be detected. Reading
-  // textareaRef's own height instead -- which resizeTextarea keeps
-  // accurate every keystroke -- avoids that trap and shrinks correctly.
-  // contentRef's vertical padding (py-1.5) is added back since it isn't
-  // part of the textarea's own box.
-  //
-  // The footer (see the Show block below) is a flex sibling of
-  // contentRef, not something measured here, so it never contributes to
-  // the note's required height -- only main's own content does.
-  // content.ts (which owns the wrapper element) is what temporarily adds
-  // the footer's height back in while editing.
-  const reportContentHeight = () => {
-    let height = 0;
-    if (editing() && textareaRef && contentRef) {
-      const { paddingTop, paddingBottom } = getComputedStyle(contentRef);
-      height = textareaRef.offsetHeight + parseFloat(paddingTop) + parseFloat(paddingBottom);
-    } else {
-      height = contentRef?.scrollHeight ?? 0;
-    }
-    window.parent.postMessage({ type: NOTE_CONTENT_RESIZE_MESSAGE, height }, "*");
-  };
-
-  // Re-measure whenever the draft text/title changes while editing, so
-  // the wrapper keeps growing as the user types.
-  createEffect(() => {
-    draft();
-    draftTitle();
-    if (!editing()) return;
-    resizeTextarea();
-    queueMicrotask(reportContentHeight);
+   // Content height is intentionally NOT re-measured on exiting edit
+  // mode: while editing, reportContentHeight (see useContentHeight.ts)
+  // already keeps the note's size following the textarea (with its
+  // 4-line floor), and that's the size we want to keep once saved --
+  // re-measuring from the read-mode display here would shrink the note
+  // back down below that floor.
+  const parentMessaging = useParentMessaging({
+    onInit: setAnnotation,
+    onStartEditTitle: () => startEdit("title"),
+    editing,
+    onBlurWhileEditing: () => saveEdit(),
   });
 
-  // Tell the content script whenever edit mode toggles, so its drag
-  // header (see content.ts) can stop intercepting pointer events while
-  // editing -- otherwise clicks could never reach the title input,
-  // since that header overlays this iframe from a separate document.
-  // Content height is intentionally NOT re-measured here on exiting edit
-  // mode: while editing, reportContentHeight already keeps the note's
-  // size following the textarea (with its 4-line floor), and that's the
-  // size we want to keep once saved -- re-measuring from the read-mode
-  // display here would shrink the note back down below that floor.
-  createEffect(() => {
-    const nowEditing = editing();
-    window.parent.postMessage(
-      { type: NOTE_EDITING_MESSAGE, editing: nowEditing } satisfies NoteEditingMessage,
-      "*",
-    );
-  });
 
   const cancelEdit = () => {
     setEditing(false);
@@ -200,7 +133,7 @@ export default function NoteContent() {
     setDeleting(true);
     try {
       await deleteAnnotation(current.id);
-      window.parent.postMessage({ type: NOTE_DELETED_MESSAGE }, "*");
+      parentMessaging.sendDeleted();
     } catch (err) {
       console.error("[sticky-party] failed to delete annotation", err);
       setConfirmDelete(false);
@@ -227,30 +160,7 @@ export default function NoteContent() {
     }
   };
 
-  // Receive the annotation to render, or a request to start editing the
-  // title (relayed from a double-click on the content script's drag
-  // header -- see content.ts), from the content script.
-  const onMessage = (e: MessageEvent<ParentToNoteMessage>) => {
-    if (e.source !== window.parent) return;
-    if (e.data?.type === INIT_NOTE_MESSAGE) setAnnotation(e.data.annotation);
-    else if (e.data?.type === START_EDIT_TITLE_MESSAGE) startEdit("title");
-  };
-  window.addEventListener("message", onMessage);
-  onCleanup(() => window.removeEventListener("message", onMessage));
 
-  // Tell the content script this iframe is ready to receive its
-  // annotation. Sent after the listener above is registered, so the
-  // reply can never arrive before anything is listening for it.
-  window.parent.postMessage({ type: NOTE_READY_MESSAGE }, "*");
-
-  // Auto-save when focus leaves this iframe entirely (e.g. the user
-  // clicks elsewhere on the host page) while editing, mirroring the old
-  // focusout-to-save behavior from the Shadow DOM version.
-  const onWindowBlur = () => {
-    if (editing()) saveEdit();
-  };
-  window.addEventListener("blur", onWindowBlur);
-  onCleanup(() => window.removeEventListener("blur", onWindowBlur));
 
   return (
     <Show when={annotation()}>
@@ -260,162 +170,52 @@ export default function NoteContent() {
           // own listeners (separate document), so report focus
           // explicitly to let the content script bring this note to
           // the front of the stack.
-          onPointerDown={() => window.parent.postMessage({ type: NOTE_FOCUS_MESSAGE }, "*")}
+          onPointerDown={parentMessaging.sendFocus}
           class="flex h-full flex-col box-border bg-[color:var(--note-bg)] text-[color:var(--note-text)] font-[system-ui,-apple-system,sans-serif] text-[14px] leading-[1.4]"
         >
-          {/* Sits directly under the content script's transparent drag
-              header (see content.ts), which is exactly
-              TITLE_ROW_HEIGHT_PX tall and overlays the Dismiss button on
-              top of this row -- that's why the title text stops short of
-              the row's right edge (padding-right below). Background is
-              omitted here since it's already flat-opaque from the
-              wrapper above. */}
-          <header
-            // Height stays inline (not a Tailwind class) since it must
-            // stay tied to the TITLE_ROW_HEIGHT_PX constant -- a
-            // hardcoded class here would be a second source of truth
-            // that could drift from content.ts's drag-header overlay,
-            // which this row has to line up with pixel-for-pixel.
-            style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
-            class="flex shrink-0 items-center box-border pl-2 pr-8 font-bold border-b border-[color:var(--note-border)]"
-          >
-            <Show
-              when={!editing()}
-              fallback={
-                <TextField
-                  value={draftTitle()}
-                  onChange={setDraftTitle}
-                  disabled={saving()}
-                  class="flex-1 min-w-0"
-                >
-                  <TextField.Input
-                    ref={(el) => (titleInputRef = el)}
-                    onKeyDown={onEditorKeyDown}
-                    class="w-full box-border border-none bg-transparent font-[inherit] font-bold text-[color:var(--note-text)]"
-                  />
-                </TextField>
-              }
-            >
-              <div class="w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                {note().title}
-              </div>
-            </Show>
-          </header>
+          <NoteHeader
+            title={note().title}
+            editing={editing()}
+            draftTitle={draftTitle()}
+            onDraftTitleChange={setDraftTitle}
+            saving={saving()}
+            onKeyDown={onEditorKeyDown}
+            titleInputRef={(el) => (titleInputRef = el)}
+          />
 
-          {/* position:relative so the lock-overlay button below can be
-              absolutely positioned over this area. Blur itself is
-              applied to the inner wrapper div, not main -- blurring
-              main directly would blur the overlay button too, since a
-              CSS filter blurs an element's own rendered content
-              (including children) as a whole. */}
-          <main ref={(el) => (contentRef = el)} class="relative flex-1 overflow-auto px-2.5 py-1.5">
-            <div classList={{ "blur-sm": note().hide && !revealed() }}>
-              <Show
-                when={!editing()}
-                fallback={
-                  <TextField value={draft()} onChange={setDraft} disabled={saving()}>
-                    <TextField.TextArea
-                      ref={(el) => {
-                        textareaRef = el;
-                        resizeTextarea();
-                      }}
-                      // Floor: with no CSS height set, a textarea's
-                      // intrinsic height comes from `rows`, and
-                      // scrollHeight (used by resizeTextarea) can't go
-                      // below that -- so this keeps the note at least
-                      // 1 line tall, growing (and shrinking back) with
-                      // its content beyond that.
-                      rows={1}
-                      onInput={resizeTextarea}
-                      onKeyDown={onEditorKeyDown}
-                      // No min-h-full here: that would pin the textarea to
-                      // the note's current (possibly larger, e.g. from a
-                      // previous longer draft) height, preventing it from
-                      // ever shrinking back down when content is removed.
-                      class="block w-full box-border border-none resize-none overflow-hidden bg-transparent font-[inherit] text-[color:var(--note-text)]"
-                    />
-                  </TextField>
-                }
-              >
-                {/* min-h-full makes this fill the whole main area (not
-                    just wrap the text), so double-clicking any blank space
-                    below a short body still starts editing. */}
-                <div
-                  onDblClick={(e) => {
-                    e.preventDefault();
-                    startEdit("body");
-                  }}
-                  class="min-h-full"
-                >
-                  <AnnotationBody body={note().body} />
-                </div>
-              </Show>
-            </div>
-
-            {/* Lets the viewer peek past the blur without changing the
-                persisted hide flag -- a per-view override, not a
-                toggle of hide itself (that's the footer's eye button). */}
-            <Show when={note().hide && !revealed()}>
-              <div class="absolute inset-0 flex items-center justify-center">
-                <Button
-                  onClick={triggerShake}
-                  onDblClick={() => setRevealed(true)}
-                  aria-label="Double-click to reveal note"
-                  class={`sticky-party-icon-btn flex items-center justify-center border-none cursor-pointer p-2 rounded-full${
-                    shaking() ? " sticky-party-shake" : ""
-                  }`}
-                >
-                  <Lock size={20} />
-                </Button>
-              </div>
-            </Show>
-          </main>
+          <NoteMain
+            note={note()}
+            editing={editing()}
+            draft={draft()}
+            onDraftChange={setDraft}
+            saving={saving()}
+            onKeyDown={onEditorKeyDown}
+            onStartEditBody={() => startEdit("body")}
+            setContentRef={contentHeight.setContentRef}
+            setTextareaRef={contentHeight.setTextareaRef}
+            resizeTextarea={contentHeight.resizeTextarea}
+            revealed={revealed()}
+            shaking={shaking()}
+            onLockClick={triggerShake}
+            onLockDblClick={() => setRevealed(true)}
+          />
 
           {/* Footer only appears while editing, so a casual click can
               never delete data by accident. It's a normal flex item
               appended below main, not counted in main's own height:
               content.ts temporarily grows the note's wrapper by exactly
               TITLE_ROW_HEIGHT_PX while editing to make room for it, and
-              reportContentHeight above never includes it, so the note's
+              reportContentHeight never includes it, so the note's
               saved/resting size is unaffected either way. */}
-          {/* Background is omitted here too, for the same reason as the
-              title row above -- it's already flat-opaque from the
-              wrapper. */}
           <Show when={editing()}>
-            <footer
-              // Height stays inline for the same reason as the title
-              // row above: it must stay tied to TITLE_ROW_HEIGHT_PX.
-              style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
-              class="flex shrink-0 items-center justify-start gap-1 box-border px-2 border-t border-[color:var(--note-border)]"
-            >
-              <Button
-                class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
-                onMouseDown={(e: MouseEvent) => e.preventDefault()}
-                onClick={handleDelete}
-                disabled={deleting()}
-                aria-label={confirmDelete() ? "Confirm delete" : "Delete"}
-              >
-                <Show when={confirmDelete()} fallback={<Trash size={16} />}>
-                  <Shredder size={16} />
-                </Show>
-              </Button>
-              {/* onMouseDown preventDefault mirrors the delete button
-                  above: without it, the pointerdown-before-click on this
-                  button would fire the iframe's window "blur" handler's
-                  saveEdit() first, same trap noted for the delete flow. */}
-              <ToggleButton
-                class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
-                onMouseDown={(e: MouseEvent) => e.preventDefault()}
-                pressed={note().hide}
-                onChange={handleToggleHide}
-                disabled={togglingHide()}
-                aria-label={note().hide ? "Unblur note" : "Blur note"}
-              >
-                <Show when={note().hide} fallback={<Eye size={16} />}>
-                  <EyeOff size={16} />
-                </Show>
-              </ToggleButton>
-            </footer>
+            <NoteFooter
+              confirmDelete={confirmDelete()}
+              deleting={deleting()}
+              onDelete={handleDelete}
+              hide={note().hide}
+              togglingHide={togglingHide()}
+              onToggleHide={handleToggleHide}
+            />
           </Show>
         </div>
       )}
