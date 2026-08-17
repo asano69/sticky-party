@@ -365,7 +365,7 @@ export default function NoteContent() {
                     "sticky-party-icon-btn": true,
                     "sticky-party-shake": shaking(),
                   }}
-                  class="flex items-center justify-center border-none bg-black/10 cursor-pointer p-2 rounded-full"
+                  class="flex items-center justify-center border-none cursor-pointer p-2 rounded-full"
                 >
                   <Lock size={20} />
                 </Button>
