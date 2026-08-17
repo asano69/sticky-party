@@ -1046,6 +1046,20 @@ func init() {
 						"type": "relation"
 					},
 					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"help": "",
+						"hidden": false,
+						"id": "relation2375276105",
+						"maxSelect": 0,
+						"minSelect": 0,
+						"name": "user",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
 						"autogeneratePattern": "",
 						"help": "",
 						"hidden": false,
@@ -1053,6 +1067,21 @@ func init() {
 						"max": 0,
 						"min": 0,
 						"name": "device",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"help": "",
+						"hidden": false,
+						"id": "text3746324784",
+						"max": 0,
+						"min": 0,
+						"name": "screen",
 						"pattern": "",
 						"presentable": false,
 						"primaryKey": false,
