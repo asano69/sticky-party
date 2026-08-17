@@ -56,6 +56,12 @@ export default function NoteContent() {
   // note re-blurs the next time hide becomes true rather than staying
   // permanently revealed for the rest of the session.
   const [revealed, setRevealed] = createSignal(false);
+  // Drives the shake animation on a single click of the lock button --
+  // the actual reveal only happens on double-click (see the button
+  // below), so a lone click gets this "not yet" wiggle instead of
+  // silently doing nothing.
+  const [shaking, setShaking] = createSignal(false);
+  let shakeTimer: ReturnType<typeof setTimeout> | undefined;
 
   let titleInputRef: HTMLInputElement | undefined;
   let textareaRef: HTMLTextAreaElement | undefined;
@@ -145,6 +151,19 @@ export default function NoteContent() {
     setEditing(false);
     setConfirmDelete(false);
   };
+
+  // Restarts the shake animation on every single click of the lock
+  // button, including the first click of a double-click -- setting
+  // shaking back to false first (rather than leaving it true) forces
+  // Solid to remove and re-add the class so the CSS animation replays
+  // instead of being a no-op on rapid repeated clicks.
+  const triggerShake = () => {
+    clearTimeout(shakeTimer);
+    setShaking(false);
+    requestAnimationFrame(() => setShaking(true));
+    shakeTimer = setTimeout(() => setShaking(false), 400);
+  };
+  onCleanup(() => clearTimeout(shakeTimer));
 
   const saveEdit = async () => {
     const current = annotation();
@@ -339,9 +358,14 @@ export default function NoteContent() {
             <Show when={note().hide && !revealed()}>
               <div class="absolute inset-0 flex items-center justify-center">
                 <Button
-                  onClick={() => setRevealed(true)}
-                  aria-label="Reveal note"
-                  class="sticky-party-icon-btn flex items-center justify-center border-none bg-black/10 cursor-pointer p-2 rounded-full"
+                  onClick={triggerShake}
+                  onDblClick={() => setRevealed(true)}
+                  aria-label="Double-click to reveal note"
+                  classList={{
+                    "sticky-party-icon-btn": true,
+                    "sticky-party-shake": shaking(),
+                  }}
+                  class="flex items-center justify-center border-none bg-black/10 cursor-pointer p-2 rounded-full"
                 >
                   <Lock size={20} />
                 </Button>

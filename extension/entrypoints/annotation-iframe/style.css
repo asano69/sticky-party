@@ -47,3 +47,30 @@ body {
 .sticky-party-icon-btn:hover {
   background-color: rgba(0, 0, 0, 0.15);
 }
+
+/* Playful "not yet" feedback on the first click of the lock-reveal
+ * button (see NoteContent.tsx) -- the real unlock only happens on
+ * double-click, so a single click just wiggles the button instead of
+ * doing nothing silently. */
+@keyframes sticky-party-shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-4px);
+  }
+  40%,
+  60% {
+    transform: translateX(4px);
+  }
+}
+.sticky-party-shake {
+  animation: sticky-party-shake 0.4s ease-in-out;
+}
