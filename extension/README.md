@@ -2,7 +2,6 @@
 
 This template should help get you started developing with SolidJS in WXT.
 
-
 ```sh
 pnpm dlx wxt@latest init my-extension
 pnpm install
@@ -15,4 +14,3 @@ pnpm dev:firefox
 
 1. about:debugging#/runtime/this-firefox を開く
 2. 一時的なアドオンを読み込む
-

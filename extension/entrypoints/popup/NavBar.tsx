@@ -1,12 +1,12 @@
-import { ToggleGroup } from '@kobalte/core/toggle-group';
-import { Button } from '@kobalte/core/button';
-import SquarePen from 'lucide-solid/icons/square-pen';
-import NotebookTabs from 'lucide-solid/icons/notebook-tabs';
-import SettingsIcon from 'lucide-solid/icons/settings';
-import RefreshCw from 'lucide-solid/icons/refresh-cw';
-import { ICON_BTN } from './classes';
+import { ToggleGroup } from "@kobalte/core/toggle-group";
+import { Button } from "@kobalte/core/button";
+import SquarePen from "lucide-solid/icons/square-pen";
+import NotebookTabs from "lucide-solid/icons/notebook-tabs";
+import SettingsIcon from "lucide-solid/icons/settings";
+import RefreshCw from "lucide-solid/icons/refresh-cw";
+import { ICON_BTN } from "./classes";
 
-export type View = 'home' | 'settings' | 'targets';
+export type View = "home" | "settings" | "targets";
 
 // Header shown atop every popup screen. The three views are switched via
 // Kobalte's ToggleGroup in single-select mode, so exactly one is always
@@ -30,7 +30,7 @@ export default function NavBar(props: {
           disabled={props.syncing}
           aria-label="Sync from server"
         >
-          <RefreshCw size={18} class={props.syncing ? 'animate-spin' : ''} />
+          <RefreshCw size={18} class={props.syncing ? "animate-spin" : ""} />
         </Button>
       </div>
 
@@ -43,7 +43,11 @@ export default function NavBar(props: {
         onChange={(value) => value && props.onViewChange(value as View)}
         class="flex gap-1"
       >
-        <ToggleGroup.Item value="home" class={`${ICON_BTN} data-[pressed]:bg-black/10`} aria-label="Home">
+        <ToggleGroup.Item
+          value="home"
+          class={`${ICON_BTN} data-[pressed]:bg-black/10`}
+          aria-label="Home"
+        >
           <SquarePen size={18} />
         </ToggleGroup.Item>
         <ToggleGroup.Item

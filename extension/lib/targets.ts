@@ -7,9 +7,9 @@
 // background script's periodic full sync. Both full syncs overwrite this
 // key wholesale via setCachedTargets, not addCachedTarget.
 
-import { getAuthedPb } from './pb';
+import { getAuthedPb } from "./pb";
 
-const TARGETS_KEY = 'cachedTargets';
+const TARGETS_KEY = "cachedTargets";
 
 export async function getCachedTargets(): Promise<string[]> {
   const result = await browser.storage.local.get(TARGETS_KEY);
@@ -22,7 +22,7 @@ export async function getCachedTargets(): Promise<string[]> {
 // cache, and match checks) so the normalization rule never drifts out
 // of sync between them.
 export function normalizeTarget(url: string): string {
-  return url.endsWith('/') ? url.slice(0, -1) : url;
+  return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
 export async function addCachedTarget(target: string): Promise<void> {
@@ -51,13 +51,17 @@ export function isTargetMatch(url: string, targets: string[]): boolean {
 // background script's periodic sync.
 export async function fullSyncTargets(): Promise<string[]> {
   const pb = await getAuthedPb();
-  const records = await pb.collection('annotations').getFullList<{ target: string }>({
-    fields: 'target',
-  });
+  const records = await pb
+    .collection("annotations")
+    .getFullList<{ target: string }>({
+      fields: "target",
+    });
   // Multiple annotations can share the same target URL, so dedupe here;
   // otherwise the cached list grows noisy and the match check does
   // redundant work for no benefit.
-  const targets = [...new Set(records.map((record) => record.target).filter(Boolean))];
+  const targets = [
+    ...new Set(records.map((record) => record.target).filter(Boolean)),
+  ];
   await setCachedTargets(targets);
   return targets;
 }

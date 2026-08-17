@@ -52,11 +52,17 @@ export function useContentHeight(params: {
     let height = 0;
     if (params.editing() && textareaRef && contentRef) {
       const { paddingTop, paddingBottom } = getComputedStyle(contentRef);
-      height = textareaRef.offsetHeight + parseFloat(paddingTop) + parseFloat(paddingBottom);
+      height =
+        textareaRef.offsetHeight +
+        parseFloat(paddingTop) +
+        parseFloat(paddingBottom);
     } else {
       height = contentRef?.scrollHeight ?? 0;
     }
-    window.parent.postMessage({ type: NOTE_CONTENT_RESIZE_MESSAGE, height }, "*");
+    window.parent.postMessage(
+      { type: NOTE_CONTENT_RESIZE_MESSAGE, height },
+      "*",
+    );
   };
 
   // Re-measure whenever the draft text/title changes while editing, so
@@ -82,5 +88,11 @@ export function useContentHeight(params: {
 
   const focusTextarea = () => textareaRef?.focus();
 
-  return { setTextareaRef, setContentRef, resizeTextarea, reportContentHeight, focusTextarea };
+  return {
+    setTextareaRef,
+    setContentRef,
+    resizeTextarea,
+    reportContentHeight,
+    focusTextarea,
+  };
 }

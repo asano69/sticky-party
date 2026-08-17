@@ -1,8 +1,17 @@
 import { createSignal, onCleanup, Show } from "solid-js";
 
-import { deleteAnnotation, setAnnotationColor, setAnnotationHide, updateAnnotation } from "../../lib/annotations";
+import {
+  deleteAnnotation,
+  setAnnotationColor,
+  setAnnotationHide,
+  updateAnnotation,
+} from "../../lib/annotations";
 import type { AnnotationData } from "../../lib/messages";
-import { DEFAULT_NOTE_COLOR, isNoteColor, type NoteColor } from "../../lib/colors";
+import {
+  DEFAULT_NOTE_COLOR,
+  isNoteColor,
+  type NoteColor,
+} from "../../lib/colors";
 import { useContentHeight } from "./useContentHeight";
 import { useParentMessaging } from "./useParentMessaging";
 import NoteHeader from "./NoteHeader";
@@ -71,7 +80,7 @@ export default function NoteContent() {
     });
   };
 
-   // Content height is intentionally NOT re-measured on exiting edit
+  // Content height is intentionally NOT re-measured on exiting edit
   // mode: while editing, reportContentHeight (see useContentHeight.ts)
   // already keeps the note's size following the textarea (with its
   // 4-line floor), and that's the size we want to keep once saved --
@@ -83,7 +92,6 @@ export default function NoteContent() {
     editing,
     onBlurWhileEditing: () => saveEdit(),
   });
-
 
   const cancelEdit = () => {
     setEditing(false);
@@ -108,7 +116,10 @@ export default function NoteContent() {
     if (!current) return;
     setSaving(true);
     try {
-      await updateAnnotation(current.id, { title: draftTitle(), body: draft() });
+      await updateAnnotation(current.id, {
+        title: draftTitle(),
+        body: draft(),
+      });
       setAnnotation({ ...current, title: draftTitle(), body: draft() });
       setEditing(false);
     } catch (err) {
@@ -182,8 +193,6 @@ export default function NoteContent() {
     }
   };
 
-
-
   return (
     <Show when={annotation()}>
       {(note) => (
@@ -245,7 +254,9 @@ export default function NoteContent() {
               hide={note().hide}
               togglingHide={togglingHide()}
               onToggleHide={handleToggleHide}
-              color={isNoteColor(note().color) ? note().color : DEFAULT_NOTE_COLOR}
+              color={
+                isNoteColor(note().color) ? note().color : DEFAULT_NOTE_COLOR
+              }
               togglingColor={togglingColor()}
               onColorChange={handleColorChange}
             />

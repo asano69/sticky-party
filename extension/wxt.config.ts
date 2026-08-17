@@ -1,9 +1,9 @@
-import { defineConfig } from 'wxt';
-import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from "wxt";
+import tailwindcss from "@tailwindcss/vite";
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
-  modules: ['@wxt-dev/module-solid'],
+  modules: ["@wxt-dev/module-solid"],
   // Tailwind v4 needs no PostCSS setup, just its own Vite plugin (same
   // pattern as frontend/vite.config.js). Each bundle (popup,
   // annotation-iframe) pulls it in via `@import "tailwindcss";` in its
@@ -28,11 +28,11 @@ export default defineConfig({
   // loaded from the extension's own origin rather than injected into the
   // host page's DOM, the host page cannot read its content.
   manifest: {
-    permissions: ['storage', 'activeTab', 'tabs', 'alarms'],
+    permissions: ["storage", "activeTab", "tabs", "alarms"],
     web_accessible_resources: [
       {
-        resources: ['annotation-iframe.html'],
-        matches: ['*://*/*'],
+        resources: ["annotation-iframe.html"],
+        matches: ["*://*/*"],
       },
     ],
     // Required by Firefox for MV3 add-ons: a stable id so updates are
@@ -42,9 +42,9 @@ export default defineConfig({
     // backend), hence "none".
     browser_specific_settings: {
       gecko: {
-        id: 'sticky-party@asano69.dev',
+        id: "sticky-party@asano69.dev",
         data_collection_permissions: {
-          required: ['none'],
+          required: ["none"],
         },
       },
     },

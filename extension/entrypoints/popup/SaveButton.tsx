@@ -1,8 +1,8 @@
-import { Button } from '@kobalte/core/button';
-import CircleCheckBig from 'lucide-solid/icons/circle-check-big';
-import { ICON_BTN } from './classes';
+import { Button } from "@kobalte/core/button";
+import CircleCheckBig from "lucide-solid/icons/circle-check-big";
+import { ICON_BTN } from "./classes";
 
-export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
+export type SaveStatus = "idle" | "saving" | "success" | "error";
 
 // Shared submit button for popup forms (Home.tsx, Settings.tsx): a
 // circle-check icon that spins while saving, then optionally settles
@@ -15,19 +15,19 @@ export default function SaveButton(props: { status: SaveStatus }) {
     <Button
       type="submit"
       class={ICON_BTN}
-      disabled={props.status === 'saving'}
+      disabled={props.status === "saving"}
       aria-label="Save"
     >
       <CircleCheckBig
         size={20}
         class={
-          props.status === 'saving'
-            ? 'animate-spin'
-            : props.status === 'success'
-              ? 'text-green-600'
-              : props.status === 'error'
-                ? 'text-[#8b0000]'
-                : ''
+          props.status === "saving"
+            ? "animate-spin"
+            : props.status === "success"
+              ? "text-green-600"
+              : props.status === "error"
+                ? "text-[#8b0000]"
+                : ""
         }
       />
     </Button>

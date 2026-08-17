@@ -2,13 +2,13 @@
 // content script (see entrypoints/background.ts and
 // entrypoints/content.ts). Kept in one place so both sides stay in sync.
 
-import type { PositionData, ViewportInfo } from './positions';
+import type { PositionData, ViewportInfo } from "./positions";
 
 // background -> content
-export const SHOW_ANNOTATION_MESSAGE = 'sticky-party:show-annotation';
-export const HIDE_ANNOTATION_MESSAGE = 'sticky-party:hide-annotation';
+export const SHOW_ANNOTATION_MESSAGE = "sticky-party:show-annotation";
+export const HIDE_ANNOTATION_MESSAGE = "sticky-party:hide-annotation";
 // content -> background
-export const CHECK_ANNOTATION_MESSAGE = 'sticky-party:check-annotation';
+export const CHECK_ANNOTATION_MESSAGE = "sticky-party:check-annotation";
 
 // content -> background: fetch/save a note's position and size.
 // Routed through the background script rather than calling PocketBase
@@ -17,8 +17,8 @@ export const CHECK_ANNOTATION_MESSAGE = 'sticky-party:check-annotation';
 // attributes them to the host page's origin, which broke loading saved
 // positions once the extension was installed as a real add-on instead
 // of run via `wxt dev`).
-export const GET_POSITION_MESSAGE = 'sticky-party:get-position';
-export const SAVE_POSITION_MESSAGE = 'sticky-party:save-position';
+export const GET_POSITION_MESSAGE = "sticky-party:get-position";
+export const SAVE_POSITION_MESSAGE = "sticky-party:save-position";
 
 export interface GetPositionMessage {
   type: typeof GET_POSITION_MESSAGE;

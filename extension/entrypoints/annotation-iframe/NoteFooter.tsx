@@ -102,7 +102,10 @@ export default function NoteFooter(props: {
                     color-swatch export yet, so the swatch itself is
                     just a plain colored circle rather than Kobalte's
                     ColorSwatch component. */}
-                <div class="block h-4 w-4 rounded-full" style={{ "background-color": swatchColor(color) }} />
+                <div
+                  class="block h-4 w-4 rounded-full"
+                  style={{ "background-color": swatchColor(color) }}
+                />
               </ToggleGroup.Item>
             )}
           </For>

@@ -92,10 +92,15 @@ test:
 	go test ./...
 
 lint:
-	golangci-lint run
+	golangci-lint run; cd extension && pnpm run lint
 
 # 本番では、後方互換性のために残しておいたほうが良いかも。
 migrate-collections:
 	ls -1 migrations/*.go | sort | head -n -1 | xargs rm -f
 	yes | go run ./cmd/sticky-party migrate collections
 	ls -1 migrations/*.go | sort | head -n -1 | xargs rm -f
+
+
+
+format:
+	cd extension && pnpm exec prettier --write .

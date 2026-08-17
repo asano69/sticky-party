@@ -8,17 +8,19 @@
 // array (not a 404) when nothing matches, so there is no stale-target
 // error case to handle here.
 
-import { getAuthedPb } from './pb';
-import type { AnnotationData } from './messages';
+import { getAuthedPb } from "./pb";
+import type { AnnotationData } from "./messages";
 
 export async function fetchAnnotations(url: string): Promise<AnnotationData[]> {
   const pb = await getAuthedPb();
-  const records = await pb.collection('annotations').getFullList<AnnotationData>({
-    filter: pb.filter('target = {:url}', { url }),
-    // Oldest first, so the most recently edited annotation is rendered
-    // last and sits on top when notes overlap (see AnnotationData.updated).
-    sort: 'updated',
-  });
+  const records = await pb
+    .collection("annotations")
+    .getFullList<AnnotationData>({
+      filter: pb.filter("target = {:url}", { url }),
+      // Oldest first, so the most recently edited annotation is rendered
+      // last and sits on top when notes overlap (see AnnotationData.updated).
+      sort: "updated",
+    });
   // Keep annotations with a title even if the body is empty, since a
   // title alone is now enough content to be worth showing.
   return records.filter((record) => record.body || record.title);
@@ -31,25 +33,31 @@ export async function updateAnnotation(
   data: { title: string; body: string },
 ): Promise<void> {
   const pb = await getAuthedPb();
-  await pb.collection('annotations').update(id, data);
+  await pb.collection("annotations").update(id, data);
 }
 
 // Toggles whether an annotation's body is blurred to guard against
 // shoulder-surfing. Kept separate from updateAnnotation since it's
 // triggered by its own control (the footer's eye/eye-off button), not
 // the title/body edit form.
-export async function setAnnotationHide(id: string, hide: boolean): Promise<void> {
+export async function setAnnotationHide(
+  id: string,
+  hide: boolean,
+): Promise<void> {
   const pb = await getAuthedPb();
-  await pb.collection('annotations').update(id, { hide });
+  await pb.collection("annotations").update(id, { hide });
 }
 
 // Sets an annotation's background color. Kept separate from
 // updateAnnotation for the same reason as setAnnotationHide: it's
 // triggered by its own control (the footer's palette button), not the
 // title/body edit form.
-export async function setAnnotationColor(id: string, color: string): Promise<void> {
+export async function setAnnotationColor(
+  id: string,
+  color: string,
+): Promise<void> {
   const pb = await getAuthedPb();
-  await pb.collection('annotations').update(id, { color });
+  await pb.collection("annotations").update(id, { color });
 }
 
 // Deletes an annotation from PocketBase. Used by the sticky note's trash
@@ -59,5 +67,5 @@ export async function setAnnotationColor(id: string, color: string): Promise<voi
 // risk hiding notes that are still valid.
 export async function deleteAnnotation(id: string): Promise<void> {
   const pb = await getAuthedPb();
-  await pb.collection('annotations').delete(id);
+  await pb.collection("annotations").delete(id);
 }

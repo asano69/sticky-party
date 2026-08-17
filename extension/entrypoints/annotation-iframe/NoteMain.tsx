@@ -34,7 +34,10 @@ export default function NoteMain(props: {
     // directly would blur the overlay button too, since a CSS filter
     // blurs an element's own rendered content (including children) as
     // a whole.
-    <main ref={props.setContentRef} class="relative flex-1 overflow-auto px-2.5 py-1.5">
+    <main
+      ref={props.setContentRef}
+      class="relative flex-1 overflow-auto px-2.5 py-1.5"
+    >
       {/* Fully hides the text (not just blurs it) when hidden, so no
           content leaks through -- only the lock overlay below stays
           visible. */}
@@ -42,7 +45,11 @@ export default function NoteMain(props: {
         <Show
           when={!props.editing}
           fallback={
-            <TextField value={props.draft} onChange={props.onDraftChange} disabled={props.saving}>
+            <TextField
+              value={props.draft}
+              onChange={props.onDraftChange}
+              disabled={props.saving}
+            >
               <TextField.TextArea
                 ref={props.setTextareaRef}
                 // Floor: with no CSS height set, a textarea's

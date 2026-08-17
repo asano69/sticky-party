@@ -75,12 +75,21 @@ function toRatio(pos: PositionData, viewport: ViewportInfo) {
 // Converts a stored ratio back into pixel coordinates for the content
 // page's window, clamping so the note can't be restored off-screen --
 // e.g. after shrinking the window, or loading on a smaller device.
-function fromRatio(record: PositionRecord, viewport: ViewportInfo): PositionData {
+function fromRatio(
+  record: PositionRecord,
+  viewport: ViewportInfo,
+): PositionData {
   const left = record.x * viewport.windowWidth;
   const top = record.y * viewport.windowHeight;
   return {
-    left: Math.min(Math.max(left, 0), Math.max(viewport.windowWidth - record.width, 0)),
-    top: Math.min(Math.max(top, 0), Math.max(viewport.windowHeight - record.height, 0)),
+    left: Math.min(
+      Math.max(left, 0),
+      Math.max(viewport.windowWidth - record.width, 0),
+    ),
+    top: Math.min(
+      Math.max(top, 0),
+      Math.max(viewport.windowHeight - record.height, 0),
+    ),
     width: record.width,
     height: record.height,
     z: record.z,
@@ -97,18 +106,24 @@ export async function fetchPosition(
   if (!userId) throw new Error("Not authenticated.");
 
   try {
-    const record = await pb.collection("positions").getFirstListItem<PositionRecord>(
-      pb.filter("annotation = {:annotation} && user = {:user} && screen = {:screen}", {
-        annotation: annotationId,
-        user: userId,
-        screen: screenKey(viewport),
-      }),
-    );
+    const record = await pb
+      .collection("positions")
+      .getFirstListItem<PositionRecord>(
+        pb.filter(
+          "annotation = {:annotation} && user = {:user} && screen = {:screen}",
+          {
+            annotation: annotationId,
+            user: userId,
+            screen: screenKey(viewport),
+          },
+        ),
+      );
     return { id: record.id, ...fromRatio(record, viewport) };
   } catch (err) {
     // getFirstListItem throws a 404 when no record matches; no saved
     // position yet is a normal case, not an error.
-    if (err instanceof ClientResponseError && err.status === 404) return undefined;
+    if (err instanceof ClientResponseError && err.status === 404)
+      return undefined;
     throw err;
   }
 }

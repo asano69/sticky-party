@@ -1,6 +1,6 @@
 // See docs/architecture.md for the full sync design this implements.
 
-import { fetchAnnotations } from '../lib/annotations';
+import { fetchAnnotations } from "../lib/annotations";
 import {
   CHECK_ANNOTATION_MESSAGE,
   GET_POSITION_MESSAGE,
@@ -9,9 +9,14 @@ import {
   SHOW_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
   type PositionMessage,
-} from '../lib/messages';
-import { fetchPosition, savePosition } from '../lib/positions';
-import { fullSyncTargets, getCachedTargets, isTargetMatch, normalizeTarget } from '../lib/targets';
+} from "../lib/messages";
+import { fetchPosition, savePosition } from "../lib/positions";
+import {
+  fullSyncTargets,
+  getCachedTargets,
+  isTargetMatch,
+  normalizeTarget,
+} from "../lib/targets";
 
 export default defineBackground(() => {
   // Full sync: pull the current target list from PocketBase and
@@ -22,7 +27,7 @@ export default defineBackground(() => {
     } catch (err) {
       // Most commonly missing/invalid credentials in Settings; the popup
       // surfaces that separately, so just log here.
-      console.error('[sticky-party] full sync failed', err);
+      console.error("[sticky-party] full sync failed", err);
     }
   };
 
@@ -33,9 +38,9 @@ export default defineBackground(() => {
   // browser.alarms wakes the service worker on a schedule even after
   // MV3 kills it for inactivity, so this is what makes periodic full
   // sync actually happen in MV3.
-  browser.alarms.create('full-sync', { periodInMinutes: 5 });
+  browser.alarms.create("full-sync", { periodInMinutes: 5 });
   browser.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'full-sync') fullSync();
+    if (alarm.name === "full-sync") fullSync();
   });
 
   // Checks `url` against the cached target list and tells tab `tabId`
@@ -56,16 +61,21 @@ export default defineBackground(() => {
       // Clears any overlay left over from the previous URL. Needed for
       // client-side route changes, where the content script isn't
       // reinjected and so won't reset itself on its own.
-      browser.tabs.sendMessage(tabId, { type: HIDE_ANNOTATION_MESSAGE }).catch(() => {});
+      browser.tabs
+        .sendMessage(tabId, { type: HIDE_ANNOTATION_MESSAGE })
+        .catch(() => {});
       return;
     }
 
     try {
       const annotations = await fetchAnnotations(url);
       if (annotations.length === 0) return;
-      await browser.tabs.sendMessage(tabId, { type: SHOW_ANNOTATION_MESSAGE, annotations });
+      await browser.tabs.sendMessage(tabId, {
+        type: SHOW_ANNOTATION_MESSAGE,
+        annotations,
+      });
     } catch (err) {
-      console.error('[sticky-party] failed to fetch annotation', err);
+      console.error("[sticky-party] failed to fetch annotation", err);
     }
   };
 
@@ -86,11 +96,13 @@ export default defineBackground(() => {
   //   note appears immediately instead of waiting for the next
   //   navigation or periodic full sync. The popup has no sender.tab of
   //   its own, so it passes tabId explicitly.
-  browser.runtime.onMessage.addListener((message: CheckAnnotationMessage, sender) => {
-    if (message?.type !== CHECK_ANNOTATION_MESSAGE) return;
-    const tabId = message.tabId ?? sender.tab?.id;
-    if (tabId != null) checkTab(tabId, message.url);
-  });
+  browser.runtime.onMessage.addListener(
+    (message: CheckAnnotationMessage, sender) => {
+      if (message?.type !== CHECK_ANNOTATION_MESSAGE) return;
+      const tabId = message.tabId ?? sender.tab?.id;
+      if (tabId != null) checkTab(tabId, message.url);
+    },
+  );
 
   // Handles GET_POSITION_MESSAGE/SAVE_POSITION_MESSAGE from content.ts
   // (see lib/messages.ts for why this can't run in the content script
@@ -102,7 +114,12 @@ export default defineBackground(() => {
       return fetchPosition(message.annotationId, message.viewport);
     }
     if (message?.type === SAVE_POSITION_MESSAGE) {
-      return savePosition(message.annotationId, message.position, message.viewport, message.existingId);
+      return savePosition(
+        message.annotationId,
+        message.position,
+        message.viewport,
+        message.existingId,
+      );
     }
   });
 });

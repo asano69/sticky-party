@@ -1,11 +1,21 @@
-import { createSignal, onMount } from 'solid-js';
-import { TextField } from '@kobalte/core/text-field';
+import { createSignal, onMount } from "solid-js";
+import { TextField } from "@kobalte/core/text-field";
 
-import { getAuthedPb } from '../../lib/pb';
-import { CHECK_ANNOTATION_MESSAGE, type CheckAnnotationMessage } from '../../lib/messages';
-import { addCachedTarget, normalizeTarget } from '../../lib/targets';
-import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, FIELD_TEXTAREA, SAVED_HINT } from './classes';
-import SaveButton, { type SaveStatus } from './SaveButton';
+import { getAuthedPb } from "../../lib/pb";
+import {
+  CHECK_ANNOTATION_MESSAGE,
+  type CheckAnnotationMessage,
+} from "../../lib/messages";
+import { addCachedTarget, normalizeTarget } from "../../lib/targets";
+import {
+  CARD,
+  FIELD,
+  FIELD_INPUT,
+  FIELD_LABEL,
+  FIELD_TEXTAREA,
+  SAVED_HINT,
+} from "./classes";
+import SaveButton, { type SaveStatus } from "./SaveButton";
 
 // Form for creating a new annotation on the current page. Saving writes
 // the annotation to PocketBase, then mirrors its target into the local
@@ -13,10 +23,10 @@ import SaveButton, { type SaveStatus } from './SaveButton';
 // docs/architecture.md). Position data (x/y/width/height) is not
 // collected here -- that belongs to the future drag-placement flow.
 export default function Home() {
-  const [url, setUrl] = createSignal('');
-  const [note, setNote] = createSignal('');
-  const [error, setError] = createSignal('');
-  const [status, setStatus] = createSignal<SaveStatus>('idle');
+  const [url, setUrl] = createSignal("");
+  const [note, setNote] = createSignal("");
+  const [error, setError] = createSignal("");
+  const [status, setStatus] = createSignal<SaveStatus>("idle");
   // Needed after save to ask the background script to re-check this tab
   // (see handleSave below); captured once here since the popup has no
   // sender.tab context of its own to fall back on.
@@ -39,7 +49,7 @@ export default function Home() {
   // Lets Ctrl/Cmd+Enter submit from any field, without needing to tab to
   // the Save button first (mirrors AnnotationBoard.tsx's editor shortcut).
   const onFormKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSave(e);
     }
@@ -47,14 +57,14 @@ export default function Home() {
 
   const handleSave = async (e: Event) => {
     e.preventDefault();
-    setError('');
-    setStatus('saving');
+    setError("");
+    setStatus("saving");
     try {
       const pb = await getAuthedPb();
       // Normalize once so the value written to the DB and the value
       // mirrored into the local cache (write-through) are identical.
       const target = normalizeTarget(url());
-      await pb.collection('annotations').create({
+      await pb.collection("annotations").create({
         target,
         body: note(),
       });
@@ -69,11 +79,11 @@ export default function Home() {
           tabId: tabId(),
         } satisfies CheckAnnotationMessage);
       }
-      setNote('');
-      setStatus('success');
+      setNote("");
+      setStatus("success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save.');
-      setStatus('error');
+      setError(err instanceof Error ? err.message : "Failed to save.");
+      setStatus("error");
     }
   };
 
@@ -81,12 +91,20 @@ export default function Home() {
     <form class={CARD} onSubmit={handleSave} onKeyDown={onFormKeyDown}>
       <TextField class={FIELD} value={url()} onChange={setUrl}>
         <TextField.Label class={FIELD_LABEL}>URL</TextField.Label>
-        <TextField.Input class={FIELD_INPUT} type="url" placeholder="https://example.com" />
+        <TextField.Input
+          class={FIELD_INPUT}
+          type="url"
+          placeholder="https://example.com"
+        />
       </TextField>
 
       <TextField class={FIELD} value={note()} onChange={setNote}>
         <TextField.Label class={FIELD_LABEL}>Note</TextField.Label>
-        <TextField.TextArea class={FIELD_TEXTAREA} rows={4} placeholder="Write a note for this page…" />
+        <TextField.TextArea
+          class={FIELD_TEXTAREA}
+          rows={4}
+          placeholder="Write a note for this page…"
+        />
       </TextField>
 
       <div class="flex justify-center">

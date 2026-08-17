@@ -3,7 +3,13 @@
 // CSS variable pair defined (light + dark) in assets/theme.css -- see
 // that file for the actual color values.
 
-export const NOTE_COLORS = ["yellow", "pink", "green", "blue", "purple"] as const;
+export const NOTE_COLORS = [
+  "yellow",
+  "pink",
+  "green",
+  "blue",
+  "purple",
+] as const;
 
 export type NoteColor = (typeof NOTE_COLORS)[number];
 

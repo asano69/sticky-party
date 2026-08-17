@@ -33,7 +33,8 @@ export function useParentMessaging(params: {
   const onMessage = (e: MessageEvent<ParentToNoteMessage>) => {
     if (e.source !== window.parent) return;
     if (e.data?.type === INIT_NOTE_MESSAGE) params.onInit(e.data.annotation);
-    else if (e.data?.type === START_EDIT_TITLE_MESSAGE) params.onStartEditTitle();
+    else if (e.data?.type === START_EDIT_TITLE_MESSAGE)
+      params.onStartEditTitle();
   };
   window.addEventListener("message", onMessage);
   onCleanup(() => window.removeEventListener("message", onMessage));
@@ -50,7 +51,10 @@ export function useParentMessaging(params: {
   createEffect(() => {
     const nowEditing = params.editing();
     window.parent.postMessage(
-      { type: NOTE_EDITING_MESSAGE, editing: nowEditing } satisfies NoteEditingMessage,
+      {
+        type: NOTE_EDITING_MESSAGE,
+        editing: nowEditing,
+      } satisfies NoteEditingMessage,
       "*",
     );
   });
@@ -65,11 +69,13 @@ export function useParentMessaging(params: {
   // listeners (separate document), so focus must be reported
   // explicitly to let the content script bring this note to the front
   // of the stack.
-  const sendFocus = () => window.parent.postMessage({ type: NOTE_FOCUS_MESSAGE }, "*");
+  const sendFocus = () =>
+    window.parent.postMessage({ type: NOTE_FOCUS_MESSAGE }, "*");
 
   // Sent once the annotation has been deleted from PocketBase, so the
   // content script can remove this note's wrapper from the page.
-  const sendDeleted = () => window.parent.postMessage({ type: NOTE_DELETED_MESSAGE }, "*");
+  const sendDeleted = () =>
+    window.parent.postMessage({ type: NOTE_DELETED_MESSAGE }, "*");
 
   return { sendFocus, sendDeleted };
 }

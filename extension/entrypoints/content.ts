@@ -72,7 +72,9 @@ export default defineContentScript({
     // register duplicate listeners and mount duplicate sticky notes.
     // The flag lives on `window` since that's the one object shared
     // across re-injections into the same document.
-    const w = window as typeof window & { __stickyPartyContentLoaded?: boolean };
+    const w = window as typeof window & {
+      __stickyPartyContentLoaded?: boolean;
+    };
     if (w.__stickyPartyContentLoaded) return;
     w.__stickyPartyContentLoaded = true;
 
@@ -97,7 +99,9 @@ export default defineContentScript({
     // Rescaling top/left by the window's size delta on every resize
     // keeps position/windowSize constant -- equivalent to reapplying
     // the original saved ratio -- so no DB round trip is needed here.
-    const repositionOnResize = new Set<(scaleX: number, scaleY: number) => void>();
+    const repositionOnResize = new Set<
+      (scaleX: number, scaleY: number) => void
+    >();
     let prevWindowWidth = window.innerWidth;
     let prevWindowHeight = window.innerHeight;
     window.addEventListener("resize", () => {
@@ -126,11 +130,12 @@ export default defineContentScript({
         // Fetched via the background script, not directly here -- see
         // lib/messages.ts for why a content script can't safely call
         // PocketBase itself.
-        const saved: StoredPosition | undefined = await browser.runtime.sendMessage({
-          type: GET_POSITION_MESSAGE,
-          annotationId: annotation.id,
-          viewport: currentViewport(),
-        } satisfies GetPositionMessage);
+        const saved: StoredPosition | undefined =
+          await browser.runtime.sendMessage({
+            type: GET_POSITION_MESSAGE,
+            annotationId: annotation.id,
+            viewport: currentViewport(),
+          } satisfies GetPositionMessage);
         if (saved) {
           positionRecordId = saved.id;
           top = saved.top;
@@ -218,8 +223,14 @@ export default defineContentScript({
             // the window returns to its original size.
             top *= scaleY;
             left *= scaleX;
-            const clampedTop = Math.min(Math.max(top, 0), Math.max(window.innerHeight - wrapper.offsetHeight, 0));
-            const clampedLeft = Math.min(Math.max(left, 0), Math.max(window.innerWidth - wrapper.offsetWidth, 0));
+            const clampedTop = Math.min(
+              Math.max(top, 0),
+              Math.max(window.innerHeight - wrapper.offsetHeight, 0),
+            );
+            const clampedLeft = Math.min(
+              Math.max(left, 0),
+              Math.max(window.innerWidth - wrapper.offsetWidth, 0),
+            );
             wrapper.style.top = `${clampedTop}px`;
             wrapper.style.left = `${clampedLeft}px`;
           };
