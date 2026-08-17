@@ -35,5 +35,18 @@ export default defineConfig({
         matches: ['*://*/*'],
       },
     ],
+    // Required by Firefox for MV3 add-ons: a stable id so updates are
+    // recognized as the same extension, plus a declaration of what user
+    // data (if any) is collected. This extension collects nothing itself
+    // (annotation data goes straight to the user's own PocketBase
+    // backend), hence "none".
+    browser_specific_settings: {
+      gecko: {
+        id: 'sticky-party@asano69.dev',
+        data_collection_permissions: {
+          required: ['none'],
+        },
+      },
+    },
   },
 });
