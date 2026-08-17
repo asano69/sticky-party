@@ -3,15 +3,40 @@
  * background/text without hand-copying values between them. Each
  * entrypoint's own style.css still defines its own --note-border (the
  * two use different border styles) and any entrypoint-specific
- * variables. */
+ * variables.
+ *
+ * --note-color-<name>-bg/-text define the five selectable note colors
+ * (see lib/colors.ts for the NoteColor list). --note-bg/--note-text are
+ * the popup's fixed palette, and also the fallback annotation-iframe
+ * uses for notes without a recognized color -- both simply alias the
+ * "yellow" pair. */
 :root {
-  --note-bg: #fff8b8;
-  --note-text: #3a3520;
+  --note-color-yellow-bg: #fff8b8;
+  --note-color-yellow-text: #3a3520;
+  --note-color-pink-bg: hsl(330, 65%, 88%);
+  --note-color-pink-text: hsl(330, 45%, 25%);
+  --note-color-green-bg: hsl(140, 55%, 84%);
+  --note-color-green-text: hsl(140, 45%, 20%);
+  --note-color-blue-bg: hsl(210, 65%, 88%);
+  --note-color-blue-text: hsl(210, 45%, 25%);
+  --note-color-purple-bg: hsl(275, 55%, 88%);
+  --note-color-purple-text: hsl(275, 40%, 25%);
+
+  --note-bg: var(--note-color-yellow-bg);
+  --note-text: var(--note-color-yellow-text);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --note-bg: #4a4420;
-    --note-text: #f5efc9;
+    --note-color-yellow-bg: #4a4420;
+    --note-color-yellow-text: #f5efc9;
+    --note-color-pink-bg: hsl(330, 35%, 22%);
+    --note-color-pink-text: hsl(330, 55%, 87%);
+    --note-color-green-bg: hsl(140, 30%, 18%);
+    --note-color-green-text: hsl(140, 45%, 85%);
+    --note-color-blue-bg: hsl(210, 35%, 20%);
+    --note-color-blue-text: hsl(210, 55%, 87%);
+    --note-color-purple-bg: hsl(275, 30%, 21%);
+    --note-color-purple-text: hsl(275, 50%, 87%);
   }
 }

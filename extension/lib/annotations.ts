@@ -43,6 +43,15 @@ export async function setAnnotationHide(id: string, hide: boolean): Promise<void
   await pb.collection('annotations').update(id, { hide });
 }
 
+// Sets an annotation's background color. Kept separate from
+// updateAnnotation for the same reason as setAnnotationHide: it's
+// triggered by its own control (the footer's palette button), not the
+// title/body edit form.
+export async function setAnnotationColor(id: string, color: string): Promise<void> {
+  const pb = await getAuthedPb();
+  await pb.collection('annotations').update(id, { color });
+}
+
 // Deletes an annotation from PocketBase. Used by the sticky note's trash
 // button, shown only while editing. The local target-list cache
 // (lib/targets.ts) is intentionally left untouched here: other

@@ -1,7 +1,8 @@
 import { createSignal, onCleanup, Show } from "solid-js";
 
-import { deleteAnnotation, setAnnotationHide, updateAnnotation } from "../../lib/annotations";
+import { deleteAnnotation, setAnnotationColor, setAnnotationHide, updateAnnotation } from "../../lib/annotations";
 import type { AnnotationData } from "../../lib/messages";
+import { DEFAULT_NOTE_COLOR, isNoteColor, type NoteColor } from "../../lib/colors";
 import { useContentHeight } from "./useContentHeight";
 import { useParentMessaging } from "./useParentMessaging";
 import NoteHeader from "./NoteHeader";
@@ -34,6 +35,10 @@ export default function NoteContent() {
   // Tracks the in-flight PATCH from handleToggleHide, so the button
   // disables itself rather than allowing a second toggle mid-request.
   const [togglingHide, setTogglingHide] = createSignal(false);
+  // Tracks the in-flight PATCH from handleColorChange, so the color
+  // picker disables itself rather than allowing a second change
+  // mid-request.
+  const [togglingColor, setTogglingColor] = createSignal(false);
   // Client-side-only override that lets the viewer peek past the blur
   // without changing the persisted `hide` flag. Reset back to false
   // whenever hide is turned on again (see handleToggleHide), so the
@@ -160,6 +165,23 @@ export default function NoteContent() {
     }
   };
 
+  // Sets the annotation's background color, persisting it immediately --
+  // same pattern as handleToggleHide, since there's no separate save
+  // step for footer controls.
+  const handleColorChange = async (color: NoteColor) => {
+    const current = annotation();
+    if (!current) return;
+    setTogglingColor(true);
+    try {
+      await setAnnotationColor(current.id, color);
+      setAnnotation({ ...current, color });
+    } catch (err) {
+      console.error("[sticky-party] failed to change color", err);
+    } finally {
+      setTogglingColor(false);
+    }
+  };
+
 
 
   return (
@@ -171,6 +193,14 @@ export default function NoteContent() {
           // explicitly to let the content script bring this note to
           // the front of the stack.
           onPointerDown={parentMessaging.sendFocus}
+          // Overrides the shared --note-bg/--note-text (see
+          // assets/theme.css) with this note's own color, falling back
+          // to DEFAULT_NOTE_COLOR for empty/unrecognized values (e.g.
+          // annotations created before the color field existed).
+          style={{
+            "--note-bg": `var(--note-color-${isNoteColor(note().color) ? note().color : DEFAULT_NOTE_COLOR}-bg)`,
+            "--note-text": `var(--note-color-${isNoteColor(note().color) ? note().color : DEFAULT_NOTE_COLOR}-text)`,
+          }}
           class="flex h-full flex-col box-border bg-[color:var(--note-bg)] text-[color:var(--note-text)] font-[system-ui,-apple-system,sans-serif] text-[14px] leading-[1.4]"
         >
           <NoteHeader
@@ -215,6 +245,9 @@ export default function NoteContent() {
               hide={note().hide}
               togglingHide={togglingHide()}
               onToggleHide={handleToggleHide}
+              color={isNoteColor(note().color) ? note().color : DEFAULT_NOTE_COLOR}
+              togglingColor={togglingColor()}
+              onColorChange={handleColorChange}
             />
           </Show>
         </div>

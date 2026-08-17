@@ -20,6 +20,10 @@ export interface AnnotationData {
   // Whether this note's body is blurred (shoulder-surfing protection),
   // toggled via the eye/eye-off button in NoteContent.tsx's footer.
   hide: boolean;
+  // Background color name (see lib/colors.ts), toggled via the palette
+  // button in NoteContent.tsx's footer. Empty/unrecognized values fall
+  // back to DEFAULT_NOTE_COLOR.
+  color: string;
   updated: string;
 }
 

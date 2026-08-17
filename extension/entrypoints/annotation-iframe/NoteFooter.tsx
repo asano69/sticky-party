@@ -1,18 +1,22 @@
-// Renders a note's edit-mode footer: delete (two-step confirm) and
-// blur toggle. Only shown while editing (see the Show block in
-// NoteContent.tsx), so a casual click can never delete data by
+// Renders a note's edit-mode footer: delete (two-step confirm), color
+// picker, and blur toggle. Only shown while editing (see the Show block
+// in NoteContent.tsx), so a casual click can never delete data by
 // accident, and its height (TITLE_ROW_HEIGHT_PX) is added back into
 // the wrapper by content.ts only while editing -- see
 // docs/note-sizing.md.
 
-import { Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import Trash from "lucide-solid/icons/trash";
 import Shredder from "lucide-solid/icons/shredder";
 import Eye from "lucide-solid/icons/eye";
 import EyeOff from "lucide-solid/icons/eye-off";
+import Palette from "lucide-solid/icons/palette";
 import { Button } from "@kobalte/core/button";
 import { ToggleButton } from "@kobalte/core/toggle-button";
+import { ToggleGroup } from "@kobalte/core/toggle-group";
+import { ColorSwatch } from "@kobalte/core/color-swatch";
 import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
+import { NOTE_COLORS, swatchColor, type NoteColor } from "../../lib/colors";
 
 export default function NoteFooter(props: {
   confirmDelete: boolean;
@@ -21,13 +25,24 @@ export default function NoteFooter(props: {
   hide: boolean;
   togglingHide: boolean;
   onToggleHide: (next: boolean) => void;
+  color: NoteColor;
+  togglingColor: boolean;
+  onColorChange: (color: NoteColor) => void;
 }) {
+  // Whether the color swatches are shown. Local to this component (not
+  // annotation.color's own state), since it's purely a UI reveal, not
+  // something persisted.
+  const [pickerOpen, setPickerOpen] = createSignal(false);
+
   return (
     <footer
       // Height stays inline for the same reason as the title row in
       // NoteHeader.tsx: it must stay tied to TITLE_ROW_HEIGHT_PX.
       style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
-      class="flex shrink-0 items-center justify-start gap-1 box-border px-2 border-t border-[color:var(--note-border)]"
+      // overflow-hidden: if the note is too narrow to fit all five
+      // swatches, they simply get clipped -- widening the note is the
+      // fix, not wrapping or scrolling this row.
+      class="flex shrink-0 items-center justify-start gap-1 box-border px-2 border-t border-[color:var(--note-border)] overflow-hidden"
     >
       <Button
         class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
@@ -56,6 +71,40 @@ export default function NoteFooter(props: {
           <EyeOff size={16} />
         </Show>
       </ToggleButton>
+      {/* Same pointerdown/blur trap as the buttons above. */}
+      <Button
+        class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
+        onMouseDown={(e: MouseEvent) => e.preventDefault()}
+        onClick={() => setPickerOpen((open) => !open)}
+        aria-label="Change color"
+        aria-pressed={pickerOpen()}
+      >
+        <Palette size={16} />
+      </Button>
+      <Show when={pickerOpen()}>
+        {/* onMouseDown preventDefault on the group covers every swatch
+            button inside it (the event still bubbles up before its
+            default action runs), same trap as the buttons above. */}
+        <ToggleGroup
+          value={props.color}
+          onChange={(value) => value && props.onColorChange(value as NoteColor)}
+          disabled={props.togglingColor}
+          onMouseDown={(e: MouseEvent) => e.preventDefault()}
+          class="flex shrink-0 items-center gap-1"
+        >
+          <For each={NOTE_COLORS}>
+            {(color) => (
+              <ToggleGroup.Item
+                value={color}
+                aria-label={color}
+                class="flex items-center justify-center rounded-full p-0.5 data-[pressed]:ring-2 data-[pressed]:ring-[color:var(--note-text)]"
+              >
+                <ColorSwatch value={swatchColor(color)} class="block h-4 w-4 rounded-full" />
+              </ToggleGroup.Item>
+            )}
+          </For>
+        </ToggleGroup>
+      </Show>
     </footer>
   );
 }
