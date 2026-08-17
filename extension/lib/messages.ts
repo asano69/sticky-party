@@ -2,7 +2,7 @@
 // content script (see entrypoints/background.ts and
 // entrypoints/content.ts). Kept in one place so both sides stay in sync.
 
-import type { PositionData } from './positions';
+import type { PositionData, ViewportInfo } from './positions';
 
 // background -> content
 export const SHOW_ANNOTATION_MESSAGE = 'sticky-party:show-annotation';
@@ -23,12 +23,17 @@ export const SAVE_POSITION_MESSAGE = 'sticky-party:save-position';
 export interface GetPositionMessage {
   type: typeof GET_POSITION_MESSAGE;
   annotationId: string;
+  // The content page's own viewport/screen -- lib/positions.ts runs in
+  // the background script, which has no access to the content page's
+  // `window`/`screen` (see lib/positions.ts for why that matters).
+  viewport: ViewportInfo;
 }
 
 export interface SavePositionMessage {
   type: typeof SAVE_POSITION_MESSAGE;
   annotationId: string;
   position: PositionData;
+  viewport: ViewportInfo;
   existingId?: string;
 }
 

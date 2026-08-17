@@ -42,7 +42,21 @@ import {
   START_EDIT_TITLE_MESSAGE,
   TITLE_ROW_HEIGHT_PX,
 } from "../lib/iframe-messages";
-import type { StoredPosition } from "../lib/positions";
+import type { StoredPosition, ViewportInfo } from "../lib/positions";
+
+// The content page's own viewport/screen at the moment of the call,
+// read fresh each time rather than cached -- lib/positions.ts needs
+// this because it runs in the background script (see that file's
+// header comment), which has no access to this page's real
+// `window`/`screen`.
+function currentViewport(): ViewportInfo {
+  return {
+    windowWidth: window.innerWidth,
+    windowHeight: window.innerHeight,
+    screenWidth: screen.width,
+    screenHeight: screen.height,
+  };
+}
 
 const IFRAME_PAGE = "/annotation-iframe.html";
 
@@ -115,6 +129,7 @@ export default defineContentScript({
         const saved: StoredPosition | undefined = await browser.runtime.sendMessage({
           type: GET_POSITION_MESSAGE,
           annotationId: annotation.id,
+          viewport: currentViewport(),
         } satisfies GetPositionMessage);
         if (saved) {
           positionRecordId = saved.id;
@@ -234,6 +249,7 @@ export default defineContentScript({
                   height: TITLE_ROW_HEIGHT_PX + contentHeight,
                   z,
                 },
+                viewport: currentViewport(),
                 existingId: positionRecordId,
               } satisfies SavePositionMessage)
               .then((id: string) => (positionRecordId = id))

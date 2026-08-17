@@ -6,10 +6,27 @@
 // than raw pixels, since window size varies across devices (and across
 // resizes of the same window); width/height are stored as raw pixels,
 // since sticky notes have a fixed min-size regardless of window size.
+//
+// This module is called from the background script, not the content
+// script (see lib/messages.ts), so it has no access to the content
+// page's own `window`/`screen` -- reading those globals here would
+// describe the background page instead, which is what broke restoring
+// x/y before this was fixed. Callers must pass the content page's
+// viewport/screen dimensions in explicitly via ViewportInfo.
 
 import { ClientResponseError } from "pocketbase";
 
 import { getAuthedPb } from "./pb";
+
+// The content page's viewport size and display resolution, captured by
+// content.ts (which has the real `window`/`screen`) and passed through
+// the background-script message (see lib/messages.ts).
+export interface ViewportInfo {
+  windowWidth: number;
+  windowHeight: number;
+  screenWidth: number;
+  screenHeight: number;
+}
 
 // This display's resolution, so a dual-monitor setup keeps a separate
 // saved layout per screen instead of two monitors fighting over the
@@ -18,8 +35,8 @@ import { getAuthedPb } from "./pb";
 // (rather than a locally generated fingerprint), so reinstalling the
 // extension -- or switching to a different browser or machine -- still
 // restores the same saved layout instead of starting over.
-function screenKey(): string {
-  return `${screen.width}x${screen.height}`;
+function screenKey(viewport: ViewportInfo): string {
+  return `${viewport.screenWidth}x${viewport.screenHeight}`;
 }
 
 interface PositionRecord {
@@ -43,10 +60,10 @@ export interface StoredPosition extends PositionData {
   id: string;
 }
 
-function toRatio(pos: PositionData) {
+function toRatio(pos: PositionData, viewport: ViewportInfo) {
   return {
-    x: pos.left / window.innerWidth,
-    y: pos.top / window.innerHeight,
+    x: pos.left / viewport.windowWidth,
+    y: pos.top / viewport.windowHeight,
     width: pos.width,
     height: pos.height,
     // z is a stacking order, not a screen coordinate, so it's stored
@@ -55,15 +72,15 @@ function toRatio(pos: PositionData) {
   };
 }
 
-// Converts a stored ratio back into pixel coordinates for the current
-// window, clamping so the note can't be restored off-screen -- e.g.
-// after shrinking the window, or loading on a smaller device.
-function fromRatio(record: PositionRecord): PositionData {
-  const left = record.x * window.innerWidth;
-  const top = record.y * window.innerHeight;
+// Converts a stored ratio back into pixel coordinates for the content
+// page's window, clamping so the note can't be restored off-screen --
+// e.g. after shrinking the window, or loading on a smaller device.
+function fromRatio(record: PositionRecord, viewport: ViewportInfo): PositionData {
+  const left = record.x * viewport.windowWidth;
+  const top = record.y * viewport.windowHeight;
   return {
-    left: Math.min(Math.max(left, 0), Math.max(window.innerWidth - record.width, 0)),
-    top: Math.min(Math.max(top, 0), Math.max(window.innerHeight - record.height, 0)),
+    left: Math.min(Math.max(left, 0), Math.max(viewport.windowWidth - record.width, 0)),
+    top: Math.min(Math.max(top, 0), Math.max(viewport.windowHeight - record.height, 0)),
     width: record.width,
     height: record.height,
     z: record.z,
@@ -71,7 +88,10 @@ function fromRatio(record: PositionRecord): PositionData {
 }
 
 // Fetches this user+display's saved position for an annotation, if any.
-export async function fetchPosition(annotationId: string): Promise<StoredPosition | undefined> {
+export async function fetchPosition(
+  annotationId: string,
+  viewport: ViewportInfo,
+): Promise<StoredPosition | undefined> {
   const pb = await getAuthedPb();
   const userId = pb.authStore.record?.id;
   if (!userId) throw new Error("Not authenticated.");
@@ -81,10 +101,10 @@ export async function fetchPosition(annotationId: string): Promise<StoredPositio
       pb.filter("annotation = {:annotation} && user = {:user} && screen = {:screen}", {
         annotation: annotationId,
         user: userId,
-        screen: screenKey(),
+        screen: screenKey(viewport),
       }),
     );
-    return { id: record.id, ...fromRatio(record) };
+    return { id: record.id, ...fromRatio(record, viewport) };
   } catch (err) {
     // getFirstListItem throws a 404 when no record matches; no saved
     // position yet is a normal case, not an error.
@@ -99,6 +119,7 @@ export async function fetchPosition(annotationId: string): Promise<StoredPositio
 export async function savePosition(
   annotationId: string,
   pos: PositionData,
+  viewport: ViewportInfo,
   existingId?: string,
 ): Promise<string> {
   const pb = await getAuthedPb();
@@ -107,8 +128,8 @@ export async function savePosition(
   const data = {
     annotation: annotationId,
     user: userId,
-    screen: screenKey(),
-    ...toRatio(pos),
+    screen: screenKey(viewport),
+    ...toRatio(pos, viewport),
   };
 
   if (existingId) {

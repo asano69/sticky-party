@@ -99,10 +99,10 @@ export default defineBackground(() => {
   // with whatever fetchPosition/savePosition resolve to.
   browser.runtime.onMessage.addListener((message: PositionMessage) => {
     if (message?.type === GET_POSITION_MESSAGE) {
-      return fetchPosition(message.annotationId);
+      return fetchPosition(message.annotationId, message.viewport);
     }
     if (message?.type === SAVE_POSITION_MESSAGE) {
-      return savePosition(message.annotationId, message.position, message.existingId);
+      return savePosition(message.annotationId, message.position, message.viewport, message.existingId);
     }
   });
 });
