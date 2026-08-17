@@ -1,12 +1,11 @@
 import { createSignal, onMount } from 'solid-js';
 import { TextField } from '@kobalte/core/text-field';
-import { Button } from '@kobalte/core/button';
-import CircleCheckBig from 'lucide-solid/icons/circle-check-big';
 
 import { getAuthedPb } from '../../lib/pb';
 import { CHECK_ANNOTATION_MESSAGE, type CheckAnnotationMessage } from '../../lib/messages';
 import { addCachedTarget, normalizeTarget } from '../../lib/targets';
-import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, FIELD_TEXTAREA, ICON_BTN, SAVED_HINT } from './classes';
+import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, FIELD_TEXTAREA, SAVED_HINT } from './classes';
+import SaveButton, { type SaveStatus } from './SaveButton';
 
 // Form for creating a new annotation on the current page. Saving writes
 // the annotation to PocketBase, then mirrors its target into the local
@@ -17,7 +16,7 @@ export default function Home() {
   const [url, setUrl] = createSignal('');
   const [note, setNote] = createSignal('');
   const [error, setError] = createSignal('');
-  const [saving, setSaving] = createSignal(false);
+  const [status, setStatus] = createSignal<SaveStatus>('idle');
   // Needed after save to ask the background script to re-check this tab
   // (see handleSave below); captured once here since the popup has no
   // sender.tab context of its own to fall back on.
@@ -49,7 +48,7 @@ export default function Home() {
   const handleSave = async (e: Event) => {
     e.preventDefault();
     setError('');
-    setSaving(true);
+    setStatus('saving');
     try {
       const pb = await getAuthedPb();
       // Normalize once so the value written to the DB and the value
@@ -71,10 +70,10 @@ export default function Home() {
         } satisfies CheckAnnotationMessage);
       }
       setNote('');
+      setStatus('success');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save.');
-    } finally {
-      setSaving(false);
+      setStatus('error');
     }
   };
 
@@ -90,13 +89,10 @@ export default function Home() {
         <TextField.TextArea class={FIELD_TEXTAREA} rows={4} placeholder="Write a note for this page…" />
       </TextField>
 
-      {error() && <p class={SAVED_HINT}>{error()}</p>}
-
       <div class="flex justify-center">
-        <Button type="submit" class={ICON_BTN} disabled={saving()} aria-label="Save">
-          <CircleCheckBig size={20} class={saving() ? 'animate-spin' : ''} />
-        </Button>
+        <SaveButton status={status()} />
       </div>
+      {error() && <p class={SAVED_HINT}>{error()}</p>}
     </form>
   );
 }

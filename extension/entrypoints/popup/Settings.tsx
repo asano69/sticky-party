@@ -1,20 +1,18 @@
 import { createSignal, onMount } from 'solid-js';
 import { TextField } from '@kobalte/core/text-field';
-import { Button } from '@kobalte/core/button';
-import CircleCheckBig from 'lucide-solid/icons/circle-check-big';
 
 import { getSettings, saveSettings, ensureFingerprint } from '../../lib/settings';
 import { getAuthedPb } from '../../lib/pb';
-import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, ICON_BTN } from './classes';
+import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, SAVED_HINT } from './classes';
+import SaveButton, { type SaveStatus } from './SaveButton';
 
 export default function Settings() {
   const [email, setEmail] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [backendUrl, setBackendUrl] = createSignal('');
-  const [saving, setSaving] = createSignal(false);
-  // Result of the connection check that follows a save, used to color
-  // the button icon (green/red) instead of showing a text hint.
-  const [status, setStatus] = createSignal<'idle' | 'success' | 'error'>('idle');
+  // Result of the connection check that follows a save, used to drive
+  // SaveButton's spin/color states.
+  const [status, setStatus] = createSignal<SaveStatus>('idle');
   // Only populated on failure, shown below the button so the person
   // knows why the icon turned red.
   const [error, setError] = createSignal('');
@@ -45,8 +43,7 @@ export default function Settings() {
   const handleSave = async (e: Event) => {
     e.preventDefault();
 
-    setSaving(true);
-    setStatus('idle');
+    setStatus('saving');
     setError('');
     try {
       await saveSettings({
@@ -62,8 +59,6 @@ export default function Settings() {
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to connect.');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -85,22 +80,9 @@ export default function Settings() {
       </TextField>
 
       <div class="flex justify-center">
-        <Button type="submit" class={ICON_BTN} disabled={saving()} aria-label="Save">
-          <CircleCheckBig
-            size={20}
-            class={
-              saving()
-                ? 'animate-spin'
-                : status() === 'success'
-                  ? 'text-green-600'
-                  : status() === 'error'
-                    ? 'text-red-600'
-                    : ''
-            }
-          />
-        </Button>
+        <SaveButton status={status()} />
       </div>
-      {status() === 'error' && <p class="m-0 text-[0.8em] text-red-600">{error()}</p>}
+      {status() === 'error' && <p class={SAVED_HINT}>{error()}</p>}
     </form>
   );
 }
