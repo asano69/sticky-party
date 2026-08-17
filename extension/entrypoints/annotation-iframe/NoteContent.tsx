@@ -361,11 +361,9 @@ export default function NoteContent() {
                   onClick={triggerShake}
                   onDblClick={() => setRevealed(true)}
                   aria-label="Double-click to reveal note"
-                  classList={{
-                    "sticky-party-icon-btn": true,
-                    "sticky-party-shake": shaking(),
-                  }}
-                  class="flex items-center justify-center border-none cursor-pointer p-2 rounded-full"
+                  class={`sticky-party-icon-btn flex items-center justify-center border-none cursor-pointer p-2 rounded-full${
+                    shaking() ? " sticky-party-shake" : ""
+                  }`}
                 >
                   <Lock size={20} />
                 </Button>
