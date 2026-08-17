@@ -12,35 +12,38 @@ import {
 } from "../lib/messages";
 import { fetchPosition, savePosition } from "../lib/positions";
 import {
-  fullSyncTargets,
   getCachedTargets,
   isTargetMatch,
   normalizeTarget,
+  removeCachedTarget,
+  syncTargets,
 } from "../lib/targets";
 
 export default defineBackground(() => {
-  // Full sync: pull the current target list from PocketBase and
-  // overwrite the local cache wholesale.
-  const fullSync = async () => {
+  // Keeps the local target cache fresh: a differential sync (only
+  // annotations touched since the last sync) once a previous sync
+  // exists, falling back to a full sync on the very first run (see
+  // lib/targets.ts's syncTargets).
+  const sync = async () => {
     try {
-      await fullSyncTargets();
+      await syncTargets();
     } catch (err) {
       // Most commonly missing/invalid credentials in Settings; the popup
       // surfaces that separately, so just log here.
-      console.error("[sticky-party] full sync failed", err);
+      console.error("[sticky-party] target sync failed", err);
     }
   };
 
   // Runs once whenever the service worker starts (extension install,
   // browser restart, or SW waking up after being killed).
-  fullSync();
+  sync();
 
   // browser.alarms wakes the service worker on a schedule even after
-  // MV3 kills it for inactivity, so this is what makes periodic full
-  // sync actually happen in MV3.
-  browser.alarms.create("full-sync", { periodInMinutes: 5 });
+  // MV3 kills it for inactivity, so this is what makes periodic sync
+  // actually happen in MV3.
+  browser.alarms.create("target-sync", { periodInMinutes: 5 });
   browser.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === "full-sync") fullSync();
+    if (alarm.name === "target-sync") sync();
   });
 
   // Checks `url` against the cached target list and tells tab `tabId`
@@ -69,7 +72,15 @@ export default defineBackground(() => {
 
     try {
       const annotations = await fetchAnnotations(url);
-      if (annotations.length === 0) return;
+      if (annotations.length === 0) {
+        // The cache said this URL had an annotation, but the DB has
+        // none -- most likely it was deleted since the last sync (a
+        // differential sync can't detect deletions on its own; see
+        // lib/targets.ts's syncTargets). Drop it now so future checks
+        // skip this URL without a network round trip.
+        await removeCachedTarget(url);
+        return;
+      }
       await browser.tabs.sendMessage(tabId, {
         type: SHOW_ANNOTATION_MESSAGE,
         annotations,
