@@ -1,6 +1,7 @@
-import { createResource, For, Show } from 'solid-js';
+import { createMemo, createResource, createSignal, For, Show } from 'solid-js';
+import { TextField } from '@kobalte/core/text-field';
 import { getCachedTargets } from '../../lib/targets';
-import { CARD, SAVED_HINT } from './classes';
+import { CARD, FIELD_INPUT, SAVED_HINT } from './classes';
 
 // Read-only view of the local target cache (see docs/architecture.md).
 // Lets you sanity-check that write-through/full-sync is populating the
@@ -10,19 +11,42 @@ import { CARD, SAVED_HINT } from './classes';
 // cache each time it mounts.
 export default function Targets() {
   const [targets] = createResource(getCachedTargets);
+  const [query, setQuery] = createSignal('');
+
+  // Case-insensitive substring match, recomputed on every keystroke so
+  // the list narrows incrementally. No network round trip: it just
+  // filters the already-cached target list held in `targets`.
+  const filtered = createMemo(() => {
+    const q = query().trim().toLowerCase();
+    const all = targets() ?? [];
+    return q ? all.filter((target) => target.toLowerCase().includes(q)) : all;
+  });
 
   return (
     <div class={CARD}>
-      <Show when={(targets() ?? []).length > 0} fallback={<p class={SAVED_HINT}>No cached URLs yet.</p>}>
-        <ul class="m-0 flex max-h-[200px] list-none flex-col gap-1 overflow-y-auto p-0">
-          <For each={targets()}>
-            {(target) => (
-              <li class="break-all rounded-md border border-[color:var(--note-button-border)] px-2 py-1 text-[0.8em]">
-                {target}
-              </li>
-            )}
-          </For>
-        </ul>
+      <Show when={(targets() ?? []).length > 1} fallback={<p class={SAVED_HINT}>No cached URLs yet.</p>}>
+        <TextField value={query()} onChange={setQuery}>
+          <TextField.Input class={FIELD_INPUT} type="search" placeholder="Search cached URLs…" />
+        </TextField>
+
+        <Show when={filtered().length > 0} fallback={<p class={SAVED_HINT}>No matches.</p>}>
+          <ul class="m-0 flex max-h-[200px] list-none flex-col gap-1 overflow-y-auto p-0">
+    <For each={filtered()}>
+  {(target) => (
+    <li>
+      <a
+        href={target}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="block truncate text-[0.8em] text-inherit underline"
+      >
+        {target}
+      </a>
+    </li>
+  )}
+</For>
+          </ul>
+        </Show>
       </Show>
     </div>
   );
