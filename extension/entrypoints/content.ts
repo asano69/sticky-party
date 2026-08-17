@@ -169,13 +169,20 @@ export default defineContentScript({
           // window when the browser window is resized (registered
           // into repositionOnResize above).
           reposition = (scaleX, scaleY) => {
+            // top/left themselves stay pure ratio-scaled values, never
+            // clamped -- clamping the state itself (not just the
+            // rendered position) would permanently lose the note's true
+            // position once the window shrinks far enough, so growing
+            // the window back afterward could no longer restore it
+            // exactly. Only the on-screen rendering is clamped here, so
+            // top/left always scale back to their original values once
+            // the window returns to its original size.
             top *= scaleY;
             left *= scaleX;
-            // Clamp so shrinking the window can't strand the note off-screen.
-            top = Math.min(Math.max(top, 0), Math.max(window.innerHeight - wrapper.offsetHeight, 0));
-            left = Math.min(Math.max(left, 0), Math.max(window.innerWidth - wrapper.offsetWidth, 0));
-            wrapper.style.top = `${top}px`;
-            wrapper.style.left = `${left}px`;
+            const clampedTop = Math.min(Math.max(top, 0), Math.max(window.innerHeight - wrapper.offsetHeight, 0));
+            const clampedLeft = Math.min(Math.max(left, 0), Math.max(window.innerWidth - wrapper.offsetWidth, 0));
+            wrapper.style.top = `${clampedTop}px`;
+            wrapper.style.left = `${clampedLeft}px`;
           };
           repositionOnResize.add(reposition);
 
