@@ -35,7 +35,13 @@ a {
  * note's own text color (see lib/colors.ts's five note colors) -- the
  * dark value is lighter so it still reads clearly against dark note
  * backgrounds. */
+/* Lets the browser render native form controls (the task-list
+ * checkbox in AnnotationBody.tsx) with the correct light/dark
+ * appearance automatically, instead of always defaulting to light --
+ * this iframe never otherwise declares a color scheme, unlike
+ * popup/style.css which already sets this. */
 :root {
+  color-scheme: light dark;
   --note-border: rgba(0, 0, 0, 0.25);
   --note-link: #1a56db;
 }
