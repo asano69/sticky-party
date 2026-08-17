@@ -35,7 +35,10 @@ export default function NoteMain(props: {
     // blurs an element's own rendered content (including children) as
     // a whole.
     <main ref={props.setContentRef} class="relative flex-1 overflow-auto px-2.5 py-1.5">
-      <div classList={{ "blur-sm": props.note.hide && !props.revealed }}>
+      {/* Fully hides the text (not just blurs it) when hidden, so no
+          content leaks through -- only the lock overlay below stays
+          visible. */}
+      <div classList={{ invisible: props.note.hide && !props.revealed }}>
         <Show
           when={!props.editing}
           fallback={
