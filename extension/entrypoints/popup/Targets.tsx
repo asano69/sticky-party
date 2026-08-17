@@ -24,7 +24,9 @@ export default function Targets() {
 
   return (
     <div class={CARD}>
-      <Show when={(targets() ?? []).length > 1} fallback={<p class={SAVED_HINT}>No cached URLs yet.</p>}>
+      {/* > 0, not > 1: a single cached URL should still render the
+          search box and list, not fall back to the empty state. */}
+      <Show when={(targets() ?? []).length > 0} fallback={<p class={SAVED_HINT}>No cached URLs yet.</p>}>
         <TextField value={query()} onChange={setQuery}>
           <TextField.Input class={FIELD_INPUT} type="search" placeholder="Search cached URLs…" />
         </TextField>
