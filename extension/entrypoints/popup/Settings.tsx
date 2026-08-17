@@ -4,13 +4,20 @@ import { Button } from '@kobalte/core/button';
 import CircleCheckBig from 'lucide-solid/icons/circle-check-big';
 
 import { getSettings, saveSettings, ensureFingerprint } from '../../lib/settings';
-import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, ICON_BTN, SAVED_HINT } from './classes';
+import { getAuthedPb } from '../../lib/pb';
+import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, ICON_BTN } from './classes';
 
 export default function Settings() {
   const [email, setEmail] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [backendUrl, setBackendUrl] = createSignal('');
-  const [saved, setSaved] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
+  // Result of the connection check that follows a save, used to color
+  // the button icon (green/red) instead of showing a text hint.
+  const [status, setStatus] = createSignal<'idle' | 'success' | 'error'>('idle');
+  // Only populated on failure, shown below the button so the person
+  // knows why the icon turned red.
+  const [error, setError] = createSignal('');
 
   onMount(async () => {
     const settings = await getSettings();
@@ -38,14 +45,26 @@ export default function Settings() {
   const handleSave = async (e: Event) => {
     e.preventDefault();
 
-    await saveSettings({
-      email: email(),
-      password: password(),
-      backendUrl: backendUrl(),
-    });
-
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    setSaving(true);
+    setStatus('idle');
+    setError('');
+    try {
+      await saveSettings({
+        email: email(),
+        password: password(),
+        backendUrl: backendUrl(),
+      });
+      // Actually authenticate with the entered credentials/URL, so the
+      // icon reflects whether the connection really works, not just
+      // that the values were saved locally.
+      await getAuthedPb();
+      setStatus('success');
+    } catch (err) {
+      setStatus('error');
+      setError(err instanceof Error ? err.message : 'Failed to connect.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -66,11 +85,22 @@ export default function Settings() {
       </TextField>
 
       <div class="flex justify-center">
-        <Button type="submit" class={ICON_BTN} aria-label="Save">
-          <CircleCheckBig size={20} />
+        <Button type="submit" class={ICON_BTN} disabled={saving()} aria-label="Save">
+          <CircleCheckBig
+            size={20}
+            class={
+              saving()
+                ? 'animate-spin'
+                : status() === 'success'
+                  ? 'text-green-600'
+                  : status() === 'error'
+                    ? 'text-red-600'
+                    : ''
+            }
+          />
         </Button>
       </div>
-      {saved() && <p class={SAVED_HINT}>Saved.</p>}
+      {status() === 'error' && <p class="m-0 text-[0.8em] text-red-600">{error()}</p>}
     </form>
   );
 }
