@@ -1,7 +1,7 @@
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js';
 import { TextField } from '@kobalte/core/text-field';
 import { getCachedTargets } from '../../lib/targets';
-import { CARD, FIELD_INPUT, SAVED_HINT } from './classes';
+import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, SAVED_HINT } from './classes';
 
 // Read-only view of the local target cache (see docs/architecture.md).
 // Lets you sanity-check that write-through/full-sync is populating the
@@ -27,7 +27,8 @@ export default function Targets() {
       {/* > 0, not > 1: a single cached URL should still render the
           search box and list, not fall back to the empty state. */}
       <Show when={(targets() ?? []).length > 0} fallback={<p class={SAVED_HINT}>No cached URLs yet.</p>}>
-        <TextField value={query()} onChange={setQuery}>
+        <TextField class={FIELD} value={query()} onChange={setQuery}>
+          <TextField.Label class={FIELD_LABEL}>Search</TextField.Label>
           <TextField.Input class={FIELD_INPUT} type="search" placeholder="Search cached URLs…" />
         </TextField>
 

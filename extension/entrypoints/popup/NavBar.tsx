@@ -12,7 +12,8 @@ export type View = 'home' | 'settings' | 'targets';
 // Kobalte's ToggleGroup in single-select mode, so exactly one is always
 // active -- this replaces the old back-button/conditional-header setup,
 // since all three icons can now just stay visible all the time. Sync is
-// a one-off action rather than a view, so it stays outside the group.
+// a one-off action rather than a view, so it stays outside the group,
+// placed right next to the title instead.
 export default function NavBar(props: {
   view: View;
   onViewChange: (view: View) => void;
@@ -21,8 +22,8 @@ export default function NavBar(props: {
 }) {
   return (
     <header class="flex items-center justify-between px-3 pt-3">
-      <h1 class="m-0 text-[1.1em] leading-tight font-bold">Note</h1>
       <div class="flex items-center gap-1">
+        <div class="font-bold">Note</div>
         <Button
           class={ICON_BTN}
           onClick={props.onSync}
@@ -31,35 +32,35 @@ export default function NavBar(props: {
         >
           <RefreshCw size={18} class={props.syncing ? 'animate-spin' : ''} />
         </Button>
-
-        <ToggleGroup
-          value={props.view}
-          // Guard against `value` being null: ToggleGroup in single
-          // mode reports null when the active item is toggled off, but
-          // this group is a mode switcher, not an optional filter -- one
-          // view must always stay selected.
-          onChange={(value) => value && props.onViewChange(value as View)}
-          class="flex gap-1"
-        >
-          <ToggleGroup.Item value="home" class={`${ICON_BTN} data-[pressed]:bg-black/10`} aria-label="Home">
-            <SquarePen size={18} />
-          </ToggleGroup.Item>
-          <ToggleGroup.Item
-            value="targets"
-            class={`${ICON_BTN} data-[pressed]:bg-black/10`}
-            aria-label="Cached URLs"
-          >
-            <NotebookTabs size={18} />
-          </ToggleGroup.Item>
-          <ToggleGroup.Item
-            value="settings"
-            class={`${ICON_BTN} data-[pressed]:bg-black/10`}
-            aria-label="Settings"
-          >
-            <SettingsIcon size={18} />
-          </ToggleGroup.Item>
-        </ToggleGroup>
       </div>
+
+      <ToggleGroup
+        value={props.view}
+        // Guard against `value` being null: ToggleGroup in single
+        // mode reports null when the active item is toggled off, but
+        // this group is a mode switcher, not an optional filter -- one
+        // view must always stay selected.
+        onChange={(value) => value && props.onViewChange(value as View)}
+        class="flex gap-1"
+      >
+        <ToggleGroup.Item value="home" class={`${ICON_BTN} data-[pressed]:bg-black/10`} aria-label="Home">
+          <SquarePen size={18} />
+        </ToggleGroup.Item>
+        <ToggleGroup.Item
+          value="targets"
+          class={`${ICON_BTN} data-[pressed]:bg-black/10`}
+          aria-label="Cached URLs"
+        >
+          <NotebookTabs size={18} />
+        </ToggleGroup.Item>
+        <ToggleGroup.Item
+          value="settings"
+          class={`${ICON_BTN} data-[pressed]:bg-black/10`}
+          aria-label="Settings"
+        >
+          <SettingsIcon size={18} />
+        </ToggleGroup.Item>
+      </ToggleGroup>
     </header>
   );
 }
