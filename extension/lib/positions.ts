@@ -1,6 +1,6 @@
 // Reads and writes a sticky note's on-page position and size, persisted
-// per (annotation, device) in the `positions` collection so each device
-// keeps its own layout (see AnnotationBoard.tsx).
+// per (annotation, user, screen) in the `positions` collection so each
+// display keeps its own layout (see AnnotationBoard.tsx).
 //
 // x/y are stored as ratios of the window's inner width/height rather
 // than raw pixels, since window size varies across devices (and across
@@ -10,14 +10,16 @@
 import { ClientResponseError } from "pocketbase";
 
 import { getAuthedPb } from "./pb";
-import { ensureFingerprint, getSettings } from "./settings";
 
-// Combines the browser fingerprint with this display's resolution, so a
-// dual-monitor setup keeps a separate saved layout per screen instead of
-// two monitors fighting over the same stored position (e.g. a laptop
-// docked to an external display with a different resolution).
-function deviceKey(fingerprint: string): string {
-  return `${fingerprint}@${screen.width}x${screen.height}`;
+// This display's resolution, so a dual-monitor setup keeps a separate
+// saved layout per screen instead of two monitors fighting over the
+// same stored position (e.g. a laptop docked to an external display
+// with a different resolution). Combined with the backend user id
+// (rather than a locally generated fingerprint), so reinstalling the
+// extension -- or switching to a different browser or machine -- still
+// restores the same saved layout instead of starting over.
+function screenKey(): string {
+  return `${screen.width}x${screen.height}`;
 }
 
 interface PositionRecord {
@@ -68,17 +70,18 @@ function fromRatio(record: PositionRecord): PositionData {
   };
 }
 
-// Fetches this device's saved position for an annotation, if any.
+// Fetches this user+display's saved position for an annotation, if any.
 export async function fetchPosition(annotationId: string): Promise<StoredPosition | undefined> {
-  await ensureFingerprint();
-  const settings = await getSettings();
   const pb = await getAuthedPb();
+  const userId = pb.authStore.record?.id;
+  if (!userId) throw new Error("Not authenticated.");
 
   try {
     const record = await pb.collection("positions").getFirstListItem<PositionRecord>(
-      pb.filter("annotation = {:annotation} && device = {:device}", {
+      pb.filter("annotation = {:annotation} && user = {:user} && screen = {:screen}", {
         annotation: annotationId,
-        device: deviceKey(settings!.fingerprint),
+        user: userId,
+        screen: screenKey(),
       }),
     );
     return { id: record.id, ...fromRatio(record) };
@@ -90,20 +93,21 @@ export async function fetchPosition(annotationId: string): Promise<StoredPositio
   }
 }
 
-// Saves this device's position/size for an annotation. Pass the id
-// returned by a previous fetchPosition/savePosition call to update that
-// record instead of creating a new one.
+// Saves this user+display's position/size for an annotation. Pass the
+// id returned by a previous fetchPosition/savePosition call to update
+// that record instead of creating a new one.
 export async function savePosition(
   annotationId: string,
   pos: PositionData,
   existingId?: string,
 ): Promise<string> {
-  await ensureFingerprint();
-  const settings = await getSettings();
   const pb = await getAuthedPb();
+  const userId = pb.authStore.record?.id;
+  if (!userId) throw new Error("Not authenticated.");
   const data = {
     annotation: annotationId,
-    device: deviceKey(settings!.fingerprint),
+    user: userId,
+    screen: screenKey(),
     ...toRatio(pos),
   };
 

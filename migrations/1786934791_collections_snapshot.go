@@ -1063,21 +1063,6 @@ func init() {
 						"autogeneratePattern": "",
 						"help": "",
 						"hidden": false,
-						"id": "text154121870",
-						"max": 0,
-						"min": 0,
-						"name": "device",
-						"pattern": "",
-						"presentable": false,
-						"primaryKey": false,
-						"required": false,
-						"system": false,
-						"type": "text"
-					},
-					{
-						"autogeneratePattern": "",
-						"help": "",
-						"hidden": false,
 						"id": "text3746324784",
 						"max": 0,
 						"min": 0,
@@ -1177,7 +1162,7 @@ func init() {
 				],
 				"id": "pbc_2998141924",
 				"indexes": [
-					"CREATE UNIQUE INDEX ` + "`" + `idx_5tpj9cvacu` + "`" + ` ON ` + "`" + `positions` + "`" + ` (\n  ` + "`" + `annotation` + "`" + `,\n  ` + "`" + `device` + "`" + `\n)"
+					"CREATE UNIQUE INDEX ` + "`" + `idx_9viysjs323` + "`" + ` ON ` + "`" + `positions` + "`" + ` (\n  ` + "`" + `annotation` + "`" + `,\n  ` + "`" + `user` + "`" + `,\n  ` + "`" + `screen` + "`" + `\n)"
 				],
 				"listRule": "",
 				"name": "positions",

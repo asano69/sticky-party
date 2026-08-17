@@ -1,7 +1,7 @@
 import { createSignal, onMount } from 'solid-js';
 import { TextField } from '@kobalte/core/text-field';
 
-import { getSettings, saveSettings, ensureFingerprint } from '../../lib/settings';
+import { getSettings, saveSettings } from '../../lib/settings';
 import { getAuthedPb } from '../../lib/pb';
 import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, SAVED_HINT } from './classes';
 import SaveButton, { type SaveStatus } from './SaveButton';
@@ -25,10 +25,6 @@ export default function Settings() {
       setPassword(settings.password);
       setBackendUrl(settings.backendUrl);
     }
-
-    // Ensure a fingerprint exists as soon as the popup is opened, even if
-    // the user never touches the form.
-    await ensureFingerprint();
   });
 
   // Lets Ctrl/Cmd+Enter submit from any field, without needing to tab to
