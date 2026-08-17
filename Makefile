@@ -74,8 +74,14 @@ server:
 dev-back: clean
 	air
 
+# Firefox defaults to MV2 (see extension/README.md), but this project's
+# background.ts/content.ts rely on MV3 semantics (service-worker
+# alarms, content-script network requests routed through the
+# background script -- see lib/messages.ts), so dev matches the MV3
+# build produced by zip-extension-firefox instead of pnpm's default
+# dev:firefox script.
 dev-ext:
-	cd extension && pnpm dev:firefox
+	cd extension && pnpm exec wxt -b firefox --mv3
 
 icons:
 	cd extension && pnpm run icons

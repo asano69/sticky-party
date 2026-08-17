@@ -2,11 +2,37 @@
 // content script (see entrypoints/background.ts and
 // entrypoints/content.ts). Kept in one place so both sides stay in sync.
 
+import type { PositionData } from './positions';
+
 // background -> content
 export const SHOW_ANNOTATION_MESSAGE = 'sticky-party:show-annotation';
 export const HIDE_ANNOTATION_MESSAGE = 'sticky-party:hide-annotation';
 // content -> background
 export const CHECK_ANNOTATION_MESSAGE = 'sticky-party:check-annotation';
+
+// content -> background: fetch/save a note's position and size.
+// Routed through the background script rather than calling PocketBase
+// directly from content.ts, because a content script's own network
+// requests are treated differently from the extension's (Firefox
+// attributes them to the host page's origin, which broke loading saved
+// positions once the extension was installed as a real add-on instead
+// of run via `wxt dev`).
+export const GET_POSITION_MESSAGE = 'sticky-party:get-position';
+export const SAVE_POSITION_MESSAGE = 'sticky-party:save-position';
+
+export interface GetPositionMessage {
+  type: typeof GET_POSITION_MESSAGE;
+  annotationId: string;
+}
+
+export interface SavePositionMessage {
+  type: typeof SAVE_POSITION_MESSAGE;
+  annotationId: string;
+  position: PositionData;
+  existingId?: string;
+}
+
+export type PositionMessage = GetPositionMessage | SavePositionMessage;
 
 // A single annotation's id (needed to save edits back to PocketBase),
 // body text, and last-updated timestamp. `updated` drives the stacking

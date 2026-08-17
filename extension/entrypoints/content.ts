@@ -22,11 +22,15 @@ import X from "lucide-solid/icons/x";
 
 import {
   CHECK_ANNOTATION_MESSAGE,
+  GET_POSITION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
+  SAVE_POSITION_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type AnnotationData,
   type AnnotationMessage,
   type CheckAnnotationMessage,
+  type GetPositionMessage,
+  type SavePositionMessage,
 } from "../lib/messages";
 import {
   INIT_NOTE_MESSAGE,
@@ -38,7 +42,7 @@ import {
   START_EDIT_TITLE_MESSAGE,
   TITLE_ROW_HEIGHT_PX,
 } from "../lib/iframe-messages";
-import { fetchPosition, savePosition } from "../lib/positions";
+import type { StoredPosition } from "../lib/positions";
 
 const IFRAME_PAGE = "/annotation-iframe.html";
 
@@ -105,7 +109,13 @@ export default defineContentScript({
       let savedHeight: number | undefined;
 
       try {
-        const saved = await fetchPosition(annotation.id);
+        // Fetched via the background script, not directly here -- see
+        // lib/messages.ts for why a content script can't safely call
+        // PocketBase itself.
+        const saved: StoredPosition | undefined = await browser.runtime.sendMessage({
+          type: GET_POSITION_MESSAGE,
+          annotationId: annotation.id,
+        } satisfies GetPositionMessage);
         if (saved) {
           positionRecordId = saved.id;
           top = saved.top;
@@ -206,22 +216,28 @@ export default defineContentScript({
           };
 
           const persistPosition = () => {
-            savePosition(
-              annotation.id,
-              // Use contentHeight (the resting/non-editing size), not
-              // wrapper.offsetHeight -- the wrapper is temporarily taller
-              // than that while editing (see applyWrapperHeight above).
-              {
-                top,
-                left,
-                width: wrapper.offsetWidth,
-                height: TITLE_ROW_HEIGHT_PX + contentHeight,
-                z,
-              },
-              positionRecordId,
-            )
-              .then((id) => (positionRecordId = id))
-              .catch((err) =>
+            // Saved via the background script, not directly here -- see
+            // lib/messages.ts for why a content script can't safely call
+            // PocketBase itself.
+            browser.runtime
+              .sendMessage({
+                type: SAVE_POSITION_MESSAGE,
+                annotationId: annotation.id,
+                // Use contentHeight (the resting/non-editing size), not
+                // wrapper.offsetHeight -- the wrapper is temporarily
+                // taller than that while editing (see applyWrapperHeight
+                // above).
+                position: {
+                  top,
+                  left,
+                  width: wrapper.offsetWidth,
+                  height: TITLE_ROW_HEIGHT_PX + contentHeight,
+                  z,
+                },
+                existingId: positionRecordId,
+              } satisfies SavePositionMessage)
+              .then((id: string) => (positionRecordId = id))
+              .catch((err: unknown) =>
                 console.error("[sticky-party] failed to save position", err),
               );
           };

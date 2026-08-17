@@ -3,10 +3,14 @@
 import { fetchAnnotations } from '../lib/annotations';
 import {
   CHECK_ANNOTATION_MESSAGE,
+  GET_POSITION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
+  SAVE_POSITION_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
+  type PositionMessage,
 } from '../lib/messages';
+import { fetchPosition, savePosition } from '../lib/positions';
 import { fullSyncTargets, getCachedTargets, isTargetMatch, normalizeTarget } from '../lib/targets';
 
 export default defineBackground(() => {
@@ -86,5 +90,19 @@ export default defineBackground(() => {
     if (message?.type !== CHECK_ANNOTATION_MESSAGE) return;
     const tabId = message.tabId ?? sender.tab?.id;
     if (tabId != null) checkTab(tabId, message.url);
+  });
+
+  // Handles GET_POSITION_MESSAGE/SAVE_POSITION_MESSAGE from content.ts
+  // (see lib/messages.ts for why this can't run in the content script
+  // itself). Returning a Promise here makes the polyfilled
+  // browser.runtime.onMessage resolve the sender's sendMessage() call
+  // with whatever fetchPosition/savePosition resolve to.
+  browser.runtime.onMessage.addListener((message: PositionMessage) => {
+    if (message?.type === GET_POSITION_MESSAGE) {
+      return fetchPosition(message.annotationId);
+    }
+    if (message?.type === SAVE_POSITION_MESSAGE) {
+      return savePosition(message.annotationId, message.position, message.existingId);
+    }
   });
 });
