@@ -9,5 +9,10 @@ export interface InlineToken {
 
 export interface Line {
   bullet: boolean;
+  // Set for task list lines ("- [ ] ..." / "- [x] ..."); undefined for
+  // non-task lines. When set, AnnotationBody renders a checkbox instead
+  // of the bullet dot, regardless of `bullet` (which is always false
+  // for task lines -- see parseLines in blocks.ts).
+  checked?: boolean;
   tokens: InlineToken[];
 }

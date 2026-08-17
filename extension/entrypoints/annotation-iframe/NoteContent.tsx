@@ -6,6 +6,7 @@ import {
   setAnnotationHide,
   updateAnnotation,
 } from "../../lib/annotations";
+import { toggleTaskLine } from "../../lib/markup";
 import type { AnnotationData } from "../../lib/messages";
 import {
   DEFAULT_NOTE_COLOR,
@@ -193,6 +194,23 @@ export default function NoteContent() {
     }
   };
 
+  // Toggles a task line's checkbox directly from view mode (no edit
+  // step needed), persisting the change immediately -- same pattern as
+  // handleToggleHide/handleColorChange. Rewrites the raw body text via
+  // toggleTaskLine rather than any parsed representation, so every
+  // other line is left untouched.
+  const handleToggleTask = async (lineIndex: number) => {
+    const current = annotation();
+    if (!current) return;
+    const body = toggleTaskLine(current.body, lineIndex);
+    try {
+      await updateAnnotation(current.id, { title: current.title, body });
+      setAnnotation({ ...current, body });
+    } catch (err) {
+      console.error("[sticky-party] failed to toggle task", err);
+    }
+  };
+
   return (
     // The loading state is now shown by content.ts (which owns the
     // wrapper on the host page), so this Show has no fallback -- while
@@ -240,6 +258,7 @@ export default function NoteContent() {
             shaking={shaking()}
             onLockClick={triggerShake}
             onLockDblClick={() => setRevealed(true)}
+            onToggleTask={handleToggleTask}
           />
 
           {/* Footer only appears while editing, so a casual click can

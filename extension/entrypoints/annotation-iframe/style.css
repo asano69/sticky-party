@@ -12,18 +12,38 @@ body {
   overflow: hidden;
 }
 
+/* Tailwind's preflight resets anchors to inherit color/text-decoration
+ * from their parent, which leaves auto-linked URLs (see
+ * AnnotationBody.tsx) with no visible link styling at all. Uses
+ * --note-link (defined above) rather than currentColor/inherit, so
+ * links stay a recognizable blue instead of blending into the note's
+ * own text color. Mirrors the same rule in popup/style.css -- kept
+ * separate since these are two different documents that can't share
+ * CSS directly. */
+a {
+  color: var(--note-link);
+  text-decoration: underline;
+}
+
 /* Sticky-note border, light and dark variants. This iframe renders into
  * its own document, so it can't rely on the host page's theme or CSS
  * custom properties -- --note-bg/--note-text come from theme.css
  * (shared with popup/style.css); --note-border stays local since this
- * iframe uses a translucent border instead of popup's solid one. */
+ * iframe uses a translucent border instead of popup's solid one.
+ * --note-link follows the same light/dark split: a fixed blue (not
+ * currentColor/inherit) so links stay recognizable regardless of the
+ * note's own text color (see lib/colors.ts's five note colors) -- the
+ * dark value is lighter so it still reads clearly against dark note
+ * backgrounds. */
 :root {
   --note-border: rgba(0, 0, 0, 0.25);
+  --note-link: #1a56db;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --note-border: rgba(255, 255, 255, 0.3);
+    --note-link: #7aa2f7;
   }
 }
 

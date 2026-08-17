@@ -10,6 +10,10 @@
   --note-border: #e6d97a;
   --note-header-border: rgba(0, 0, 0, 0.12);
   --note-button-border: rgba(0, 0, 0, 0.25);
+  /* Matches --note-link in annotation-iframe/style.css -- a fixed blue
+   * rather than currentColor/inherit, so links stay recognizable as
+   * links instead of blending into the surrounding text color. */
+  --note-link: #1a56db;
 
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -28,7 +32,7 @@
 
 a {
   font-weight: 500;
-  color: inherit;
+  color: var(--note-link);
   text-decoration: underline;
 }
 
@@ -51,5 +55,6 @@ h1 {
     --note-border: #6b6230;
     --note-header-border: rgba(255, 255, 255, 0.15);
     --note-button-border: rgba(255, 255, 255, 0.3);
+    --note-link: #7aa2f7;
   }
 }

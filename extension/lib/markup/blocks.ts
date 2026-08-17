@@ -10,12 +10,44 @@ import type { Line } from "./types";
 // mistaken for a bullet.
 const BULLET_PATTERN = /^[*-]\s+(.*)$/;
 
+// A task marker is "[ ]" or "[x]"/"[X]" (checked) right after the
+// bullet marker, followed by at least one whitespace character before
+// the task's own text -- e.g. "- [ ] buy milk" or "- [x] buy milk".
+const TASK_PATTERN = /^\[([ xX])\]\s+(.*)$/;
+
 export function parseLines(body: string): Line[] {
   return body.split("\n").map((raw) => {
-    const match = raw.match(BULLET_PATTERN);
-    if (match) {
-      return { bullet: true, tokens: parseInline(match[1]) };
+    const bulletMatch = raw.match(BULLET_PATTERN);
+    if (bulletMatch) {
+      const taskMatch = bulletMatch[1].match(TASK_PATTERN);
+      if (taskMatch) {
+        return {
+          bullet: false,
+          checked: taskMatch[1].toLowerCase() === "x",
+          tokens: parseInline(taskMatch[2]),
+        };
+      }
+      return { bullet: true, tokens: parseInline(bulletMatch[1]) };
     }
     return { bullet: false, tokens: parseInline(raw) };
   });
+}
+
+// Flips a task line's checked state directly in the raw body text, at
+// `lineIndex` (matching the array index parseLines would give that
+// line). Used by the view-mode checkbox toggle (see AnnotationBody.tsx)
+// to persist a change without re-serializing the whole parsed structure
+// -- every other line is left byte-for-byte untouched. The regex here
+// intentionally mirrors BULLET_PATTERN + TASK_PATTERN above; if the
+// task syntax ever changes, update both.
+export function toggleTaskLine(body: string, lineIndex: number): string {
+  const lines = body.split("\n");
+  const line = lines[lineIndex];
+  if (line === undefined) return body;
+  lines[lineIndex] = line.replace(
+    /^([*-]\s+\[)([ xX])(\]\s+)/,
+    (_match, prefix, mark, suffix) =>
+      `${prefix}${mark.toLowerCase() === "x" ? " " : "x"}${suffix}`,
+  );
+  return lines.join("\n");
 }

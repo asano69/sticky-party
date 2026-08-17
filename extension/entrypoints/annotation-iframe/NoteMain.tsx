@@ -26,6 +26,7 @@ export default function NoteMain(props: {
   shaking: boolean;
   onLockClick: () => void;
   onLockDblClick: () => void;
+  onToggleTask: (lineIndex: number) => void;
 }) {
   return (
     // position:relative so the lock-overlay button below can be
@@ -80,7 +81,10 @@ export default function NoteMain(props: {
             }}
             class="min-h-full"
           >
-            <AnnotationBody body={props.note.body} />
+            <AnnotationBody
+              body={props.note.body}
+              onToggleTask={props.onToggleTask}
+            />
           </div>
         </Show>
       </div>
