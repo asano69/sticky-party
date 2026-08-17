@@ -14,7 +14,6 @@ import Palette from "lucide-solid/icons/palette";
 import { Button } from "@kobalte/core/button";
 import { ToggleButton } from "@kobalte/core/toggle-button";
 import { ToggleGroup } from "@kobalte/core/toggle-group";
-import { ColorSwatch } from "@kobalte/core/color-swatch";
 import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
 import { NOTE_COLORS, swatchColor, type NoteColor } from "../../lib/colors";
 
@@ -99,7 +98,11 @@ export default function NoteFooter(props: {
                 aria-label={color}
                 class="flex items-center justify-center rounded-full p-0.5 data-[pressed]:ring-2 data-[pressed]:ring-[color:var(--note-text)]"
               >
-                <ColorSwatch value={swatchColor(color)} class="block h-4 w-4 rounded-full" />
+                {/* @kobalte/core@0.13.13 (see pnpm-lock.yaml) has no
+                    color-swatch export yet, so the swatch itself is
+                    just a plain colored circle rather than Kobalte's
+                    ColorSwatch component. */}
+                <div class="block h-4 w-4 rounded-full" style={{ "background-color": swatchColor(color) }} />
               </ToggleGroup.Item>
             )}
           </For>
