@@ -14,8 +14,9 @@
 
 ## Features
 - 付箋内のURLの自動認識
-- ユーザのデバイスごとに、付箋の位置とサイズを記憶
+- ユーザのモニターごとに、付箋の位置とサイズを記憶
 - セキュリティ: 付箋はExtension page iframeとしてマウントされるため、Webサイトの管理者からも付箋の内容を読むことができません。[^1]
+- **Sticky Note Blur for Sensitive Information**: Blur sensitive content displayed on sticky notes to help mitigate the risk of information theft by screen-capturing infostealers.
 - 付箋のアクセスコントロールなし。登録済みユーザのみ、すべの付箋を自由に作成・編集・削除できます。
 - 管理機能：管理者ユーザは、SQLiteに保存された付箋データをWebUIから操作できます。(PocketBase)
 - 付箋の位置・サイズ・ドラッグ用ヘッダーだけがWebページのDOMに存在し、タイトル・本文などの実際の内容は拡張機能自身のオリジンを持つiframe内にのみ存在します。
