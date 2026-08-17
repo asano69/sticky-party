@@ -1,7 +1,28 @@
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js';
 import { TextField } from '@kobalte/core/text-field';
+import { Link } from '@kobalte/core/link';
 import { getCachedTargets } from '../../lib/targets';
 import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, SAVED_HINT } from './classes';
+
+// A target is only a clickable link if it's an actual URL. Wildcard/regex
+// targets (not yet implemented, but planned -- see docs/architecture.md's
+// "未確定事項") aren't real addresses, so `new URL` throwing is treated as
+// "not clickable" rather than trying to detect wildcard/regex syntax
+// ourselves.
+function isClickableTarget(target: string): boolean {
+  try {
+    new URL(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Strips the scheme to save horizontal space in the list; the full
+// target (scheme included) is still used as the actual href.
+function displayTarget(target: string): string {
+  return target.replace(/^https?:\/\//, '');
+}
 
 // Read-only view of the local target cache (see docs/architecture.md).
 // Lets you sanity-check that write-through/full-sync is populating the
@@ -37,14 +58,15 @@ export default function Targets() {
     <For each={filtered()}>
   {(target) => (
     <li>
-      <a
+      <Link
         href={target}
+        disabled={!isClickableTarget(target)}
         target="_blank"
         rel="noopener noreferrer"
-        class="block truncate text-[0.8em] text-inherit underline"
+        class="block truncate text-[0.8em] text-inherit underline data-[disabled]:no-underline data-[disabled]:opacity-50 data-[disabled]:cursor-default"
       >
-        {target}
-      </a>
+        {displayTarget(target)}
+      </Link>
     </li>
   )}
 </For>
