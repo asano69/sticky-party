@@ -3,8 +3,9 @@ import Home from "./Home";
 import Settings from "./Settings";
 import Targets from "./Targets";
 import NavBar, { type View } from "./NavBar";
-import { fullSyncTargets } from "../../lib/targets";
+import { fullSyncTargets, syncTargets } from "../../lib/targets";
 import { getSettings } from "../../lib/settings";
+import { clearSyncErrorBadge, showSyncErrorBadge } from "../../lib/syncBadge";
 import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
@@ -35,7 +36,22 @@ function App() {
       settings.password
     );
     setLocked(!configured);
-    if (!configured) setView("settings");
+    if (!configured) {
+      setView("settings");
+      return;
+    }
+
+    // Opening the popup is a good moment to catch a stale cache early,
+    // rather than waiting for the next periodic alarm (see
+    // background.ts) -- try a differential sync right away and surface
+    // any failure via the same toolbar badge.
+    try {
+      await syncTargets();
+      clearSyncErrorBadge();
+    } catch (err) {
+      console.error("[sticky-party] popup sync failed", err);
+      showSyncErrorBadge();
+    }
   };
 
   onMount(checkConfigured);
@@ -63,6 +79,7 @@ function App() {
     setSyncing(true);
     try {
       await fullSyncTargets();
+      clearSyncErrorBadge();
       const [activeTab] = await browser.tabs.query({
         active: true,
         currentWindow: true,
@@ -76,6 +93,7 @@ function App() {
       }
     } catch (err) {
       console.error("[sticky-party] full sync failed", err);
+      showSyncErrorBadge();
     } finally {
       setSyncing(false);
     }

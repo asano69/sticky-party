@@ -1,6 +1,7 @@
 // See docs/architecture.md for the full sync design this implements.
 
 import { fetchAnnotations } from "../lib/annotations";
+import { clearSyncErrorBadge, showSyncErrorBadge } from "../lib/syncBadge";
 import {
   CHECK_ANNOTATION_MESSAGE,
   GET_POSITION_MESSAGE,
@@ -27,10 +28,14 @@ export default defineBackground(() => {
   const sync = async () => {
     try {
       await syncTargets();
+      clearSyncErrorBadge();
     } catch (err) {
-      // Most commonly missing/invalid credentials in Settings; the popup
-      // surfaces that separately, so just log here.
+      // Most commonly missing/invalid credentials in Settings, or the
+      // backend being unreachable. The popup doesn't surface this on
+      // its own since sync runs in the background with no UI open, so
+      // the badge is what makes the failure visible.
       console.error("[sticky-party] target sync failed", err);
+      showSyncErrorBadge();
     }
   };
 
@@ -72,6 +77,11 @@ export default defineBackground(() => {
 
     try {
       const annotations = await fetchAnnotations(url);
+      // Reaching here means the backend responded, regardless of
+      // whether this particular URL had any annotations -- clear
+      // whatever earlier failure (this or any other sync) put the
+      // badge up.
+      clearSyncErrorBadge();
       if (annotations.length === 0) {
         // The cache said this URL had an annotation, but the DB has
         // none -- most likely it was deleted since the last sync (a
@@ -86,7 +96,12 @@ export default defineBackground(() => {
         annotations,
       });
     } catch (err) {
+      // A matched URL whose annotation body couldn't be loaded (e.g.
+      // backend unreachable) is exactly the kind of silent failure the
+      // badge exists to surface -- without it, the user would just see
+      // no sticky note and have no idea why.
       console.error("[sticky-party] failed to fetch annotation", err);
+      showSyncErrorBadge();
     }
   };
 

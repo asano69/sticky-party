@@ -3,6 +3,7 @@ import { TextField } from "@kobalte/core/text-field";
 
 import { getSettings, saveSettings } from "../../lib/settings";
 import { fullSyncTargets } from "../../lib/targets";
+import { clearSyncErrorBadge, showSyncErrorBadge } from "../../lib/syncBadge";
 import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, SAVED_HINT } from "./classes";
 import SaveButton, { type SaveStatus } from "./SaveButton";
 
@@ -53,6 +54,7 @@ export default function Settings(props: { onSaved?: () => void }) {
       // so Settings doubles as a manual "connect + sync" action instead
       // of a bare connection check.
       await fullSyncTargets();
+      clearSyncErrorBadge();
       setStatus("success");
       // Lets App.tsx re-check whether credentials are now saved, so
       // Home/Targets unlock immediately instead of staying locked
@@ -61,6 +63,7 @@ export default function Settings(props: { onSaved?: () => void }) {
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Failed to connect.");
+      showSyncErrorBadge();
     }
   };
 
