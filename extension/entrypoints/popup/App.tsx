@@ -1,20 +1,13 @@
 import { createSignal, Show } from 'solid-js';
-import ArrowLeft from 'lucide-solid/icons/arrow-left';
-import NotebookTabs from 'lucide-solid/icons/notebook-tabs';
-import SettingsIcon from 'lucide-solid/icons/settings';
-import RefreshCw from 'lucide-solid/icons/refresh-cw';
-import { Button } from '@kobalte/core/button';
 import Home from './Home';
 import Settings from './Settings';
 import Targets from './Targets';
-import { ICON_BTN } from './classes';
+import NavBar, { type View } from './NavBar';
 import { fullSyncTargets } from '../../lib/targets';
 
-// Three-screen popup. Home (create an annotation) is the default view;
-// Targets (cached URL list) and Settings are reached via the header
-// icons, which are replaced by a single back button while either is open.
-type View = 'home' | 'settings' | 'targets';
-
+// Three-screen popup, switched via NavBar's mode toggle. Home (create an
+// annotation) is the default view; Targets (cached URL list) and
+// Settings are the other two.
 function App() {
   const [view, setView] = createSignal<View>('home');
   const [syncing, setSyncing] = createSignal(false);
@@ -36,34 +29,7 @@ function App() {
 
   return (
     <div class="w-[260px]">
-      <header class="flex items-center justify-between px-3 pt-3">
-        <h1 class="m-0 text-[1.1em] leading-tight">Note</h1>
-        <Show
-          when={view() === 'home'}
-          fallback={
-            <Button class={ICON_BTN} onClick={() => setView('home')} aria-label="Back">
-              <ArrowLeft size={18} />
-            </Button>
-          }
-        >
-          <div class="flex gap-1">
-            <Button
-              class={ICON_BTN}
-              onClick={handleSync}
-              disabled={syncing()}
-              aria-label="Sync from server"
-            >
-              <RefreshCw size={18} class={syncing() ? 'animate-spin' : ''} />
-            </Button>
-            <Button class={ICON_BTN} onClick={() => setView('targets')} aria-label="Cached URLs">
-              <NotebookTabs size={18} />
-            </Button>
-            <Button class={ICON_BTN} onClick={() => setView('settings')} aria-label="Settings">
-              <SettingsIcon size={18} />
-            </Button>
-          </div>
-        </Show>
-      </header>
+      <NavBar view={view()} onViewChange={setView} syncing={syncing()} onSync={handleSync} />
 
       <Show when={view() === 'home'} fallback={
         <Show when={view() === 'settings'} fallback={<Targets />}>
