@@ -136,6 +136,11 @@ export default defineContentScript({
       let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
       let onMessage: ((e: MessageEvent) => void) | undefined;
       let reposition: ((scaleX: number, scaleY: number) => void) | undefined;
+      // Tracks the media query used below to keep the Dismiss icon's
+      // color in sync with the system color scheme, and the listener
+      // function so it can be removed again in onRemove.
+      let darkModeQuery: MediaQueryList | undefined;
+      let applyHeaderColor: (() => void) | undefined;
 
       const ui = createIframeUi(ctx, {
         page: IFRAME_PAGE,
@@ -246,6 +251,19 @@ export default defineContentScript({
             cursor: "grab",
             zIndex: "1",
           });
+
+          // The Dismiss icon (X) uses currentColor, but this wrapper is
+          // plain DOM on the host page, not a Shadow DOM, so it has no
+          // access to the --note-text variable from assets/theme.css.
+          // Set the header's color directly here, matching theme.css's
+          // palette, so the icon follows the system color scheme instead
+          // of staying stuck at the host page's default text color.
+          darkModeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+          applyHeaderColor = () => {
+            header.style.color = darkModeQuery!.matches ? "#f5efc9" : "#3a3520";
+          };
+          applyHeaderColor();
+          darkModeQuery.addEventListener("change", applyHeaderColor);
 
           const dismissBtn = document.createElement("button");
           dismissBtn.type = "button";
@@ -404,6 +422,9 @@ export default defineContentScript({
         onRemove: () => {
           if (onMessage) window.removeEventListener("message", onMessage);
           if (reposition) repositionOnResize.delete(reposition);
+          if (darkModeQuery && applyHeaderColor) {
+            darkModeQuery.removeEventListener("change", applyHeaderColor);
+          }
           resizeObserver?.disconnect();
           clearTimeout(resizeSaveTimer);
         },
