@@ -17,6 +17,9 @@ export interface AnnotationData {
   id: string;
   title: string;
   body: string;
+  // Whether this note's body is blurred (shoulder-surfing protection),
+  // toggled via the eye/eye-off button in NoteContent.tsx's footer.
+  hide: boolean;
   updated: string;
 }
 

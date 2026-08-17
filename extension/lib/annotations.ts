@@ -34,6 +34,15 @@ export async function updateAnnotation(
   await pb.collection('annotations').update(id, data);
 }
 
+// Toggles whether an annotation's body is blurred to guard against
+// shoulder-surfing. Kept separate from updateAnnotation since it's
+// triggered by its own control (the footer's eye/eye-off button), not
+// the title/body edit form.
+export async function setAnnotationHide(id: string, hide: boolean): Promise<void> {
+  const pb = await getAuthedPb();
+  await pb.collection('annotations').update(id, { hide });
+}
+
 // Deletes an annotation from PocketBase. Used by the sticky note's trash
 // button, shown only while editing. The local target-list cache
 // (lib/targets.ts) is intentionally left untouched here: other

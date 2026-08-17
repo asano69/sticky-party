@@ -1,10 +1,14 @@
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import Trash from "lucide-solid/icons/trash";
 import Shredder from "lucide-solid/icons/shredder";
+import Eye from "lucide-solid/icons/eye";
+import EyeOff from "lucide-solid/icons/eye-off";
+import Lock from "lucide-solid/icons/lock";
 import { TextField } from "@kobalte/core/text-field";
 import { Button } from "@kobalte/core/button";
+import { ToggleButton } from "@kobalte/core/toggle-button";
 
-import { deleteAnnotation, updateAnnotation } from "../../lib/annotations";
+import { deleteAnnotation, setAnnotationHide, updateAnnotation } from "../../lib/annotations";
 import {
   INIT_NOTE_MESSAGE,
   NOTE_CONTENT_RESIZE_MESSAGE,
@@ -43,6 +47,15 @@ export default function NoteContent() {
   // shredder as an "are you sure" cue); the actual delete fires on a
   // second click while armed.
   const [confirmDelete, setConfirmDelete] = createSignal(false);
+  // Tracks the in-flight PATCH from handleToggleHide, so the button
+  // disables itself rather than allowing a second toggle mid-request.
+  const [togglingHide, setTogglingHide] = createSignal(false);
+  // Client-side-only override that lets the viewer peek past the blur
+  // without changing the persisted `hide` flag. Reset back to false
+  // whenever hide is turned on again (see handleToggleHide), so the
+  // note re-blurs the next time hide becomes true rather than staying
+  // permanently revealed for the rest of the session.
+  const [revealed, setRevealed] = createSignal(false);
 
   let titleInputRef: HTMLInputElement | undefined;
   let textareaRef: HTMLTextAreaElement | undefined;
@@ -177,6 +190,24 @@ export default function NoteContent() {
     }
   };
 
+  // Toggles the annotation's `hide` flag (shoulder-surfing protection),
+  // persisting it immediately -- unlike title/body, there's no separate
+  // save step for this control.
+  const handleToggleHide = async (next: boolean) => {
+    const current = annotation();
+    if (!current) return;
+    setTogglingHide(true);
+    try {
+      await setAnnotationHide(current.id, next);
+      setAnnotation({ ...current, hide: next });
+      if (next) setRevealed(false);
+    } catch (err) {
+      console.error("[sticky-party] failed to toggle hide", err);
+    } finally {
+      setTogglingHide(false);
+    }
+  };
+
   // Receive the annotation to render, or a request to start editing the
   // title (relayed from a double-click on the content script's drag
   // header -- see content.ts), from the content script.
@@ -252,45 +283,68 @@ export default function NoteContent() {
             </Show>
           </header>
 
-          <main ref={(el) => (contentRef = el)} class="flex-1 overflow-auto px-2.5 py-1.5">
-            <Show
-              when={!editing()}
-              fallback={
-                <TextField value={draft()} onChange={setDraft} disabled={saving()}>
-                  <TextField.TextArea
-                    ref={(el) => {
-                      textareaRef = el;
-                      resizeTextarea();
-                    }}
-                    // Floor: with no CSS height set, a textarea's
-                    // intrinsic height comes from `rows`, and
-                    // scrollHeight (used by resizeTextarea) can't go
-                    // below that -- so this keeps the note at least
-                    // 1 line tall, growing (and shrinking back) with
-                    // its content beyond that.
-                    rows={1}
-                    onInput={resizeTextarea}
-                    onKeyDown={onEditorKeyDown}
-                    // No min-h-full here: that would pin the textarea to
-                    // the note's current (possibly larger, e.g. from a
-                    // previous longer draft) height, preventing it from
-                    // ever shrinking back down when content is removed.
-                    class="block w-full box-border border-none resize-none overflow-hidden bg-transparent font-[inherit] text-[color:var(--note-text)]"
-                  />
-                </TextField>
-              }
-            >
-              {/* min-h-full makes this fill the whole main area (not
-                  just wrap the text), so double-clicking any blank space
-                  below a short body still starts editing. */}
-              <div
-                onDblClick={(e) => {
-                  e.preventDefault();
-                  startEdit("body");
-                }}
-                class="min-h-full"
+          {/* position:relative so the lock-overlay button below can be
+              absolutely positioned over this area. Blur itself is
+              applied to the inner wrapper div, not main -- blurring
+              main directly would blur the overlay button too, since a
+              CSS filter blurs an element's own rendered content
+              (including children) as a whole. */}
+          <main ref={(el) => (contentRef = el)} class="relative flex-1 overflow-auto px-2.5 py-1.5">
+            <div classList={{ "blur-sm": note().hide && !revealed() }}>
+              <Show
+                when={!editing()}
+                fallback={
+                  <TextField value={draft()} onChange={setDraft} disabled={saving()}>
+                    <TextField.TextArea
+                      ref={(el) => {
+                        textareaRef = el;
+                        resizeTextarea();
+                      }}
+                      // Floor: with no CSS height set, a textarea's
+                      // intrinsic height comes from `rows`, and
+                      // scrollHeight (used by resizeTextarea) can't go
+                      // below that -- so this keeps the note at least
+                      // 1 line tall, growing (and shrinking back) with
+                      // its content beyond that.
+                      rows={1}
+                      onInput={resizeTextarea}
+                      onKeyDown={onEditorKeyDown}
+                      // No min-h-full here: that would pin the textarea to
+                      // the note's current (possibly larger, e.g. from a
+                      // previous longer draft) height, preventing it from
+                      // ever shrinking back down when content is removed.
+                      class="block w-full box-border border-none resize-none overflow-hidden bg-transparent font-[inherit] text-[color:var(--note-text)]"
+                    />
+                  </TextField>
+                }
               >
-                <AnnotationBody body={note().body} />
+                {/* min-h-full makes this fill the whole main area (not
+                    just wrap the text), so double-clicking any blank space
+                    below a short body still starts editing. */}
+                <div
+                  onDblClick={(e) => {
+                    e.preventDefault();
+                    startEdit("body");
+                  }}
+                  class="min-h-full"
+                >
+                  <AnnotationBody body={note().body} />
+                </div>
+              </Show>
+            </div>
+
+            {/* Lets the viewer peek past the blur without changing the
+                persisted hide flag -- a per-view override, not a
+                toggle of hide itself (that's the footer's eye button). */}
+            <Show when={note().hide && !revealed()}>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <Button
+                  onClick={() => setRevealed(true)}
+                  aria-label="Reveal note"
+                  class="sticky-party-icon-btn flex items-center justify-center border-none bg-black/10 cursor-pointer p-2 rounded-full"
+                >
+                  <Lock size={20} />
+                </Button>
               </div>
             </Show>
           </main>
@@ -310,7 +364,7 @@ export default function NoteContent() {
               // Height stays inline for the same reason as the title
               // row above: it must stay tied to TITLE_ROW_HEIGHT_PX.
               style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
-              class="flex shrink-0 items-center justify-start box-border px-2 border-t border-[color:var(--note-border)]"
+              class="flex shrink-0 items-center justify-start gap-1 box-border px-2 border-t border-[color:var(--note-border)]"
             >
               <Button
                 class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
@@ -323,6 +377,22 @@ export default function NoteContent() {
                   <Shredder size={16} />
                 </Show>
               </Button>
+              {/* onMouseDown preventDefault mirrors the delete button
+                  above: without it, the pointerdown-before-click on this
+                  button would fire the iframe's window "blur" handler's
+                  saveEdit() first, same trap noted for the delete flow. */}
+              <ToggleButton
+                class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
+                onMouseDown={(e: MouseEvent) => e.preventDefault()}
+                pressed={note().hide}
+                onChange={handleToggleHide}
+                disabled={togglingHide()}
+                aria-label={note().hide ? "Unblur note" : "Blur note"}
+              >
+                <Show when={note().hide} fallback={<Eye size={16} />}>
+                  <EyeOff size={16} />
+                </Show>
+              </ToggleButton>
             </footer>
           </Show>
         </div>
