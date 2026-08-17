@@ -1,0 +1,17 @@
+/* Shared sticky-note colors (light + dark), used by both the popup and
+ * the annotation-iframe so the two documents render the same note
+ * background/text without hand-copying values between them. Each
+ * entrypoint's own style.css still defines its own --note-border (the
+ * two use different border styles) and any entrypoint-specific
+ * variables. */
+:root {
+  --note-bg: #fff8b8;
+  --note-text: #3a3520;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --note-bg: #4a4420;
+    --note-text: #f5efc9;
+  }
+}

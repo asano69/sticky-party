@@ -1,13 +1,13 @@
 @import "tailwindcss";
+@import "../../assets/theme.css";
 
-/* Sticky-note palette, matching entrypoints/content/AnnotationBoard.tsx
- * so the popup and the on-page notes look like the same product. Kept
- * as CSS variables (rather than duplicated hex values in App.css) so
- * every popup component can share one source of truth. */
+/* Sticky-note palette, matching entrypoints/annotation-iframe/style.css
+ * so the popup and the on-page notes look like the same product.
+ * --note-bg/--note-text come from theme.css (shared); --note-border and
+ * the header/button border variables are popup-specific since the
+ * iframe uses a different border style. */
 :root {
-  --note-bg: #fff8b8;
   --note-border: #e6d97a;
-  --note-text: #3a3520;
   --note-header-border: rgba(0, 0, 0, 0.12);
   --note-button-border: rgba(0, 0, 0, 0.25);
 
@@ -48,9 +48,7 @@ h1 {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --note-bg: #4a4420;
     --note-border: #6b6230;
-    --note-text: #f5efc9;
     --note-header-border: rgba(255, 255, 255, 0.15);
     --note-button-border: rgba(255, 255, 255, 0.3);
   }

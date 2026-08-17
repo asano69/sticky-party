@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../../assets/theme.css";
 
 html,
 body,
@@ -11,23 +12,18 @@ body {
   overflow: hidden;
 }
 
-/* Sticky-note yellow, light and dark variants. This iframe renders into
+/* Sticky-note border, light and dark variants. This iframe renders into
  * its own document, so it can't rely on the host page's theme or CSS
- * custom properties -- these are the source of truth for NoteContent.tsx's
- * Tailwind classes below (e.g. bg-[color:var(--note-bg)]). Mirrors
- * popup/style.css's palette, though the two are unrelated at runtime
- * since each is a separate document. */
+ * custom properties -- --note-bg/--note-text come from theme.css
+ * (shared with popup/style.css); --note-border stays local since this
+ * iframe uses a translucent border instead of popup's solid one. */
 :root {
-  --note-bg: #fff8b8;
   --note-border: rgba(0, 0, 0, 0.25);
-  --note-text: #3a3520;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --note-bg: #4a4420;
     --note-border: rgba(255, 255, 255, 0.3);
-    --note-text: #f5efc9;
   }
 }
 
