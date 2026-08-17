@@ -1,9 +1,10 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
 import Home from "./Home";
 import Settings from "./Settings";
 import Targets from "./Targets";
 import NavBar, { type View } from "./NavBar";
 import { fullSyncTargets } from "../../lib/targets";
+import { getSettings } from "../../lib/settings";
 import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
@@ -15,7 +16,39 @@ import {
 function App() {
   const [view, setView] = createSignal<View>("home");
   const [syncing, setSyncing] = createSignal(false);
+  // Locked until backend credentials are confirmed saved (see
+  // checkConfigured below). Starts true so Home/Targets can't be
+  // interacted with for the brief moment before that check resolves --
+  // without credentials, neither view can do anything useful anyway.
+  const [locked, setLocked] = createSignal(true);
 
+  // Reads Settings and unlocks Home/Targets only once backend
+  // credentials are actually saved; otherwise forces the Settings view
+  // so the user isn't stuck on a Home/Targets screen that can't reach
+  // the backend. Re-run after a successful Settings save (see the
+  // onSaved prop below) to unlock without requiring a popup reopen.
+  const checkConfigured = async () => {
+    const settings = await getSettings();
+    const configured = !!(
+      settings?.backendUrl &&
+      settings.email &&
+      settings.password
+    );
+    setLocked(!configured);
+    if (!configured) setView("settings");
+  };
+
+  onMount(checkConfigured);
+
+  // Ignored while locked (except switching to Settings itself), as a
+  // second guard in case something other than NavBar's disabled tabs
+  // tries to change the view.
+  const handleViewChange = (next: View) => {
+    if (locked() && next !== "settings") return;
+    setView(next);
+  };
+
+  // Manual full sync
   // Manual full sync (fetch every target from PocketBase, overwrite the
   // local cache) on top of the automatic write-through/periodic sync.
   // Lives here (rather than in Targets.tsx) since it's a global action,
@@ -52,16 +85,17 @@ function App() {
     <div class="w-[260px]">
       <NavBar
         view={view()}
-        onViewChange={setView}
+        onViewChange={handleViewChange}
         syncing={syncing()}
         onSync={handleSync}
+        locked={locked()}
       />
 
       <Show
         when={view() === "home"}
         fallback={
           <Show when={view() === "settings"} fallback={<Targets />}>
-            <Settings />
+            <Settings onSaved={checkConfigured} />
           </Show>
         }
       >

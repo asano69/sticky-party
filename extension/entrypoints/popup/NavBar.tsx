@@ -19,6 +19,11 @@ export default function NavBar(props: {
   onViewChange: (view: View) => void;
   syncing: boolean;
   onSync: () => void;
+  // True until backend credentials are confirmed saved (see App.tsx's
+  // checkConfigured); while true, Home/Targets are disabled and only
+  // Settings can be reached, since neither of the other views can do
+  // anything useful without a working connection.
+  locked: boolean;
 }) {
   return (
     <header class="flex items-center justify-between px-3 pt-3">
@@ -27,7 +32,7 @@ export default function NavBar(props: {
         <Button
           class={ICON_BTN}
           onClick={props.onSync}
-          disabled={props.syncing}
+          disabled={props.syncing || props.locked}
           aria-label="Sync from server"
         >
           <RefreshCw size={18} class={props.syncing ? "animate-spin" : ""} />
@@ -45,14 +50,16 @@ export default function NavBar(props: {
       >
         <ToggleGroup.Item
           value="home"
-          class={`${ICON_BTN} data-[pressed]:bg-black/10`}
+          disabled={props.locked}
+          class={`${ICON_BTN} data-[pressed]:bg-black/10 data-[disabled]:opacity-40 data-[disabled]:cursor-default`}
           aria-label="Home"
         >
           <SquarePen size={18} />
         </ToggleGroup.Item>
         <ToggleGroup.Item
           value="targets"
-          class={`${ICON_BTN} data-[pressed]:bg-black/10`}
+          disabled={props.locked}
+          class={`${ICON_BTN} data-[pressed]:bg-black/10 data-[disabled]:opacity-40 data-[disabled]:cursor-default`}
           aria-label="Cached URLs"
         >
           <NotebookTabs size={18} />

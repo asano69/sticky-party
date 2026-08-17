@@ -6,7 +6,7 @@ import { fullSyncTargets } from "../../lib/targets";
 import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, SAVED_HINT } from "./classes";
 import SaveButton, { type SaveStatus } from "./SaveButton";
 
-export default function Settings() {
+export default function Settings(props: { onSaved?: () => void }) {
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [backendUrl, setBackendUrl] = createSignal("");
@@ -54,6 +54,10 @@ export default function Settings() {
       // of a bare connection check.
       await fullSyncTargets();
       setStatus("success");
+      // Lets App.tsx re-check whether credentials are now saved, so
+      // Home/Targets unlock immediately instead of staying locked
+      // until the popup is reopened (see App.tsx's checkConfigured).
+      props.onSaved?.();
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Failed to connect.");
