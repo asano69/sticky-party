@@ -4,6 +4,10 @@ import Settings from "./Settings";
 import Targets from "./Targets";
 import NavBar, { type View } from "./NavBar";
 import { fullSyncTargets } from "../../lib/targets";
+import {
+  CHECK_ANNOTATION_MESSAGE,
+  type CheckAnnotationMessage,
+} from "../../lib/messages";
 
 // Three-screen popup, switched via NavBar's mode toggle. Home (create an
 // annotation) is the default view; Targets (cached URL list) and
@@ -16,10 +20,27 @@ function App() {
   // local cache) on top of the automatic write-through/periodic sync.
   // Lives here (rather than in Targets.tsx) since it's a global action,
   // not specific to the cached-URLs view.
+  //
+  // After refreshing the cache, also re-run the mount process for the
+  // active tab (mirrors Home.tsx's post-save behavior): a stale cache
+  // may have been hiding/showing the wrong notes on the current page,
+  // and without this the fix would only take effect on the next
+  // navigation instead of immediately.
   const handleSync = async () => {
     setSyncing(true);
     try {
       await fullSyncTargets();
+      const [activeTab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (activeTab?.id != null && activeTab.url) {
+        browser.runtime.sendMessage({
+          type: CHECK_ANNOTATION_MESSAGE,
+          url: activeTab.url,
+          tabId: activeTab.id,
+        } satisfies CheckAnnotationMessage);
+      }
     } catch (err) {
       console.error("[sticky-party] full sync failed", err);
     } finally {

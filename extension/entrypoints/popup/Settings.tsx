@@ -2,7 +2,7 @@ import { createSignal, onMount } from "solid-js";
 import { TextField } from "@kobalte/core/text-field";
 
 import { getSettings, saveSettings } from "../../lib/settings";
-import { getAuthedPb } from "../../lib/pb";
+import { fullSyncTargets } from "../../lib/targets";
 import { CARD, FIELD, FIELD_INPUT, FIELD_LABEL, SAVED_HINT } from "./classes";
 import SaveButton, { type SaveStatus } from "./SaveButton";
 
@@ -47,10 +47,12 @@ export default function Settings() {
         password: password(),
         backendUrl: backendUrl(),
       });
-      // Actually authenticate with the entered credentials/URL, so the
-      // icon reflects whether the connection really works, not just
-      // that the values were saved locally.
-      await getAuthedPb();
+      // Pull the full target list rather than just authenticating: it
+      // still proves the connection works (it authenticates internally,
+      // see lib/pb.ts), but also refreshes the local cache immediately,
+      // so Settings doubles as a manual "connect + sync" action instead
+      // of a bare connection check.
+      await fullSyncTargets();
       setStatus("success");
     } catch (err) {
       setStatus("error");
