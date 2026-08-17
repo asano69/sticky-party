@@ -166,11 +166,18 @@ export default defineContentScript({
       let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
       let onMessage: ((e: MessageEvent) => void) | undefined;
       let reposition: ((scaleX: number, scaleY: number) => void) | undefined;
-      // Tracks the media query used below to keep the Dismiss icon's
-      // color in sync with the system color scheme, and the listener
-      // function so it can be removed again in onRemove.
+      // Tracks the media query used below to keep the Dismiss icon and
+      // loading spinner colors in sync with the system color scheme,
+      // and the listener function so it can be removed again in
+      // onRemove.
       let darkModeQuery: MediaQueryList | undefined;
-      let applyHeaderColor: (() => void) | undefined;
+      let applyThemeColors: (() => void) | undefined;
+      // Spinner overlay shown until the iframe reports its first
+      // measured content height (see NOTE_CONTENT_RESIZE_MESSAGE
+      // below), so the note shows a loading state instead of a blank
+      // box while the iframe itself is still loading. Cleared to
+      // undefined once removed, so later resize messages are a no-op.
+      let loadingOverlay: HTMLDivElement | undefined;
 
       const ui = createIframeUi(ctx, {
         page: IFRAME_PAGE,
@@ -295,18 +302,49 @@ export default defineContentScript({
             zIndex: "1",
           });
 
-          // The Dismiss icon (X) uses currentColor, but this wrapper is
-          // plain DOM on the host page, not a Shadow DOM, so it has no
-          // access to the --note-text variable from assets/theme.css.
-          // Set the header's color directly here, matching theme.css's
-          // palette, so the icon follows the system color scheme instead
-          // of staying stuck at the host page's default text color.
+          // pointerEvents "none" so clicks (e.g. Dismiss) pass through
+          // to the header underneath while this is still showing.
+          loadingOverlay = document.createElement("div");
+          Object.assign(loadingOverlay.style, {
+            position: "absolute",
+            inset: "0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "none",
+            zIndex: "2",
+          });
+          const spinner = document.createElement("div");
+          Object.assign(spinner.style, {
+            width: "24px",
+            height: "24px",
+            borderRadius: "9999px",
+            borderStyle: "solid",
+            borderWidth: "4px",
+          });
+          spinner.animate(
+            [{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }],
+            { duration: 800, iterations: Infinity, easing: "linear" },
+          );
+          loadingOverlay.append(spinner);
+          wrapper.append(loadingOverlay);
+
+          // The Dismiss icon (X) and the loading spinner both use fixed
+          // colors instead of currentColor, since this wrapper is plain
+          // DOM on the host page, not a Shadow DOM -- it has no access
+          // to the --note-text variable from assets/theme.css. Set both
+          // here, matching theme.css's palette, so they follow the
+          // system color scheme instead of staying stuck at the host
+          // page's default colors.
           darkModeQuery = window.matchMedia("(prefers-color-scheme: dark)");
-          applyHeaderColor = () => {
-            header.style.color = darkModeQuery!.matches ? "#f5efc9" : "#3a3520";
+          applyThemeColors = () => {
+            const dark = darkModeQuery!.matches;
+            header.style.color = dark ? "#f5efc9" : "#3a3520";
+            spinner.style.borderColor = dark ? "#404040" : "#e5e5e5";
+            spinner.style.borderTopColor = dark ? "#d4d4d4" : "#737373";
           };
-          applyHeaderColor();
-          darkModeQuery.addEventListener("change", applyHeaderColor);
+          applyThemeColors();
+          darkModeQuery.addEventListener("change", applyThemeColors);
 
           const dismissBtn = document.createElement("button");
           dismissBtn.type = "button";
@@ -447,6 +485,12 @@ export default defineContentScript({
               // what applyWrapperHeight and persistPosition build on.
               contentHeight = e.data.height;
               applyWrapperHeight();
+              // The iframe has now measured and reported real content,
+              // so the note is actually showing something -- remove the
+              // loading spinner. loadingOverlay is cleared right after,
+              // so any later resize message is a no-op here.
+              loadingOverlay?.remove();
+              loadingOverlay = undefined;
             } else if (e.data?.type === NOTE_EDITING_MESSAGE) {
               isEditingNote = e.data.editing;
               // Grows the wrapper by the footer's height while editing
@@ -465,8 +509,8 @@ export default defineContentScript({
         onRemove: () => {
           if (onMessage) window.removeEventListener("message", onMessage);
           if (reposition) repositionOnResize.delete(reposition);
-          if (darkModeQuery && applyHeaderColor) {
-            darkModeQuery.removeEventListener("change", applyHeaderColor);
+          if (darkModeQuery && applyThemeColors) {
+            darkModeQuery.removeEventListener("change", applyThemeColors);
           }
           resizeObserver?.disconnect();
           clearTimeout(resizeSaveTimer);

@@ -84,6 +84,13 @@ export function useContentHeight(params: {
 
   const setContentRef = (el: HTMLDivElement) => {
     contentRef = el;
+    // Reports the note's initial (non-editing) content height once on
+    // mount. The createEffect above only reports while editing (see
+    // its early return), so a note that's never entered edit mode
+    // would otherwise never send NOTE_CONTENT_RESIZE_MESSAGE at all --
+    // leaving content.ts's loading spinner (see entrypoints/content.ts)
+    // spinning forever.
+    queueMicrotask(reportContentHeight);
   };
 
   const focusTextarea = () => textareaRef?.focus();
