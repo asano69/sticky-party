@@ -17,6 +17,7 @@ import { useParentMessaging } from "./useParentMessaging";
 import NoteHeader from "./NoteHeader";
 import NoteMain from "./NoteMain";
 import NoteFooter from "./NoteFooter";
+import Loading from "./Loading";
 
 // Sticky-note colors (light/dark) come from the --note-bg/--note-border/
 // --note-text CSS variables in style.css, applied below via Tailwind's
@@ -194,7 +195,7 @@ export default function NoteContent() {
   };
 
   return (
-    <Show when={annotation()}>
+    <Show when={annotation()} fallback={<Loading />}>
       {(note) => (
         <div
           // Clicks inside this iframe don't bubble out to the wrapper's
