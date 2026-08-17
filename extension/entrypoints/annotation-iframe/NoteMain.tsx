@@ -37,6 +37,14 @@ export default function NoteMain(props: {
     // a whole.
     <main
       ref={props.setContentRef}
+      onDblClick={(e) => {
+        // Only view mode should enter editing here; while already
+        // editing, calling onStartEditBody would reset the draft back
+        // to the saved value, discarding any unsaved changes.
+        if (props.editing) return;
+        e.preventDefault();
+        props.onStartEditBody();
+      }}
       class="relative flex-1 overflow-auto px-2.5 py-1.5"
     >
       {/* Fully hides the text (not just blurs it) when hidden, so no
@@ -74,13 +82,7 @@ export default function NoteMain(props: {
           {/* min-h-full makes this fill the whole main area (not
               just wrap the text), so double-clicking any blank space
               below a short body still starts editing. */}
-          <div
-            onDblClick={(e) => {
-              e.preventDefault();
-              props.onStartEditBody();
-            }}
-            class="min-h-full"
-          >
+          <div class="min-h-full">
             <AnnotationBody
               body={props.note.body}
               onToggleTask={props.onToggleTask}
