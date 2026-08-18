@@ -95,6 +95,17 @@ export interface NoteEditingMessage {
 // pixel-for-pixel.
 export const TITLE_ROW_HEIGHT_PX = 32;
 
+// iframe -> content script, sent when the footer's pin toggle button is
+// clicked. Only content.ts can perform the actual toggle: it needs the
+// page's current scroll offset to convert between fixed/absolute
+// positioning, which only it has access to (see content.ts's
+// togglePin). The iframe just requests the toggle and waits for
+// NOTE_PIN_MESSAGE to report the resulting state back.
+export const TOGGLE_PIN_MESSAGE = "sticky-party:toggle-pin";
+export interface TogglePinMessage {
+  type: typeof TOGGLE_PIN_MESSAGE;
+}
+
 export type ParentToNoteMessage =
   | InitNoteMessage
   | StartEditTitleMessage
@@ -104,4 +115,5 @@ export type NoteToParentMessage =
   | NoteFocusMessage
   | NoteDeletedMessage
   | NoteContentResizeMessage
-  | NoteEditingMessage;
+  | NoteEditingMessage
+  | TogglePinMessage;

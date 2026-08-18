@@ -11,6 +11,8 @@ import Shredder from "lucide-solid/icons/shredder";
 import Eye from "lucide-solid/icons/eye";
 import EyeOff from "lucide-solid/icons/eye-off";
 import Palette from "lucide-solid/icons/palette";
+import Pin from "lucide-solid/icons/pin";
+import PinOff from "lucide-solid/icons/pin-off";
 import { Button } from "@kobalte/core/button";
 import { ToggleButton } from "@kobalte/core/toggle-button";
 import { ToggleGroup } from "@kobalte/core/toggle-group";
@@ -27,6 +29,13 @@ export default function NoteFooter(props: {
   color: NoteColor;
   togglingColor: boolean;
   onColorChange: (color: NoteColor) => void;
+  // Whether this note is pinned to a fixed spot on the page. Lives here
+  // (edit-mode only, like color) instead of as a persistent header icon
+  // -- the header icon used to be drawn by content.ts on top of the
+  // iframe, which needed a matching padding reservation on this side
+  // and easily drifted out of alignment with the title text.
+  pinned: boolean;
+  onTogglePin: () => void;
 }) {
   // Whether the color swatches are shown. Local to this component (not
   // annotation.color's own state), since it's purely a UI reveal, not
@@ -68,6 +77,23 @@ export default function NoteFooter(props: {
       >
         <Show when={props.hide} fallback={<Eye size={16} />}>
           <EyeOff size={16} />
+        </Show>
+      </ToggleButton>
+      {/* Same pointerdown/blur trap as the buttons above. Toggling only
+          sends a request to content.ts (see useParentMessaging.ts's
+          sendTogglePin) -- the actual fixed/absolute conversion needs
+          the page's current scroll offset, which only content.ts has
+          access to. The new pinned state comes back via
+          NOTE_PIN_MESSAGE. */}
+      <ToggleButton
+        class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
+        onMouseDown={(e: MouseEvent) => e.preventDefault()}
+        pressed={props.pinned}
+        onChange={() => props.onTogglePin()}
+        aria-label={props.pinned ? "Unpin from page" : "Pin to page"}
+      >
+        <Show when={props.pinned} fallback={<PinOff size={16} />}>
+          <Pin size={16} />
         </Show>
       </ToggleButton>
       {/* Same pointerdown/blur trap as the buttons above. */}

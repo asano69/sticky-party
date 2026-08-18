@@ -13,6 +13,7 @@ import {
   NOTE_PIN_MESSAGE,
   NOTE_READY_MESSAGE,
   START_EDIT_TITLE_MESSAGE,
+  TOGGLE_PIN_MESSAGE,
   type NoteEditingMessage,
   type ParentToNoteMessage,
 } from "../../lib/iframe-messages";
@@ -85,5 +86,14 @@ export function useParentMessaging(params: {
   const sendDeleted = () =>
     window.parent.postMessage({ type: NOTE_DELETED_MESSAGE }, "*");
 
-  return { sendFocus, sendDeleted };
+  // Requests that content.ts toggle this note's pinned state (see
+  // NoteFooter.tsx). Only content.ts can perform the actual toggle: it
+  // needs the page's current scroll offset to convert between
+  // fixed/absolute positioning, which this iframe has no access to
+  // (see content.ts's togglePin). The resulting pin value comes back
+  // separately via NOTE_PIN_MESSAGE (handled above in onMessage).
+  const sendTogglePin = () =>
+    window.parent.postMessage({ type: TOGGLE_PIN_MESSAGE }, "*");
+
+  return { sendFocus, sendDeleted, sendTogglePin };
 }

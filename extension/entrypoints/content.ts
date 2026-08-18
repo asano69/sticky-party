@@ -19,8 +19,6 @@
 // using the small protocol in lib/iframe-messages.ts.
 
 import X from "lucide-solid/icons/x";
-import Pin from "lucide-solid/icons/pin";
-import PinOff from "lucide-solid/icons/pin-off";
 
 import {
   CHECK_ANNOTATION_MESSAGE,
@@ -46,6 +44,7 @@ import {
   NOTE_READY_MESSAGE,
   START_EDIT_TITLE_MESSAGE,
   TITLE_ROW_HEIGHT_PX,
+  TOGGLE_PIN_MESSAGE,
   type NotePinMessage,
 } from "../lib/iframe-messages";
 import type { StoredPosition, ViewportInfo } from "../lib/positions";
@@ -434,7 +433,6 @@ export default defineContentScript({
                 );
             }
             persistPosition();
-            updatePinIcon();
             iframe.contentWindow?.postMessage(
               { type: NOTE_PIN_MESSAGE, pin: pinned } satisfies NotePinMessage,
               iframeOrigin,
@@ -510,57 +508,6 @@ export default defineContentScript({
           applyThemeColors();
           darkModeQuery.addEventListener("change", applyThemeColors);
 
-          // Pin/unpin toggle, mirrored at the header's left edge
-          // (dismissBtn sits at the right -- see justifyContent:
-          // space-between above). Built directly here, not inside the
-          // iframe, so it can call togglePin synchronously instead of
-          // round-tripping through postMessage like Dismiss doesn't
-          // need to either.
-          const pinBtn = document.createElement("button");
-          pinBtn.type = "button";
-          Object.assign(pinBtn.style, {
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            border: "none",
-            background: "transparent",
-            borderRadius: "4px",
-            cursor: "pointer",
-            font: "inherit",
-            lineHeight: "1",
-            padding: "6px 8px",
-            pointerEvents: "auto",
-          });
-          // Visible whenever the note is pinned (clickable any time,
-          // to unpin) or whenever the note is being edited (so there's
-          // something to click to pin it in the first place -- the
-          // pin-off icon is never shown outside edit mode, so an
-          // ordinary unpinned note's header stays uncluttered).
-          // Turning pin ON therefore only ever happens while editing,
-          // but turning it OFF is always one click away once a note is
-          // pinned, matching how a persistent "you're pinned" indicator
-          // should behave.
-          const updatePinIcon = () => {
-            const visible = pinned || isEditingNote;
-            pinBtn.style.display = visible ? "flex" : "none";
-            pinBtn.replaceChildren(
-              (pinned ? Pin({ size: 16 }) : PinOff({ size: 16 })) as unknown as Node,
-            );
-            pinBtn.setAttribute(
-              "aria-label",
-              pinned ? "Unpin from page" : "Pin to page",
-            );
-          };
-          updatePinIcon();
-          pinBtn.addEventListener("mouseenter", () => {
-            pinBtn.style.background = "rgba(127, 127, 127, 0.35)";
-          });
-          pinBtn.addEventListener("mouseleave", () => {
-            pinBtn.style.background = "transparent";
-          });
-          pinBtn.addEventListener("click", () => togglePin());
-          header.append(pinBtn);
-
           const dismissBtn = document.createElement("button");
           dismissBtn.type = "button";
           dismissBtn.setAttribute("aria-label", "Dismiss");
@@ -581,11 +528,10 @@ export default defineContentScript({
             // pointer-events:none during editing -- a child's own
             // pointer-events setting overrides its parent's.
             pointerEvents: "auto",
-            // Pins this button to the header's right edge regardless
-            // of whether pinBtn (to its left) is currently visible --
-            // justify-content: space-between would instead collapse a
-            // lone visible child to the start when pinBtn is
-            // display:none (e.g. view mode, unpinned note).
+            // Pins this button to the header's right edge. It's this
+            // header's only button now -- the pin toggle lives in the
+            // footer instead (see NoteFooter.tsx) -- so marginLeft:
+            // auto alone is enough to push it there.
             marginLeft: "auto",
           });
           // Solid components return a real DOM node when called directly
@@ -747,9 +693,13 @@ export default defineContentScript({
               // editing, so clicks reach the title input inside the
               // iframe (see the header comment above).
               header.style.pointerEvents = e.data.editing ? "none" : "auto";
-              // Entering/leaving edit mode changes whether the pin
-              // button is visible/clickable -- see updatePinIcon above.
-              updatePinIcon();
+            } else if (e.data?.type === TOGGLE_PIN_MESSAGE) {
+              // Requested by the footer's pin button (see
+              // NoteFooter.tsx / useParentMessaging.ts's sendTogglePin).
+              // Only content.ts can perform the actual toggle, since it
+              // needs the page's current scroll offset to convert
+              // between fixed/absolute positioning.
+              togglePin();
             }
           };
           window.addEventListener("message", onMessage);
