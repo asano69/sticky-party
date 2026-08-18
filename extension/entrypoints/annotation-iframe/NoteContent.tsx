@@ -245,6 +245,8 @@ export default function NoteContent() {
             saving={saving()}
             onKeyDown={onEditorKeyDown}
             titleInputRef={(el) => (titleInputRef = el)}
+            pinned={note().pin}
+            onTogglePin={parentMessaging.sendTogglePin}
           />
 
           <NoteMain
@@ -285,8 +287,6 @@ export default function NoteContent() {
               }
               togglingColor={togglingColor()}
               onColorChange={handleColorChange}
-              pinned={note().pin}
-              onTogglePin={parentMessaging.sendTogglePin}
             />
           </Show>
         </div>
