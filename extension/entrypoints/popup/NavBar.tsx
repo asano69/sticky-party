@@ -8,6 +8,8 @@ import SettingsIcon from "lucide-solid/icons/settings";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
 import RefreshCwOff from "lucide-solid/icons/refresh-cw-off";
 import { ICON_BTN } from "./classes";
+import type { NoteColor } from "../../lib/colors";
+import ColorPicker from "./ColorPicker";
 
 export type View = "home" | "settings" | "targets";
 
@@ -32,15 +34,22 @@ export default function NavBar(props: {
   // in environments where the toolbar badge itself isn't (see
   // App.tsx).
   syncError: boolean;
-  // Total annotation count fetched on popup open (see App.tsx's
-  // checkConfigured/handleSync). undefined until the first fetch
-  // resolves -- shown as nothing rather than "0" so it's not mistaken
-  // for a real (zero) count while still loading.
+  // Total annotation count shown next to NavBar's Sync icon. undefined
+  // until the first fetch resolves (see checkConfigured/handleSync); a
+  // failed fetch leaves the previous value in place rather than
+  // clearing it, so the number doesn't flicker away on a transient
+  // error.
   count?: number;
+  // Currently selected note/popup color and its setter (see
+  // App.tsx's bgColor/handleBgColorChange) -- shown here so the color
+  // picker sits next to the "Note" heading rather than inside Home.tsx.
+  color: NoteColor;
+  onColorChange: (color: NoteColor) => void;
 }) {
   return (
     <header class="flex items-center justify-between px-3 pt-3">
       <div class="flex items-center gap-1">
+        <ColorPicker color={props.color} onColorChange={props.onColorChange} />
         <div class="font-bold">Note</div>
         <Button
           class={ICON_BTN}

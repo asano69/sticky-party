@@ -14,7 +14,6 @@ import {
   normalizeTarget,
 } from "../../lib/targets";
 import type { NoteColor } from "../../lib/colors";
-import AppearanceControls from "../../lib/components/AppearanceControls";
 import {
   CARD,
   FIELD,
@@ -32,21 +31,13 @@ import SaveButton, { type SaveStatus } from "./SaveButton";
 // collected here -- that belongs to the future drag-placement flow.
 export default function Home(props: {
   onAnnotationCreated?: () => void;
-  // Current popup background theme (see App.tsx/lib/popupColor.ts).
-  // The color picker below both sets this note's color and drives the
-  // popup's overall background, so the state itself lives in the parent.
+  // Color for the note being created. Owned by the parent (App.tsx)
+  // and set via NavBar's color picker, since it also drives the
+  // popup's overall background -- see App.tsx/lib/popupColor.ts.
   color: NoteColor;
-  onColorChange: (color: NoteColor) => void;
 }) {
   const [url, setUrl] = createSignal("");
   const [note, setNote] = createSignal("");
-  // Appearance settings for the note being created -- mirrors the
-  // footer controls shown while editing an existing note (see
-  // lib/components/AppearanceControls.tsx), just included in the
-  // create() payload below instead of being persisted immediately.
-  // Color itself is owned by the parent (props.color), since it also
-  // drives the popup's background -- see App.tsx.
-  const [hide, setHide] = createSignal(false);
   const [error, setError] = createSignal("");
   const [status, setStatus] = createSignal<SaveStatus>("idle");
   // Needed after save to ask the background script to re-check this tab
@@ -123,7 +114,6 @@ export default function Home(props: {
       const created = await pb.collection("annotations").create({
         target,
         body: note(),
-        hide: hide(),
         color: props.color,
       });
       await addCachedTarget(target, created.updated);
@@ -145,7 +135,6 @@ export default function Home(props: {
       // exists.
       props.onAnnotationCreated?.();
       setNote("");
-      setHide(false);
       setStatus("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
@@ -174,14 +163,6 @@ export default function Home(props: {
           onKeyDown={onNoteKeyDown}
         />
       </TextField>
-      <div class="flex items-center">
-        <AppearanceControls
-          hide={hide()}
-          onHideChange={setHide}
-          color={props.color}
-          onColorChange={props.onColorChange}
-        />
-      </div>
 
       <div class="flex justify-center">
         <SaveButton status={status()} />

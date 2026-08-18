@@ -210,6 +210,8 @@ function App() {
         locked={locked()}
         syncError={syncError()}
         count={annotationCount()}
+        color={bgColor()}
+        onColorChange={handleBgColorChange}
       />
 
       <Show
@@ -220,11 +222,7 @@ function App() {
           </Show>
         }
       >
-        <Home
-          onAnnotationCreated={handleAnnotationCreated}
-          color={bgColor()}
-          onColorChange={handleBgColorChange}
-        />
+        <Home onAnnotationCreated={handleAnnotationCreated} color={bgColor()} />
       </Show>
     </div>
   );

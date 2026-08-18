@@ -1,8 +1,10 @@
-// Shared color-picker + blur-toggle controls for a sticky note's
-// appearance (hide/color). Used both while editing an existing note
-// (NoteFooter.tsx, which persists each change immediately via PATCH)
-// and while composing a new one in the popup (Home.tsx, which just
-// holds local state and includes it in the create() payload instead).
+// Color-picker + blur-toggle controls for a sticky note's appearance
+// (hide/color), used by the annotation-iframe's edit footer
+// (NoteFooter.tsx), which persists each change immediately via PATCH.
+// The popup's new-note form uses its own dedicated color picker
+// (entrypoints/popup/ColorPicker.tsx) instead -- the two live in
+// separate documents with different persistence needs, so sharing UI
+// here only coupled them for no benefit.
 // Delete stays out of this component since it only makes sense for an
 // existing annotation.
 
