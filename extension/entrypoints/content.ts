@@ -77,6 +77,15 @@ function currentViewport(): ViewportInfo {
   };
 }
 
+// The whole document's size in CSS px, used for pinned notes' ratio
+// math (see persistPosition/togglePin below). Unlike viewportSize,
+// this isn't clamped to the visible area -- a pinned note anchors to a
+// point in the whole document, not just the window.
+function documentSize(): { width: number; height: number } {
+  const el = document.documentElement;
+  return { width: el.scrollWidth, height: el.scrollHeight };
+}
+
 const IFRAME_PAGE = "/annotation-iframe.html";
 
 // z-index base kept well above host-page content but below the int32
@@ -158,16 +167,25 @@ export default defineContentScript({
       // collection. Toggled from the footer's pin button -- see
       // togglePin below.
       let pinned = annotation.pin;
+      // This note's anchor, as a ratio of the whole document -- the
+      // source of truth for a pinned note's position. Only meaningful
+      // while pinned; kept up to date by persistPosition/togglePin
+      // below, and read by the document ResizeObserver (see onMount)
+      // to redraw top/left whenever the document's size changes (e.g.
+      // images or fonts finishing loading), not just on window resize.
+      let pinRatioX = 0;
+      let pinRatioY = 0;
 
       if (pinned) {
         // Pinned coordinates are ratios of the whole document, not the
         // window, and live on the annotation record itself (see
         // lib/annotations.ts's setAnnotationPin) -- every viewer sees
         // the same anchor point, so there's no positions lookup here.
-        const docWidth = document.documentElement.scrollWidth;
-        const docHeight = document.documentElement.scrollHeight;
-        top = annotation.pinYRatio * docHeight;
-        left = annotation.pinXRatio * docWidth;
+        pinRatioX = annotation.pinXRatio;
+        pinRatioY = annotation.pinYRatio;
+        const doc = documentSize();
+        top = pinRatioY * doc.height;
+        left = pinRatioX * doc.width;
         savedWidth = annotation.pinWidth || undefined;
         savedHeight = annotation.pinHeight || undefined;
         z = nextZ();
@@ -211,6 +229,14 @@ export default defineContentScript({
 
       let resizeObserver: ResizeObserver | undefined;
       let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
+      // Watches the whole document (not just this note's own wrapper --
+      // see resizeObserver above) so a pinned note's on-screen position
+      // can be redrawn from pinRatioX/pinRatioY whenever the document's
+      // size changes, for any reason (window resize, images/fonts
+      // finishing loading, lazily-mounted content). Only ever created
+      // and observed for pinned notes -- see onMount below.
+      let docResizeObserver: ResizeObserver | undefined;
+      let docResizeTimer: ReturnType<typeof setTimeout> | undefined;
       let onMessage: ((e: MessageEvent) => void) | undefined;
       let reposition: ((scaleX: number, scaleY: number) => void) | undefined;
       // Tracks the media query used below to keep the Dismiss icon and
@@ -312,16 +338,23 @@ export default defineContentScript({
           // before.
           const persistPosition = () => {
             if (pinned) {
-              const docWidth = document.documentElement.scrollWidth;
-              const docHeight = document.documentElement.scrollHeight;
+              const doc = documentSize();
+              // Recompute the ratio from the current pixel position
+              // (not the other way around): this is the one place a
+              // pinned note's anchor is actually redefined -- e.g.
+              // after a drag -- so pinRatioX/pinRatioY (read by the
+              // document ResizeObserver above to redraw the note on
+              // later layout shifts) must be refreshed here too.
+              pinRatioX = left / doc.width;
+              pinRatioY = top / doc.height;
               browser.runtime
                 .sendMessage({
                   type: SET_ANNOTATION_PIN_MESSAGE,
                   annotationId: annotation.id,
                   pin: true,
                   coords: {
-                    xRatio: left / docWidth,
-                    yRatio: top / docHeight,
+                    xRatio: pinRatioX,
+                    yRatio: pinRatioY,
                     width: wrapper.offsetWidth,
                     // Use contentHeight (the resting/non-editing size),
                     // not wrapper.offsetHeight -- the wrapper is
@@ -593,6 +626,30 @@ export default defineContentScript({
           });
           resizeObserver.observe(wrapper);
 
+          // A pinned note's position is a ratio of the whole document
+          // (pinRatioX/pinRatioY), not raw pixels, so it must be
+          // recalculated whenever the document's size changes -- not
+          // just on window resize, but also as images, web fonts, or
+          // lazily-mounted content shift the page's layout after this
+          // script first ran. Watching documentElement catches all of
+          // these causes uniformly, instead of trying to guess the one
+          // "correct" moment to measure once. Debounced like
+          // resizeObserver above, since a page still loading can
+          // resize many times in quick succession.
+          if (pinned) {
+            docResizeObserver = new ResizeObserver(() => {
+              clearTimeout(docResizeTimer);
+              docResizeTimer = setTimeout(() => {
+                const doc = documentSize();
+                top = pinRatioY * doc.height;
+                left = pinRatioX * doc.width;
+                wrapper.style.top = `${top}px`;
+                wrapper.style.left = `${left}px`;
+              }, 300);
+            });
+            docResizeObserver.observe(document.documentElement);
+          }
+
           // Hand the annotation to the iframe once it reports itself
           // ready, rather than on the iframe's 'load' event -- 'load'
           // can fire before the iframe's own script has registered its
@@ -650,6 +707,8 @@ export default defineContentScript({
           }
           resizeObserver?.disconnect();
           clearTimeout(resizeSaveTimer);
+          docResizeObserver?.disconnect();
+          clearTimeout(docResizeTimer);
         },
       });
 
