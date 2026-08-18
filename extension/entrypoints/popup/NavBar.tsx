@@ -57,11 +57,6 @@ export default function NavBar(props: {
             <RefreshCw size={18} class={props.syncing ? "animate-spin" : ""} />
           </Show>
         </Button>
-        <Show when={props.count !== undefined}>
-          <span class="text-xs text-[color:var(--note-label)]">
-            {props.count}
-          </span>
-        </Show>
       </div>
 
       <ToggleGroup

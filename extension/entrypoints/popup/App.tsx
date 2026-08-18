@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import Home from "./Home";
 import Settings from "./Settings";
 import Targets from "./Targets";
@@ -81,6 +81,20 @@ function App() {
   };
 
   onMount(checkConfigured);
+
+  // Mirrors the annotation count into the toolbar icon's hover tooltip
+  // (e.g. "Sticky Party (3)"). This must go through browser.action.setTitle,
+  // not document.title: document.title only affects this popup page's own
+  // title, which doesn't exist yet when the user is hovering the toolbar
+  // icon (the popup hasn't been opened). browser.action.setTitle instead
+  // sets a property on the action itself, which persists after the popup
+  // closes and is what the hover tooltip actually reads.
+  createEffect(() => {
+    const count = annotationCount();
+    browser.action.setTitle({
+      title: count === undefined ? "Sticky Party" : `Sticky Party (${count})`,
+    });
+  });
 
   // Loads the current error state on open (it may already be true if
   // an earlier alarm-driven sync failed in background.ts before this
