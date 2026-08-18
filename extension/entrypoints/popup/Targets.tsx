@@ -79,6 +79,10 @@ export default function Targets() {
                     disabled={!isClickableTarget(item.target)}
                     target="_blank"
                     rel="noopener noreferrer"
+                    // Shows the full target URL (scheme included) on
+                    // hover, since displayTarget strips the scheme to
+                    // save horizontal space in the truncated list item.
+                    title={item.target}
                     class="block truncate text-[0.8em] text-inherit underline data-[disabled]:no-underline data-[disabled]:opacity-50 data-[disabled]:cursor-default"
                   >
                     {displayTarget(item.target)}
