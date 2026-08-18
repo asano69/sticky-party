@@ -14,6 +14,11 @@
    * rather than currentColor/inherit, so links stay recognizable as
    * links instead of blending into the surrounding text color. */
   --note-link: #1a56db;
+  /* Field labels and hint text (see classes.ts's FIELD_LABEL/SAVED_HINT).
+   * A fixed gray rather than currentColor/inherit, same reasoning as
+   * --note-link: this needs its own light/dark values since the note
+   * background itself changes between color schemes. */
+  --note-label: #6b7280;
 
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -56,5 +61,8 @@ h1 {
     --note-header-border: rgba(255, 255, 255, 0.15);
     --note-button-border: rgba(255, 255, 255, 0.3);
     --note-link: #7aa2f7;
+    /* Lighter than the light-mode gray so labels stay readable against
+     * the dark note background instead of nearly disappearing. */
+    --note-label: #a3a3a3;
   }
 }
