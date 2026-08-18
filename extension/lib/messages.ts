@@ -53,9 +53,7 @@ export interface SetAnnotationPinMessage {
 }
 
 export type PositionMessage =
-  | GetPositionMessage
-  | SavePositionMessage
-  | SetAnnotationPinMessage;
+  GetPositionMessage | SavePositionMessage | SetAnnotationPinMessage;
 
 // A single annotation's id (needed to save edits back to PocketBase),
 // body text, and last-updated timestamp. `updated` drives the stacking

@@ -47,7 +47,9 @@ export default function NavBar(props: {
           onClick={props.onSync}
           disabled={props.syncing || props.locked}
           aria-label={
-            props.syncError ? "Sync failed -- click to retry" : "Sync from server"
+            props.syncError
+              ? "Sync failed -- click to retry"
+              : "Sync from server"
           }
         >
           <Show

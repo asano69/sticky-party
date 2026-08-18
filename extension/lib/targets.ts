@@ -67,9 +67,7 @@ export async function addCachedTarget(
   // Replace any existing entry for this target rather than skipping,
   // so re-saving an annotation on the same URL refreshes its updated
   // timestamp too.
-  const next = targets.filter(
-    (t) => normalizeTarget(t.target) !== normalized,
-  );
+  const next = targets.filter((t) => normalizeTarget(t.target) !== normalized);
   next.push({ target: normalized, updated });
   await browser.storage.local.set({ [TARGETS_KEY]: next });
 }
@@ -82,17 +80,13 @@ export async function addCachedTarget(
 export async function removeCachedTarget(target: string): Promise<void> {
   const normalized = normalizeTarget(target);
   const targets = await getCachedTargets();
-  const next = targets.filter(
-    (t) => normalizeTarget(t.target) !== normalized,
-  );
+  const next = targets.filter((t) => normalizeTarget(t.target) !== normalized);
   if (next.length !== targets.length) {
     await browser.storage.local.set({ [TARGETS_KEY]: next });
   }
 }
 
-export async function setCachedTargets(
-  targets: CachedTarget[],
-): Promise<void> {
+export async function setCachedTargets(targets: CachedTarget[]): Promise<void> {
   await browser.storage.local.set({ [TARGETS_KEY]: targets });
 }
 

@@ -67,12 +67,9 @@ a {
   color: currentColor;
 }
 
-.sticky-party-icon-btn {
-  background: transparent;
-}
-.sticky-party-icon-btn:hover {
-  background-color: rgba(0, 0, 0, 0.15);
-}
+/* .sticky-party-icon-btn's hover styling now lives in
+ * assets/theme.css, shared with the popup (see
+ * lib/components/AppearanceControls.tsx). */
 
 /* Playful "not yet" feedback on the first click of the lock-reveal
  * button (see NoteContent.tsx) -- the real unlock only happens on

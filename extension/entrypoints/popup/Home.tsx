@@ -8,7 +8,13 @@ import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
 } from "../../lib/messages";
-import { addCachedTarget, isValidHttpUrl, normalizeTarget } from "../../lib/targets";
+import {
+  addCachedTarget,
+  isValidHttpUrl,
+  normalizeTarget,
+} from "../../lib/targets";
+import { DEFAULT_NOTE_COLOR, type NoteColor } from "../../lib/colors";
+import AppearanceControls from "../../lib/components/AppearanceControls";
 import {
   CARD,
   FIELD,
@@ -27,6 +33,12 @@ import SaveButton, { type SaveStatus } from "./SaveButton";
 export default function Home(props: { onAnnotationCreated?: () => void }) {
   const [url, setUrl] = createSignal("");
   const [note, setNote] = createSignal("");
+  // Appearance settings for the note being created -- mirrors the
+  // footer controls shown while editing an existing note (see
+  // lib/components/AppearanceControls.tsx), just included in the
+  // create() payload below instead of being persisted immediately.
+  const [hide, setHide] = createSignal(false);
+  const [color, setColor] = createSignal<NoteColor>(DEFAULT_NOTE_COLOR);
   const [error, setError] = createSignal("");
   const [status, setStatus] = createSignal<SaveStatus>("idle");
   // Needed after save to ask the background script to re-check this tab
@@ -103,6 +115,8 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
       const created = await pb.collection("annotations").create({
         target,
         body: note(),
+        hide: hide(),
+        color: color(),
       });
       await addCachedTarget(target, created.updated);
       // The note was saved to the DB, so the local draft is no longer
@@ -123,6 +137,8 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
       // exists.
       props.onAnnotationCreated?.();
       setNote("");
+      setHide(false);
+      setColor(DEFAULT_NOTE_COLOR);
       setStatus("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
@@ -143,6 +159,7 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
 
       <TextField class={FIELD} value={note()} onChange={updateNote}>
         <TextField.Label class={FIELD_LABEL}>Note</TextField.Label>
+
         <TextField.TextArea
           class={FIELD_TEXTAREA}
           rows={4}
@@ -150,6 +167,14 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
           onKeyDown={onNoteKeyDown}
         />
       </TextField>
+      <div class="flex items-center">
+        <AppearanceControls
+          hide={hide()}
+          onHideChange={setHide}
+          color={color()}
+          onColorChange={setColor}
+        />
+      </div>
 
       <div class="flex justify-center">
         <SaveButton status={status()} />

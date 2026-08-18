@@ -168,10 +168,7 @@ function App() {
     try {
       setAnnotationCount(await fetchAnnotationCount());
     } catch (err) {
-      console.error(
-        "[sticky-party] failed to refresh annotation count",
-        err,
-      );
+      console.error("[sticky-party] failed to refresh annotation count", err);
     }
   };
 

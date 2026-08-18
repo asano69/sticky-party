@@ -40,3 +40,14 @@
     --note-color-purple-text: hsl(275, 50%, 87%);
   }
 }
+
+/* Hover styling for footer/toolbar icon buttons (e.g. the hide/color
+ * controls in lib/components/AppearanceControls.tsx). Lives here
+ * rather than in either entrypoint's own style.css since that
+ * component is shared by both the popup and the annotation-iframe. */
+.sticky-party-icon-btn {
+  background: transparent;
+}
+.sticky-party-icon-btn:hover {
+  background-color: rgba(0, 0, 0, 0.15);
+}

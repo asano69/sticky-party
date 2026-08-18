@@ -27,7 +27,10 @@ const ANNOTATION_COUNT_COLOR = "#4b5563";
 
 export function showAnnotationCountBadge(tabId: number, count: number): void {
   browser.action.setBadgeText({ text: String(count), tabId });
-  browser.action.setBadgeBackgroundColor({ color: ANNOTATION_COUNT_COLOR, tabId });
+  browser.action.setBadgeBackgroundColor({
+    color: ANNOTATION_COUNT_COLOR,
+    tabId,
+  });
 }
 
 export function clearAnnotationCountBadge(tabId: number): void {

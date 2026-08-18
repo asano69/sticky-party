@@ -124,9 +124,7 @@ export default defineBackground(() => {
       // withSyncErrorBadge retries once before it lets a failure
       // through, so a transient hiccup right as the page loads doesn't
       // flash the badge red -- see lib/syncBadge.ts.
-      const annotations = await withSyncErrorBadge(() =>
-        fetchAnnotations(url),
-      );
+      const annotations = await withSyncErrorBadge(() => fetchAnnotations(url));
       if (annotations.length === 0) {
         // The cache said this URL had an annotation, but the DB has
         // none -- most likely it was deleted since the last sync (a

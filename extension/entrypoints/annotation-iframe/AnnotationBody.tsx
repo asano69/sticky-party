@@ -52,7 +52,11 @@ export default function AnnotationBody(props: {
             <For each={line.tokens}>
               {(token) =>
                 token.type === "link" ? (
-                  <a href={token.value} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={token.value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     {token.value}
                   </a>
                 ) : (

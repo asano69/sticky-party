@@ -107,9 +107,7 @@ export interface TogglePinMessage {
 }
 
 export type ParentToNoteMessage =
-  | InitNoteMessage
-  | StartEditTitleMessage
-  | NotePinMessage;
+  InitNoteMessage | StartEditTitleMessage | NotePinMessage;
 export type NoteToParentMessage =
   | NoteReadyMessage
   | NoteFocusMessage

@@ -42,8 +42,7 @@ export function useParentMessaging(params: {
     if (e.data?.type === INIT_NOTE_MESSAGE) params.onInit(e.data.annotation);
     else if (e.data?.type === START_EDIT_TITLE_MESSAGE)
       params.onStartEditTitle();
-    else if (e.data?.type === NOTE_PIN_MESSAGE)
-      params.onPinChange(e.data.pin);
+    else if (e.data?.type === NOTE_PIN_MESSAGE) params.onPinChange(e.data.pin);
   };
   window.addEventListener("message", onMessage);
   onCleanup(() => window.removeEventListener("message", onMessage));

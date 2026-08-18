@@ -5,7 +5,7 @@
 // logic lives in useContentHeight.ts, not here).
 
 import { Show } from "solid-js";
-import Lock from "lucide-solid/icons/lock";
+import Lock from "lucide-solid/icons/eye-off";
 import { TextField } from "@kobalte/core/text-field";
 import { Button } from "@kobalte/core/button";
 import type { AnnotationData } from "../../lib/messages";
