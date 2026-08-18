@@ -6,7 +6,7 @@ import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
 } from "../../lib/messages";
-import { addCachedTarget, normalizeTarget } from "../../lib/targets";
+import { addCachedTarget, isValidHttpUrl, normalizeTarget } from "../../lib/targets";
 import {
   CARD,
   FIELD,
@@ -58,6 +58,16 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
   const handleSave = async (e: Event) => {
     e.preventDefault();
     setError("");
+
+    // Reject anything that isn't a well-formed http(s) URL before
+    // touching the network, so an obviously bad value never reaches
+    // the DB or the local target cache.
+    if (!isValidHttpUrl(url())) {
+      setError("Enter a valid http:// or https:// URL.");
+      setStatus("error");
+      return;
+    }
+
     setStatus("saving");
     try {
       const pb = await getAuthedPb();

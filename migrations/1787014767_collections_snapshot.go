@@ -920,7 +920,7 @@ func init() {
 						"max": 0,
 						"min": 0,
 						"name": "target",
-						"pattern": "",
+						"pattern": "^https?://.+$",
 						"presentable": false,
 						"primaryKey": false,
 						"required": false,

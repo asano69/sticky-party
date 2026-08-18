@@ -46,6 +46,18 @@ export function normalizeTarget(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
+// Whether `url` is a well-formed http:// or https:// URL. Used by the
+// popup's save form (Home.tsx) to reject other schemes (e.g.
+// "javascript:", "ftp://", or plain unparsable text) before it ever
+// reaches the DB or the local target cache.
+export function isValidHttpUrl(url: string): boolean {
+  try {
+    return ["http:", "https:"].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}
+
 export async function addCachedTarget(
   target: string,
   updated: string,
