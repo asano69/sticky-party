@@ -1,31 +1,39 @@
 // Reads and writes a sticky note's on-page position and size, persisted
-// per (annotation, user, screen) in the `positions` collection so each
-// display keeps its own layout (see AnnotationBoard.tsx).
+// per (annotation, user) in the `positions` collection (see
+// AnnotationBoard.tsx).
 //
 // x/y are stored as ratios of the window's inner width/height rather
 // than raw pixels, since window size varies across devices (and across
 // resizes of the same window); width/height are stored as raw pixels,
 // since sticky notes have a fixed min-size regardless of window size.
 //
+// Positions used to also be partitioned per-screen (screen.width/height
+// as an extra key), so a dual-monitor setup wouldn't fight over one
+// stored position. That partition was removed: browser zoom changes the
+// apparent screen size, so zooming fragmented a single note's saved
+// layout into multiple records instead of just resizing it in place.
+// Since x/y are already stored as window-relative ratios (resolution-
+// independent), the per-screen key added no correctness benefit -- only
+// this bug. The tradeoff is that multi-monitor users now share one
+// layout across displays instead of a separate one per screen.
+//
 // This module is called from the background script, not the content
 // script (see lib/messages.ts), so it has no access to the content
-// page's own `window`/`screen` -- reading those globals here would
-// describe the background page instead, which is what broke restoring
-// x/y before this was fixed. Callers must pass the content page's
-// viewport/screen dimensions in explicitly via ViewportInfo.
+// page's own `window` -- reading that global here would describe the
+// background page instead, which is what broke restoring x/y before
+// this was fixed. Callers must pass the content page's viewport
+// dimensions in explicitly via ViewportInfo.
 
 import { ClientResponseError } from "pocketbase";
 
 import { getAuthedPb } from "./pb";
 
-// The content page's viewport size and display resolution, captured by
-// content.ts (which has the real `window`/`screen`) and passed through
-// the background-script message (see lib/messages.ts).
+// The content page's viewport size, captured by content.ts (which has
+// the real `window`) and passed through the background-script message
+// (see lib/messages.ts).
 export interface ViewportInfo {
   windowWidth: number;
   windowHeight: number;
-  screenWidth: number;
-  screenHeight: number;
 }
 
 // "viewport": the note follows the screen (position: fixed), the
@@ -33,17 +41,6 @@ export interface ViewportInfo {
 // spot on the page itself (position: absolute), so it scrolls with the
 // page -- e.g. pinning a note near the bottom of a long article.
 export type PositionMode = "viewport" | "page";
-
-// This display's resolution, so a dual-monitor setup keeps a separate
-// saved layout per screen instead of two monitors fighting over the
-// same stored position (e.g. a laptop docked to an external display
-// with a different resolution). Combined with the backend user id
-// (rather than a locally generated fingerprint), so reinstalling the
-// extension -- or switching to a different browser or machine -- still
-// restores the same saved layout instead of starting over.
-function screenKey(viewport: ViewportInfo): string {
-  return `${viewport.screenWidth}x${viewport.screenHeight}`;
-}
 
 interface PositionRecord {
   id: string;
@@ -148,14 +145,10 @@ export async function fetchPosition(
     const record = await pb
       .collection("positions")
       .getFirstListItem<PositionRecord>(
-        pb.filter(
-          "annotation = {:annotation} && user = {:user} && screen = {:screen}",
-          {
-            annotation: annotationId,
-            user: userId,
-            screen: screenKey(viewport),
-          },
-        ),
+        pb.filter("annotation = {:annotation} && user = {:user}", {
+          annotation: annotationId,
+          user: userId,
+        }),
       );
     return { id: record.id, ...fromRatio(record, viewport) };
   } catch (err) {
@@ -182,7 +175,6 @@ export async function savePosition(
   const data = {
     annotation: annotationId,
     user: userId,
-    screen: screenKey(viewport),
     ...toRatio(pos, viewport),
   };
 

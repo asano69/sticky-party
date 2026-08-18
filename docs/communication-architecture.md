@@ -131,11 +131,14 @@ can answer them with no reconnect logic needed.
 `x`/`y` are persisted as ratios of the browser window's inner size (see
 `lib/positions.ts`), so restoring a note keeps it in the same relative
 spot regardless of window size. That ratio math has to use the **content
-page's** `window.innerWidth`/`innerHeight` and `screen.width`/`height` —
-not the background script's, which has none of its own.
+page's** `window.innerWidth`/`innerHeight` -- not the background
+script's, which has none of its own. (`ViewportInfo` used to also carry
+`screen.width`/`height` to partition saved positions per display, but
+browser zoom changes the apparent screen size, so that partition was
+removed -- see `lib/positions.ts`'s header comment.)
 
 Since `lib/positions.ts` runs in the background script (per the section
-above), `content.ts` captures its own viewport/screen synchronously
+above), `content.ts` captures its own viewport synchronously
 (`currentViewport()`) and sends it along with every
 `GET_POSITION_MESSAGE`/`SAVE_POSITION_MESSAGE`. This is why the sequence
 diagram shows `viewport` as part of both position messages: without it,

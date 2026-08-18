@@ -1060,19 +1060,19 @@ func init() {
 						"type": "relation"
 					},
 					{
-						"autogeneratePattern": "",
 						"help": "",
 						"hidden": false,
-						"id": "text3746324784",
-						"max": 0,
-						"min": 0,
-						"name": "screen",
-						"pattern": "",
+						"id": "select2546616235",
+						"maxSelect": 0,
+						"name": "mode",
 						"presentable": false,
-						"primaryKey": false,
 						"required": false,
 						"system": false,
-						"type": "text"
+						"type": "select",
+						"values": [
+							"viewport",
+							"page"
+						]
 					},
 					{
 						"help": "",
@@ -1162,7 +1162,7 @@ func init() {
 				],
 				"id": "pbc_2998141924",
 				"indexes": [
-					"CREATE UNIQUE INDEX ` + "`" + `idx_9viysjs323` + "`" + ` ON ` + "`" + `positions` + "`" + ` (\n  ` + "`" + `annotation` + "`" + `,\n  ` + "`" + `user` + "`" + `,\n  ` + "`" + `screen` + "`" + `\n)"
+					"CREATE UNIQUE INDEX ` + "`" + `idx_4ff9gi82nk` + "`" + ` ON ` + "`" + `positions` + "`" + ` (\n  ` + "`" + `annotation` + "`" + `,\n  ` + "`" + `user` + "`" + `\n)"
 				],
 				"listRule": "",
 				"name": "positions",

@@ -67,18 +67,15 @@ function viewportSize(): { width: number; height: number } {
     : { width: window.innerWidth, height: window.innerHeight };
 }
 
-// The content page's own viewport/screen at the moment of the call,
-// read fresh each time rather than cached -- lib/positions.ts needs
-// this because it runs in the background script (see that file's
-// header comment), which has no access to this page's real
-// `window`/`screen`.
+// The content page's own viewport at the moment of the call, read
+// fresh each time rather than cached -- lib/positions.ts needs this
+// because it runs in the background script (see that file's header
+// comment), which has no access to the content page's real `window`.
 function currentViewport(): ViewportInfo {
   const { width, height } = viewportSize();
   return {
     windowWidth: width,
     windowHeight: height,
-    screenWidth: screen.width,
-    screenHeight: screen.height,
   };
 }
 
