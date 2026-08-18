@@ -1,9 +1,11 @@
+import { Show } from "solid-js";
 import { ToggleGroup } from "@kobalte/core/toggle-group";
 import { Button } from "@kobalte/core/button";
 import SquarePen from "lucide-solid/icons/square-pen";
 import NotebookTabs from "lucide-solid/icons/notebook-tabs";
 import SettingsIcon from "lucide-solid/icons/settings";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
+import RefreshCwOff from "lucide-solid/icons/refresh-cw-off";
 import { ICON_BTN } from "./classes";
 
 export type View = "home" | "settings" | "targets";
@@ -24,6 +26,11 @@ export default function NavBar(props: {
   // Settings can be reached, since neither of the other views can do
   // anything useful without a working connection.
   locked: boolean;
+  // Mirrors lib/syncBadge.ts's stored error flag -- swaps the Sync
+  // button to a red "off" icon so a failed connection is visible even
+  // in environments where the toolbar badge itself isn't (see
+  // App.tsx).
+  syncError: boolean;
 }) {
   return (
     <header class="flex items-center justify-between px-3 pt-3">
@@ -33,9 +40,16 @@ export default function NavBar(props: {
           class={ICON_BTN}
           onClick={props.onSync}
           disabled={props.syncing || props.locked}
-          aria-label="Sync from server"
+          aria-label={
+            props.syncError ? "Sync failed -- click to retry" : "Sync from server"
+          }
         >
-          <RefreshCw size={18} class={props.syncing ? "animate-spin" : ""} />
+          <Show
+            when={!props.syncError}
+            fallback={<RefreshCwOff size={18} class="text-[#c0392b]" />}
+          >
+            <RefreshCw size={18} class={props.syncing ? "animate-spin" : ""} />
+          </Show>
         </Button>
       </div>
 

@@ -1,11 +1,15 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import Home from "./Home";
 import Settings from "./Settings";
 import Targets from "./Targets";
 import NavBar, { type View } from "./NavBar";
 import { fullSyncTargets, syncTargets } from "../../lib/targets";
 import { getSettings } from "../../lib/settings";
-import { clearSyncErrorBadge, showSyncErrorBadge } from "../../lib/syncBadge";
+import {
+  clearSyncErrorBadge,
+  getSyncError,
+  showSyncErrorBadge,
+} from "../../lib/syncBadge";
 import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
@@ -22,6 +26,10 @@ function App() {
   // interacted with for the brief moment before that check resolves --
   // without credentials, neither view can do anything useful anyway.
   const [locked, setLocked] = createSignal(true);
+  // Mirrors lib/syncBadge.ts's stored error flag, so NavBar's Sync
+  // button can show the same failure state as the toolbar badge --
+  // useful wherever the badge itself isn't visible.
+  const [syncError, setSyncError] = createSignal(false);
 
   // Reads Settings and unlocks Home/Targets only once backend
   // credentials are actually saved; otherwise forces the Settings view
@@ -48,13 +56,32 @@ function App() {
     try {
       await syncTargets();
       clearSyncErrorBadge();
+      setSyncError(false);
     } catch (err) {
       console.error("[sticky-party] popup sync failed", err);
       showSyncErrorBadge();
+      setSyncError(true);
     }
   };
 
   onMount(checkConfigured);
+
+  // Loads the current error state on open (it may already be true if
+  // an earlier alarm-driven sync failed in background.ts before this
+  // popup was opened), then keeps it live afterward -- e.g. if that
+  // periodic sync succeeds or fails again while this popup happens to
+  // still be open.
+  onMount(async () => setSyncError(await getSyncError()));
+  const onStorageChange = (
+    changes: Record<string, { newValue?: unknown }>,
+    area: string,
+  ) => {
+    if (area === "local" && "syncError" in changes) {
+      setSyncError(!!changes.syncError.newValue);
+    }
+  };
+  browser.storage.onChanged.addListener(onStorageChange);
+  onCleanup(() => browser.storage.onChanged.removeListener(onStorageChange));
 
   // Ignored while locked (except switching to Settings itself), as a
   // second guard in case something other than NavBar's disabled tabs
@@ -80,6 +107,7 @@ function App() {
     try {
       await fullSyncTargets();
       clearSyncErrorBadge();
+      setSyncError(false);
       const [activeTab] = await browser.tabs.query({
         active: true,
         currentWindow: true,
@@ -94,6 +122,7 @@ function App() {
     } catch (err) {
       console.error("[sticky-party] full sync failed", err);
       showSyncErrorBadge();
+      setSyncError(true);
     } finally {
       setSyncing(false);
     }
@@ -107,6 +136,7 @@ function App() {
         syncing={syncing()}
         onSync={handleSync}
         locked={locked()}
+        syncError={syncError()}
       />
 
       <Show
