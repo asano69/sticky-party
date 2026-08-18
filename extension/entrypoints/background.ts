@@ -1,7 +1,7 @@
 // See docs/architecture.md for the full sync design this implements.
 
 import { fetchAnnotations } from "../lib/annotations";
-import { clearSyncErrorBadge, showSyncErrorBadge } from "../lib/syncBadge";
+import { withSyncErrorBadge } from "../lib/syncBadge";
 import {
   CHECK_ANNOTATION_MESSAGE,
   GET_POSITION_MESSAGE,
@@ -27,15 +27,14 @@ export default defineBackground(() => {
   // lib/targets.ts's syncTargets).
   const sync = async () => {
     try {
-      await syncTargets();
-      clearSyncErrorBadge();
+      await withSyncErrorBadge(() => syncTargets());
     } catch (err) {
       // Most commonly missing/invalid credentials in Settings, or the
       // backend being unreachable. The popup doesn't surface this on
       // its own since sync runs in the background with no UI open, so
-      // the badge is what makes the failure visible.
+      // the badge is what makes the failure visible. withSyncErrorBadge
+      // already retried once before giving up and showing the badge.
       console.error("[sticky-party] target sync failed", err);
-      showSyncErrorBadge();
     }
   };
 
@@ -58,11 +57,35 @@ export default defineBackground(() => {
   // tabs.onUpdated already fired and missed it -- otherwise a matching
   // page's annotation only ever appeared after a second navigation
   // (e.g. a full reload).
-  const checkTab = async (tabId: number, rawUrl: string) => {
+  //
+  // On a normal navigation, both callers fire within milliseconds of
+  // each other for the same tab+URL. Without dedupe, that meant two
+  // separate authenticate-and-fetch round trips to the backend right
+  // as the page itself was still loading; if either one happened to
+  // be slow enough to fail under that contention, the sync error
+  // badge would flash on for no real reason. inFlightChecks makes the
+  // second caller just await the first call's result instead of
+  // starting a redundant request.
+  const inFlightChecks = new Map<string, Promise<void>>();
+
+  const checkTab = (tabId: number, rawUrl: string): Promise<void> => {
     // Normalize once here so both the cache lookup below and the exact-
     // match DB query in fetchAnnotationBodies line up with the normalized
     // target values written by the popup (see lib/targets.ts).
     const url = normalizeTarget(rawUrl);
+    const key = `${tabId}:${url}`;
+
+    const existing = inFlightChecks.get(key);
+    if (existing) return existing;
+
+    const promise = runCheckTab(tabId, url).finally(() => {
+      inFlightChecks.delete(key);
+    });
+    inFlightChecks.set(key, promise);
+    return promise;
+  };
+
+  const runCheckTab = async (tabId: number, url: string) => {
     const targets = await getCachedTargets();
 
     if (!isTargetMatch(url, targets)) {
@@ -76,12 +99,12 @@ export default defineBackground(() => {
     }
 
     try {
-      const annotations = await fetchAnnotations(url);
-      // Reaching here means the backend responded, regardless of
-      // whether this particular URL had any annotations -- clear
-      // whatever earlier failure (this or any other sync) put the
-      // badge up.
-      clearSyncErrorBadge();
+      // withSyncErrorBadge retries once before it lets a failure
+      // through, so a transient hiccup right as the page loads doesn't
+      // flash the badge red -- see lib/syncBadge.ts.
+      const annotations = await withSyncErrorBadge(() =>
+        fetchAnnotations(url),
+      );
       if (annotations.length === 0) {
         // The cache said this URL had an annotation, but the DB has
         // none -- most likely it was deleted since the last sync (a
@@ -101,7 +124,6 @@ export default defineBackground(() => {
       // badge exists to surface -- without it, the user would just see
       // no sticky note and have no idea why.
       console.error("[sticky-party] failed to fetch annotation", err);
-      showSyncErrorBadge();
     }
   };
 

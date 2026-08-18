@@ -27,3 +27,35 @@ export async function getSyncError(): Promise<boolean> {
   const result = await browser.storage.local.get(SYNC_ERROR_KEY);
   return !!result[SYNC_ERROR_KEY];
 }
+
+// Delay before retrying a failed backend request, before the badge is
+// shown. Short on purpose: this only needs to absorb a request that
+// fails right as the page/service worker is still starting up, not a
+// genuinely down backend.
+const RETRY_DELAY_MS = 400;
+
+// Runs `fn` (a backend request) and keeps the sync-error badge in sync
+// with the outcome: cleared on success, but only shown once a second
+// attempt also fails. A single quick retry means a transient failure
+// right as a page loads doesn't flash the badge red for something that
+// resolves a moment later. This is the shared policy for every call
+// site that talks to the backend (see background.ts and App.tsx) --
+// each of them used to have its own try/catch +
+// showSyncErrorBadge/clearSyncErrorBadge pair with no retry at all.
+export async function withSyncErrorBadge<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    const result = await fn();
+    clearSyncErrorBadge();
+    return result;
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    try {
+      const result = await fn();
+      clearSyncErrorBadge();
+      return result;
+    } catch (err) {
+      showSyncErrorBadge();
+      throw err;
+    }
+  }
+}

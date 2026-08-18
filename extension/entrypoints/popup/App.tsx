@@ -6,11 +6,7 @@ import NavBar, { type View } from "./NavBar";
 import { fullSyncTargets, syncTargets } from "../../lib/targets";
 import { fetchAnnotationCount } from "../../lib/annotations";
 import { getSettings } from "../../lib/settings";
-import {
-  clearSyncErrorBadge,
-  getSyncError,
-  showSyncErrorBadge,
-} from "../../lib/syncBadge";
+import { getSyncError, withSyncErrorBadge } from "../../lib/syncBadge";
 import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
@@ -61,12 +57,13 @@ function App() {
     // background.ts) -- try a differential sync right away and surface
     // any failure via the same toolbar badge.
     try {
-      await syncTargets();
-      clearSyncErrorBadge();
+      // withSyncErrorBadge retries once before showing the badge, so a
+      // transient hiccup right as the popup opens doesn't flash it red
+      // -- see lib/syncBadge.ts.
+      await withSyncErrorBadge(() => syncTargets());
       setSyncError(false);
     } catch (err) {
       console.error("[sticky-party] popup sync failed", err);
-      showSyncErrorBadge();
       setSyncError(true);
     }
 
@@ -135,8 +132,7 @@ function App() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      await fullSyncTargets();
-      clearSyncErrorBadge();
+      await withSyncErrorBadge(() => fullSyncTargets());
       setSyncError(false);
       const [activeTab] = await browser.tabs.query({
         active: true,
@@ -154,7 +150,6 @@ function App() {
       setAnnotationCount(await fetchAnnotationCount());
     } catch (err) {
       console.error("[sticky-party] full sync failed", err);
-      showSyncErrorBadge();
       setSyncError(true);
     } finally {
       setSyncing(false);
