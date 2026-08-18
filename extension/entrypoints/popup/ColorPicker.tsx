@@ -21,7 +21,10 @@ export default function ColorPicker(props: {
   const [open, setOpen] = createSignal(false);
 
   return (
-    <div class="flex shrink-0 items-center gap-1">
+    // relative + the swatch list below being absolute: opening the
+    // picker must overlay neighboring NavBar elements (title, sync
+    // button) instead of shoving them aside.
+    <div class="relative flex shrink-0 items-center">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -31,23 +34,28 @@ export default function ColorPicker(props: {
         style={{ "background-color": swatchColor(props.color) }}
       />
       <Show when={open()}>
-        <For each={NOTE_COLORS}>
-          {(c) => (
-            <button
-              type="button"
-              onClick={() => {
-                props.onColorChange(c);
-                setOpen(false);
-              }}
-              aria-label={c}
-              classList={{
-                "ring-2 ring-[color:var(--note-text)]": c === props.color,
-              }}
-              class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
-              style={{ "background-color": swatchColor(c) }}
-            />
-          )}
-        </For>
+        {/* left-4 starts right after the toggle button so it never
+            covers it. bg-[--note-bg] makes this opaque, so it visually
+            overwrites whatever sits to its right rather than pushing
+            it further away. */}
+        <div class="absolute left-4 top-1/2 z-10 flex -translate-y-1/2 items-center gap-1 rounded-r-full bg-[color:var(--note-bg)] py-1 pl-2 pr-1">
+          {/* The currently selected color is already shown by the
+              toggle button itself, so it's excluded here. */}
+          <For each={NOTE_COLORS.filter((c) => c !== props.color)}>
+            {(c) => (
+              <button
+                type="button"
+                onClick={() => {
+                  props.onColorChange(c);
+                  setOpen(false);
+                }}
+                aria-label={c}
+                class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
+                style={{ "background-color": swatchColor(c) }}
+              />
+            )}
+          </For>
+        </div>
       </Show>
     </div>
   );
