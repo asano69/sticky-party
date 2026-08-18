@@ -2,6 +2,7 @@ import { createSignal, onMount } from "solid-js";
 import { TextField } from "@kobalte/core/text-field";
 
 import { getAuthedPb } from "../../lib/pb";
+import { getDraftNote, saveDraftNote } from "../../lib/draft";
 import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
@@ -44,7 +45,18 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
       setUrl(activeTab.url);
     }
     setTabId(activeTab?.id);
+
+    // Restore any note body left unsaved from a previous time the
+    // popup was closed (see lib/draft.ts).
+    setNote(await getDraftNote());
   });
+
+  // Keeps the note body and its draft copy in sync on every keystroke,
+  // so closing the popup mid-edit doesn't lose the text.
+  const updateNote = (value: string) => {
+    setNote(value);
+    saveDraftNote(value);
+  };
 
   // Lets Ctrl/Cmd+Enter submit from any field, without needing to tab to
   // the Save button first (mirrors AnnotationBoard.tsx's editor shortcut).
@@ -79,6 +91,9 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
         body: note(),
       });
       await addCachedTarget(target, created.updated);
+      // The note was saved to the DB, so the local draft is no longer
+      // needed.
+      await saveDraftNote("");
       // Re-run content.ts's mount process for the current tab so the
       // annotation just saved shows up immediately, instead of waiting
       // for the next navigation or periodic full sync.
@@ -112,7 +127,7 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
         />
       </TextField>
 
-      <TextField class={FIELD} value={note()} onChange={setNote}>
+      <TextField class={FIELD} value={note()} onChange={updateNote}>
         <TextField.Label class={FIELD_LABEL}>Note</TextField.Label>
         <TextField.TextArea
           class={FIELD_TEXTAREA}
