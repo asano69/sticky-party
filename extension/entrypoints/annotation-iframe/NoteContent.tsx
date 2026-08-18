@@ -6,7 +6,8 @@ import {
   setAnnotationHide,
   updateAnnotation,
 } from "../../lib/annotations";
-import { listContinuationPrefix, toggleTaskLine } from "../../lib/markup";
+import { toggleTaskLine } from "../../lib/markup";
+import { continueListOnEnter } from "../../lib/listContinuation";
 import type { AnnotationData } from "../../lib/messages";
 import {
   DEFAULT_NOTE_COLOR,
@@ -134,35 +135,6 @@ export default function NoteContent() {
     }
   };
 
-  // Auto-continues bullet/task syntax when plain Enter is pressed
-  // inside the body textarea: if the line the cursor is on starts with
-  // a bullet or task marker, the new line gets the same marker
-  // prepended ("- " or "- [ ] ", always unchecked even when continuing
-  // off a checked task -- see lib/markup's listContinuationPrefix).
-  // Only ever invoked for the body textarea (see onEditorKeyDown below
-  // -- the title <input> never matches HTMLTextAreaElement).
-  const continueList = (e: KeyboardEvent, textarea: HTMLTextAreaElement) => {
-    const { value, selectionStart, selectionEnd } = textarea;
-    const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
-    const currentLine = value.slice(lineStart, selectionStart);
-    const prefix = listContinuationPrefix(currentLine);
-    if (!prefix) return;
-
-    e.preventDefault();
-    const insertion = `\n${prefix}`;
-    const next =
-      value.slice(0, selectionStart) + insertion + value.slice(selectionEnd);
-    const cursor = selectionStart + insertion.length;
-
-    // No input event fires for a prevented Enter, so the textarea's
-    // own value/caret and the draft signal both need to be updated by
-    // hand -- setDraft alone only updates the signal, and Solid leaves
-    // an already-matching value's caret untouched.
-    textarea.value = next;
-    textarea.selectionStart = textarea.selectionEnd = cursor;
-    setDraft(next);
-  };
-
   const onEditorKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
@@ -171,7 +143,10 @@ export default function NoteContent() {
       e.preventDefault();
       cancelEdit();
     } else if (e.key === "Enter" && e.target instanceof HTMLTextAreaElement) {
-      continueList(e, e.target);
+      // Only ever reached for the body textarea, never the title
+      // <input> -- see lib/listContinuation.ts.
+      const next = continueListOnEnter(e, e.target);
+      if (next !== undefined) setDraft(next);
     }
   };
 

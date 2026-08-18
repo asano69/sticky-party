@@ -3,6 +3,7 @@ import { TextField } from "@kobalte/core/text-field";
 
 import { getAuthedPb } from "../../lib/pb";
 import { getDraftNote, saveDraftNote } from "../../lib/draft";
+import { continueListOnEnter } from "../../lib/listContinuation";
 import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
@@ -65,6 +66,19 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
       e.preventDefault();
       handleSave(e);
     }
+  };
+
+  // Auto-continues bullet/task syntax when plain Enter is pressed in
+  // the note textarea (see lib/listContinuation.ts) -- same behavior as
+  // the annotation-iframe's edit textarea (NoteContent.tsx), so a note
+  // typed at creation time and one edited later behave identically.
+  // Ctrl/Cmd+Enter is left alone here so it still bubbles up to
+  // onFormKeyDown's submit handler above.
+  const onNoteKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== "Enter" || e.ctrlKey || e.metaKey) return;
+    if (!(e.target instanceof HTMLTextAreaElement)) return;
+    const next = continueListOnEnter(e, e.target);
+    if (next !== undefined) updateNote(next);
   };
 
   const handleSave = async (e: Event) => {
@@ -133,6 +147,7 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
           class={FIELD_TEXTAREA}
           rows={4}
           placeholder="Write a note for this page…"
+          onKeyDown={onNoteKeyDown}
         />
       </TextField>
 
