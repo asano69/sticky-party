@@ -24,9 +24,17 @@ async function setLastSyncedAt(iso: string): Promise<void> {
   await browser.storage.local.set({ [LAST_SYNC_KEY]: iso });
 }
 
-export async function getCachedTargets(): Promise<string[]> {
+// A cached target paired with the `updated` timestamp of the annotation
+// it came from, so the popup's Targets list (Targets.tsx) can sort by
+// recency without a separate DB round trip.
+export interface CachedTarget {
+  target: string;
+  updated: string;
+}
+
+export async function getCachedTargets(): Promise<CachedTarget[]> {
   const result = await browser.storage.local.get(TARGETS_KEY);
-  return (result[TARGETS_KEY] as string[] | undefined) ?? [];
+  return (result[TARGETS_KEY] as CachedTarget[] | undefined) ?? [];
 }
 
 // Strips a single trailing slash so "https://example.com/" and
@@ -38,11 +46,20 @@ export function normalizeTarget(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
-export async function addCachedTarget(target: string): Promise<void> {
+export async function addCachedTarget(
+  target: string,
+  updated: string,
+): Promise<void> {
   const normalized = normalizeTarget(target);
   const targets = await getCachedTargets();
-  if (targets.includes(normalized)) return;
-  await browser.storage.local.set({ [TARGETS_KEY]: [...targets, normalized] });
+  // Replace any existing entry for this target rather than skipping,
+  // so re-saving an annotation on the same URL refreshes its updated
+  // timestamp too.
+  const next = targets.filter(
+    (t) => normalizeTarget(t.target) !== normalized,
+  );
+  next.push({ target: normalized, updated });
+  await browser.storage.local.set({ [TARGETS_KEY]: next });
 }
 
 // Removes a single target from the cache. Used when a page matches the
@@ -53,13 +70,17 @@ export async function addCachedTarget(target: string): Promise<void> {
 export async function removeCachedTarget(target: string): Promise<void> {
   const normalized = normalizeTarget(target);
   const targets = await getCachedTargets();
-  const next = targets.filter((t) => normalizeTarget(t) !== normalized);
+  const next = targets.filter(
+    (t) => normalizeTarget(t.target) !== normalized,
+  );
   if (next.length !== targets.length) {
     await browser.storage.local.set({ [TARGETS_KEY]: next });
   }
 }
 
-export async function setCachedTargets(targets: string[]): Promise<void> {
+export async function setCachedTargets(
+  targets: CachedTarget[],
+): Promise<void> {
   await browser.storage.local.set({ [TARGETS_KEY]: targets });
 }
 
@@ -67,9 +88,9 @@ export async function setCachedTargets(targets: string[]): Promise<void> {
 // difference (see normalizeTarget). Otherwise matching is exact-equality;
 // see docs/architecture.md's "未確定事項" for future match strategies
 // (prefix, pattern, etc.) if that turns out to be too strict.
-export function isTargetMatch(url: string, targets: string[]): boolean {
+export function isTargetMatch(url: string, targets: CachedTarget[]): boolean {
   const normalized = normalizeTarget(url);
-  return targets.some((target) => normalizeTarget(target) === normalized);
+  return targets.some((t) => normalizeTarget(t.target) === normalized);
 }
 
 // Fetches only the `target` field from every annotation and overwrites
@@ -86,15 +107,23 @@ export async function fullSyncTargets(): Promise<string[]> {
   const pb = await getAuthedPb();
   const records = await pb
     .collection("annotations")
-    .getFullList<{ target: string }>({
-      fields: "target",
+    .getFullList<{ target: string; updated: string }>({
+      fields: "target,updated",
+      // Ascending, so when multiple annotations share a target the
+      // later (more recent) record overwrites the earlier one below.
+      sort: "updated",
     });
-  // Multiple annotations can share the same target URL, so dedupe here;
-  // otherwise the cached list grows noisy and the match check does
-  // redundant work for no benefit.
-  const targets = [
-    ...new Set(records.map((record) => record.target).filter(Boolean)),
-  ];
+  // Multiple annotations can share the same target URL; keep only the
+  // most recently updated one per target so the popup's Targets list
+  // can sort by recency.
+  const byTarget = new Map<string, string>();
+  for (const record of records) {
+    if (record.target) byTarget.set(record.target, record.updated);
+  }
+  const targets: CachedTarget[] = [...byTarget].map(([target, updated]) => ({
+    target,
+    updated,
+  }));
   await setCachedTargets(targets);
   await setLastSyncedAt(startedAt);
   return targets;
@@ -123,16 +152,24 @@ export async function syncTargets(): Promise<string[]> {
   const pb = await getAuthedPb();
   const records = await pb
     .collection("annotations")
-    .getFullList<{ target: string }>({
+    .getFullList<{ target: string; updated: string }>({
       filter: pb.filter("updated > {:since}", { since }),
-      fields: "target",
+      fields: "target,updated",
+      // Ascending, same reasoning as fullSyncTargets: a later record
+      // for the same target overwrites the earlier one in the map.
+      sort: "updated",
     });
 
-  const merged = new Set(await getCachedTargets());
+  const merged = new Map(
+    (await getCachedTargets()).map((t) => [t.target, t.updated]),
+  );
   for (const record of records) {
-    if (record.target) merged.add(record.target);
+    if (record.target) merged.set(record.target, record.updated);
   }
-  const targets = [...merged];
+  const targets: CachedTarget[] = [...merged].map(([target, updated]) => ({
+    target,
+    updated,
+  }));
   await setCachedTargets(targets);
   await setLastSyncedAt(startedAt);
   return targets;

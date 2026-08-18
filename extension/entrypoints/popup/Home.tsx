@@ -64,11 +64,11 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
       // Normalize once so the value written to the DB and the value
       // mirrored into the local cache (write-through) are identical.
       const target = normalizeTarget(url());
-      await pb.collection("annotations").create({
+      const created = await pb.collection("annotations").create({
         target,
         body: note(),
       });
-      await addCachedTarget(target);
+      await addCachedTarget(target, created.updated);
       // Re-run content.ts's mount process for the current tab so the
       // annotation just saved shows up immediately, instead of waiting
       // for the next navigation or periodic full sync.

@@ -34,13 +34,19 @@ export default function Targets() {
   const [targets] = createResource(getCachedTargets);
   const [query, setQuery] = createSignal("");
 
+  // Newest-updated first, so the most recently created/edited
+  // annotation's target sits at the top of the list.
+  const sorted = createMemo(() =>
+    [...(targets() ?? [])].sort((a, b) => b.updated.localeCompare(a.updated)),
+  );
+
   // Case-insensitive substring match, recomputed on every keystroke so
   // the list narrows incrementally. No network round trip: it just
-  // filters the already-cached target list held in `targets`.
+  // filters the already-sorted, already-cached target list.
   const filtered = createMemo(() => {
     const q = query().trim().toLowerCase();
-    const all = targets() ?? [];
-    return q ? all.filter((target) => target.toLowerCase().includes(q)) : all;
+    const all = sorted();
+    return q ? all.filter((t) => t.target.toLowerCase().includes(q)) : all;
   });
 
   return (
@@ -66,16 +72,16 @@ export default function Targets() {
         >
           <ul class="m-0 flex max-h-[200px] list-none flex-col gap-1 overflow-y-auto p-0">
             <For each={filtered()}>
-              {(target) => (
+              {(item) => (
                 <li>
                   <Link
-                    href={target}
-                    disabled={!isClickableTarget(target)}
+                    href={item.target}
+                    disabled={!isClickableTarget(item.target)}
                     target="_blank"
                     rel="noopener noreferrer"
                     class="block truncate text-[0.8em] text-inherit underline data-[disabled]:no-underline data-[disabled]:opacity-50 data-[disabled]:cursor-default"
                   >
-                    {displayTarget(target)}
+                    {displayTarget(item.target)}
                   </Link>
                 </li>
               )}
