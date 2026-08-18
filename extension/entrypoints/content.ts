@@ -51,15 +51,32 @@ import type {
   ViewportInfo,
 } from "../lib/positions";
 
+// The layout viewport's width/height in CSS px, preferring
+// window.visualViewport over window.innerWidth/innerHeight. The two
+// normally agree, but visualViewport reports sub-pixel float values
+// while innerWidth/innerHeight are integers -- at some zoom levels that
+// rounding alone is enough for the position ratio math below to drift
+// after repeated zoom changes. visualViewport also fires its own
+// 'resize' event on pinch-zoom, which the plain window 'resize' event
+// doesn't always cover. Falls back to innerWidth/innerHeight for older
+// browsers without visualViewport support.
+function viewportSize(): { width: number; height: number } {
+  const vv = window.visualViewport;
+  return vv
+    ? { width: vv.width, height: vv.height }
+    : { width: window.innerWidth, height: window.innerHeight };
+}
+
 // The content page's own viewport/screen at the moment of the call,
 // read fresh each time rather than cached -- lib/positions.ts needs
 // this because it runs in the background script (see that file's
 // header comment), which has no access to this page's real
 // `window`/`screen`.
 function currentViewport(): ViewportInfo {
+  const { width, height } = viewportSize();
   return {
-    windowWidth: window.innerWidth,
-    windowHeight: window.innerHeight,
+    windowWidth: width,
+    windowHeight: height,
     screenWidth: screen.width,
     screenHeight: screen.height,
   };
@@ -109,16 +126,21 @@ export default defineContentScript({
     const repositionOnResize = new Set<
       (scaleX: number, scaleY: number) => void
     >();
-    let prevWindowWidth = window.innerWidth;
-    let prevWindowHeight = window.innerHeight;
-    window.addEventListener("resize", () => {
-      const scaleX = window.innerWidth / prevWindowWidth;
-      const scaleY = window.innerHeight / prevWindowHeight;
-      prevWindowWidth = window.innerWidth;
-      prevWindowHeight = window.innerHeight;
+    let prevViewport = viewportSize();
+    const onViewportResize = () => {
+      const next = viewportSize();
+      const scaleX = next.width / prevViewport.width;
+      const scaleY = next.height / prevViewport.height;
+      prevViewport = next;
       for (const reposition of repositionOnResize) reposition(scaleX, scaleY);
-    });
-
+    };
+    // Both listeners are registered: window 'resize' covers ordinary
+    // window resizing, and visualViewport 'resize' covers zoom changes
+    // (page zoom and pinch-zoom) that don't always fire window
+    // 'resize'. When both fire for the same change, the second call is
+    // a harmless no-op (scaleX/scaleY come out as 1).
+    window.addEventListener("resize", onViewportResize);
+    window.visualViewport?.addEventListener("resize", onViewportResize);
     async function mountNote(annotation: AnnotationData, index: number) {
       // Cascade defaults, used only if this device has no saved
       // position yet. Resolved before the iframe UI is created below,
