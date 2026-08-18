@@ -51,3 +51,21 @@ export function toggleTaskLine(body: string, lineIndex: number): string {
   );
   return lines.join("\n");
 }
+
+// Marker match for list continuation: captures the bullet marker plus
+// its trailing whitespace (group 1) and the rest of the line (group 2).
+// Mirrors BULLET_PATTERN above -- keep both in sync if the bullet
+// syntax ever changes.
+const LIST_MARKER_PATTERN = /^([*-]\s+)(.*)$/;
+
+// Returns the marker text that continues `line`'s list item onto a new
+// line -- "- " for a plain bullet, "- [ ] " for a task (always
+// unchecked, even when continuing off a checked task) -- or undefined
+// if `line` isn't a bullet/task line at all. Used by NoteContent.tsx's
+// Enter-key handler to auto-continue list syntax while editing.
+export function listContinuationPrefix(line: string): string | undefined {
+  const markerMatch = line.match(LIST_MARKER_PATTERN);
+  if (!markerMatch) return undefined;
+  const [, marker, rest] = markerMatch;
+  return TASK_PATTERN.test(rest) ? `${marker}[ ] ` : marker;
+}
