@@ -18,6 +18,22 @@ export async function showSyncErrorBadge(): Promise<void> {
   await browser.storage.local.set({ [SYNC_ERROR_KEY]: true });
 }
 
+// Per-tab badge showing how many notes are currently displayed on that
+// tab's page. Set with a tabId (unlike the sync-error badge above,
+// which has none and so applies as the default for every tab), so it
+// only overrides the badge on the tab that actually matched -- other
+// tabs keep showing the default (error, or blank) badge.
+const ANNOTATION_COUNT_COLOR = "#4b5563";
+
+export function showAnnotationCountBadge(tabId: number, count: number): void {
+  browser.action.setBadgeText({ text: String(count), tabId });
+  browser.action.setBadgeBackgroundColor({ color: ANNOTATION_COUNT_COLOR, tabId });
+}
+
+export function clearAnnotationCountBadge(tabId: number): void {
+  browser.action.setBadgeText({ text: "", tabId });
+}
+
 export async function clearSyncErrorBadge(): Promise<void> {
   browser.action.setBadgeText({ text: "" });
   await browser.storage.local.set({ [SYNC_ERROR_KEY]: false });

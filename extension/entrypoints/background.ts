@@ -1,7 +1,11 @@
 // See docs/architecture.md for the full sync design this implements.
 
 import { fetchAnnotations, setAnnotationPin } from "../lib/annotations";
-import { withSyncErrorBadge } from "../lib/syncBadge";
+import {
+  clearAnnotationCountBadge,
+  showAnnotationCountBadge,
+  withSyncErrorBadge,
+} from "../lib/syncBadge";
 import {
   CHECK_ANNOTATION_MESSAGE,
   GET_POSITION_MESSAGE,
@@ -96,6 +100,7 @@ export default defineBackground(() => {
       browser.tabs
         .sendMessage(tabId, { type: HIDE_ANNOTATION_MESSAGE })
         .catch(() => {});
+      clearAnnotationCountBadge(tabId);
       return;
     }
 
@@ -113,18 +118,24 @@ export default defineBackground(() => {
         // lib/targets.ts's syncTargets). Drop it now so future checks
         // skip this URL without a network round trip.
         await removeCachedTarget(url);
+        clearAnnotationCountBadge(tabId);
         return;
       }
       await browser.tabs.sendMessage(tabId, {
         type: SHOW_ANNOTATION_MESSAGE,
         annotations,
       });
+      // Shows how many notes are on screen for this tab, in a neutral
+      // dark gray -- distinct from the red sync-error badge, which
+      // signals a connection problem rather than note count.
+      showAnnotationCountBadge(tabId, annotations.length);
     } catch (err) {
       // A matched URL whose annotation body couldn't be loaded (e.g.
       // backend unreachable) is exactly the kind of silent failure the
       // badge exists to surface -- without it, the user would just see
       // no sticky note and have no idea why.
       console.error("[sticky-party] failed to fetch annotation", err);
+      clearAnnotationCountBadge(tabId);
     }
   };
 
