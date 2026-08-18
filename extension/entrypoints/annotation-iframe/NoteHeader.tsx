@@ -19,14 +19,17 @@ export default function NoteHeader(props: {
   saving: boolean;
   onKeyDown: (e: KeyboardEvent) => void;
   titleInputRef: (el: HTMLInputElement) => void;
-  // Whether this note is pinned to a fixed spot on the page. The toggle
-  // button below only renders while editing -- not because pin itself
-  // is edit-only, but because that's exactly the window during which
-  // content.ts's drag-header overlay sets pointer-events:none (see its
-  // NOTE_EDITING_MESSAGE handler), handing off clicks to this iframe.
-  // Outside that window the overlay still owns this row (drag,
-  // double-click-to-edit), so a pin button here would either be
-  // unreachable or fight the overlay for clicks.
+  // Whether this note is pinned to a fixed spot on the page. Rendered
+  // differently depending on mode:
+  // - Editing: an always-visible, clickable toggle (both pin and unpin
+  //   need to be reachable here) -- content.ts's drag-header overlay
+  //   sets pointer-events:none while editing (see its
+  //   NOTE_EDITING_MESSAGE handler), handing clicks off to this
+  //   iframe, so the toggle can actually receive them.
+  // - Viewing: a plain, non-interactive icon shown only when pinned --
+  //   the overlay still owns clicks in this mode (drag,
+  //   double-click-to-edit), so a clickable toggle here would be
+  //   unreachable; this is just an at-a-glance indicator.
   pinned: boolean;
   onTogglePin: () => void;
 }) {
@@ -48,6 +51,28 @@ export default function NoteHeader(props: {
         when={!props.editing}
         fallback={
           <>
+            {/* Always shown while editing (both the pinned and
+                unpinned state), since this is the only reachable place
+                to toggle pin at all -- see the pinned prop comment
+                above. Placed before the title field so it never
+                overlaps the field's own text; shrink-0 plus the
+                field's flex-1/min-w-0 below keeps that true regardless
+                of title length. onMouseDown preventDefault mirrors
+                NoteFooter.tsx's buttons: without it, the
+                pointerdown-before-click on this button would fire the
+                window "blur" handler's saveEdit() first (see
+                useParentMessaging.ts). */}
+            <ToggleButton
+              class="sticky-party-icon-btn flex shrink-0 items-center justify-center border-none bg-transparent cursor-pointer p-1 rounded"
+              onMouseDown={(e: MouseEvent) => e.preventDefault()}
+              pressed={props.pinned}
+              onChange={() => props.onTogglePin()}
+              aria-label={props.pinned ? "Unpin from page" : "Pin to page"}
+            >
+              <Show when={props.pinned} fallback={<PinOff size={16} />}>
+                <Pin size={16} />
+              </Show>
+            </ToggleButton>
             <TextField
               value={props.draftTitle}
               onChange={props.onDraftTitleChange}
@@ -60,26 +85,21 @@ export default function NoteHeader(props: {
                 class="w-full box-border border-none bg-transparent font-[inherit] font-bold text-[color:var(--note-text)]"
               />
             </TextField>
-            {/* onMouseDown preventDefault mirrors NoteFooter.tsx's
-                buttons: without it, the pointerdown-before-click on
-                this button would fire the window "blur" handler's
-                saveEdit() first (see useParentMessaging.ts). */}
-            <ToggleButton
-              class="sticky-party-icon-btn flex shrink-0 items-center justify-center border-none bg-transparent cursor-pointer p-1 rounded"
-              onMouseDown={(e: MouseEvent) => e.preventDefault()}
-              pressed={props.pinned}
-              onChange={() => props.onTogglePin()}
-              aria-label={props.pinned ? "Unpin from page" : "Pin to page"}
-            >
-              <Show when={props.pinned} fallback={<PinOff size={16} />}>
-                <Pin size={16} />
-              </Show>
-            </ToggleButton>
           </>
         }
       >
-        <div class="w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-          {props.title}
+        <div class="flex w-full min-w-0 items-center gap-1">
+          {/* View mode only shows this when actually pinned -- see the
+              pinned prop comment above for why it's a plain icon here,
+              not a button. shrink-0 plus the title's min-w-0/flex-1
+              keeps a long, ellipsis-truncated title from ever
+              overlapping it. */}
+          <Show when={props.pinned}>
+            <Pin size={14} class="shrink-0" />
+          </Show>
+          <div class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+            {props.title}
+          </div>
         </div>
       </Show>
     </header>
