@@ -34,7 +34,7 @@ export default function NoteFooter(props: {
       // overflow-hidden: if the note is too narrow to fit all five
       // swatches, they simply get clipped -- widening the note is the
       // fix, not wrapping or scrolling this row.
-      class="flex shrink-0 items-center justify-start gap-1 box-border px-2 border-t border-[color:var(--note-border)] overflow-hidden"
+      class="flex shrink-0 items-center justify-start box-border px-2 border-t border-[color:var(--note-border)] overflow-hidden"
     >
       <Button
         class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
