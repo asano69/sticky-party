@@ -9,6 +9,12 @@ import { formatActionTitle } from "../../lib/actionTitle";
 import { getSettings } from "../../lib/settings";
 import { getSyncError, withSyncErrorBadge } from "../../lib/syncBadge";
 import {
+  applyPopupColor,
+  getPopupColor,
+  savePopupColor,
+} from "../../lib/popupColor";
+import { DEFAULT_NOTE_COLOR, type NoteColor } from "../../lib/colors";
+import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
 } from "../../lib/messages";
@@ -34,6 +40,28 @@ function App() {
   // clearing it, so the number doesn't flicker away on a transient
   // error.
   const [annotationCount, setAnnotationCount] = createSignal<number>();
+  // Popup's background theme color, driven by the color picker in
+  // Home.tsx's footer. Lives here (not in Home) so it applies to the
+  // whole popup regardless of which view is active, and persists
+  // across reopens via lib/popupColor.ts.
+  const [bgColor, setBgColor] = createSignal<NoteColor>(DEFAULT_NOTE_COLOR);
+
+  // Loads the persisted popup color and applies it immediately. Kept
+  // separate from checkConfigured's onMount below since this doesn't
+  // depend on backend credentials.
+  onMount(async () => {
+    const saved = await getPopupColor();
+    setBgColor(saved);
+    applyPopupColor(saved);
+  });
+
+  // Called from Home.tsx's color picker: updates the popup's
+  // background right away and persists the choice for next time.
+  const handleBgColorChange = (color: NoteColor) => {
+    setBgColor(color);
+    applyPopupColor(color);
+    savePopupColor(color);
+  };
 
   // Reads Settings and unlocks Home/Targets only once backend
   // credentials are actually saved; otherwise forces the Settings view
@@ -192,7 +220,11 @@ function App() {
           </Show>
         }
       >
-        <Home onAnnotationCreated={handleAnnotationCreated} />
+        <Home
+          onAnnotationCreated={handleAnnotationCreated}
+          color={bgColor()}
+          onColorChange={handleBgColorChange}
+        />
       </Show>
     </div>
   );

@@ -13,7 +13,7 @@ import {
   isValidHttpUrl,
   normalizeTarget,
 } from "../../lib/targets";
-import { DEFAULT_NOTE_COLOR, type NoteColor } from "../../lib/colors";
+import type { NoteColor } from "../../lib/colors";
 import AppearanceControls from "../../lib/components/AppearanceControls";
 import {
   CARD,
@@ -30,15 +30,23 @@ import SaveButton, { type SaveStatus } from "./SaveButton";
 // cache the content script matches against (write-through; see
 // docs/architecture.md). Position data (x/y/width/height) is not
 // collected here -- that belongs to the future drag-placement flow.
-export default function Home(props: { onAnnotationCreated?: () => void }) {
+export default function Home(props: {
+  onAnnotationCreated?: () => void;
+  // Current popup background theme (see App.tsx/lib/popupColor.ts).
+  // The color picker below both sets this note's color and drives the
+  // popup's overall background, so the state itself lives in the parent.
+  color: NoteColor;
+  onColorChange: (color: NoteColor) => void;
+}) {
   const [url, setUrl] = createSignal("");
   const [note, setNote] = createSignal("");
   // Appearance settings for the note being created -- mirrors the
   // footer controls shown while editing an existing note (see
   // lib/components/AppearanceControls.tsx), just included in the
   // create() payload below instead of being persisted immediately.
+  // Color itself is owned by the parent (props.color), since it also
+  // drives the popup's background -- see App.tsx.
   const [hide, setHide] = createSignal(false);
-  const [color, setColor] = createSignal<NoteColor>(DEFAULT_NOTE_COLOR);
   const [error, setError] = createSignal("");
   const [status, setStatus] = createSignal<SaveStatus>("idle");
   // Needed after save to ask the background script to re-check this tab
@@ -116,7 +124,7 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
         target,
         body: note(),
         hide: hide(),
-        color: color(),
+        color: props.color,
       });
       await addCachedTarget(target, created.updated);
       // The note was saved to the DB, so the local draft is no longer
@@ -138,7 +146,6 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
       props.onAnnotationCreated?.();
       setNote("");
       setHide(false);
-      setColor(DEFAULT_NOTE_COLOR);
       setStatus("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
@@ -171,8 +178,8 @@ export default function Home(props: { onAnnotationCreated?: () => void }) {
         <AppearanceControls
           hide={hide()}
           onHideChange={setHide}
-          color={color()}
-          onColorChange={setColor}
+          color={props.color}
+          onColorChange={props.onColorChange}
         />
       </div>
 
