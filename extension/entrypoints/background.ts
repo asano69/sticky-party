@@ -1,12 +1,13 @@
 // See docs/architecture.md for the full sync design this implements.
 
-import { fetchAnnotations } from "../lib/annotations";
+import { fetchAnnotations, setAnnotationPin } from "../lib/annotations";
 import { withSyncErrorBadge } from "../lib/syncBadge";
 import {
   CHECK_ANNOTATION_MESSAGE,
   GET_POSITION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
   SAVE_POSITION_MESSAGE,
+  SET_ANNOTATION_PIN_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
   type PositionMessage,
@@ -152,11 +153,12 @@ export default defineBackground(() => {
     },
   );
 
-  // Handles GET_POSITION_MESSAGE/SAVE_POSITION_MESSAGE from content.ts
-  // (see lib/messages.ts for why this can't run in the content script
-  // itself). Returning a Promise here makes the polyfilled
-  // browser.runtime.onMessage resolve the sender's sendMessage() call
-  // with whatever fetchPosition/savePosition resolve to.
+  // Handles GET_POSITION_MESSAGE/SAVE_POSITION_MESSAGE/
+  // SET_ANNOTATION_PIN_MESSAGE from content.ts (see lib/messages.ts for
+  // why this can't run in the content script itself). Returning a
+  // Promise here makes the polyfilled browser.runtime.onMessage resolve
+  // the sender's sendMessage() call with whatever
+  // fetchPosition/savePosition/setAnnotationPin resolve to.
   browser.runtime.onMessage.addListener((message: PositionMessage) => {
     if (message?.type === GET_POSITION_MESSAGE) {
       return fetchPosition(message.annotationId, message.viewport);
@@ -167,6 +169,13 @@ export default defineBackground(() => {
         message.position,
         message.viewport,
         message.existingId,
+      );
+    }
+    if (message?.type === SET_ANNOTATION_PIN_MESSAGE) {
+      return setAnnotationPin(
+        message.annotationId,
+        message.pin,
+        message.coords,
       );
     }
   });

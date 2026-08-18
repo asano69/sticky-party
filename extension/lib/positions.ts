@@ -17,6 +17,13 @@
 // this bug. The tradeoff is that multi-monitor users now share one
 // layout across displays instead of a separate one per screen.
 //
+// Pinned (page-anchored) notes don't use this module at all: their
+// coordinates live on the annotation record itself, since pin is
+// shared by every viewer rather than a per-user preference -- see
+// lib/messages.ts's SetAnnotationPinMessage and lib/annotations.ts's
+// setAnnotationPin. Everything here only ever describes the ordinary,
+// viewport-following case.
+//
 // This module is called from the background script, not the content
 // script (see lib/messages.ts), so it has no access to the content
 // page's own `window` -- reading that global here would describe the
@@ -36,12 +43,6 @@ export interface ViewportInfo {
   windowHeight: number;
 }
 
-// "viewport": the note follows the screen (position: fixed), the
-// default for every note. "page": the note stays anchored to a fixed
-// spot on the page itself (position: absolute), so it scrolls with the
-// page -- e.g. pinning a note near the bottom of a long article.
-export type PositionMode = "viewport" | "page";
-
 interface PositionRecord {
   id: string;
   x: number;
@@ -49,7 +50,6 @@ interface PositionRecord {
   width: number;
   height: number;
   z: number;
-  mode: PositionMode;
 }
 
 export interface PositionData {
@@ -58,7 +58,6 @@ export interface PositionData {
   width: number;
   height: number;
   z: number;
-  mode: PositionMode;
 }
 
 export interface StoredPosition extends PositionData {
@@ -66,19 +65,6 @@ export interface StoredPosition extends PositionData {
 }
 
 function toRatio(pos: PositionData, viewport: ViewportInfo) {
-  if (pos.mode === "page") {
-    // Page-anchored notes store raw document-relative pixels instead
-    // of a window ratio: their whole point is to stay put regardless
-    // of viewport size, so ratio-of-window math doesn't apply here.
-    return {
-      x: pos.left,
-      y: pos.top,
-      width: pos.width,
-      height: pos.height,
-      z: pos.z,
-      mode: pos.mode,
-    };
-  }
   return {
     x: pos.left / viewport.windowWidth,
     y: pos.top / viewport.windowHeight,
@@ -87,7 +73,6 @@ function toRatio(pos: PositionData, viewport: ViewportInfo) {
     // z is a stacking order, not a screen coordinate, so it's stored
     // and restored as-is rather than as a window-relative ratio.
     z: pos.z,
-    mode: pos.mode,
   };
 }
 
@@ -101,19 +86,6 @@ function fromRatio(
   record: PositionRecord,
   viewport: ViewportInfo,
 ): PositionData {
-  // Defaults to "viewport" for records saved before the mode field
-  // existed, rather than treating them as malformed.
-  const mode: PositionMode = record.mode ?? "viewport";
-  if (mode === "page") {
-    return {
-      left: record.x,
-      top: record.y,
-      width: record.width,
-      height: record.height,
-      z: record.z,
-      mode,
-    };
-  }
   const left = record.x * viewport.windowWidth;
   const top = record.y * viewport.windowHeight;
   return {
@@ -128,7 +100,6 @@ function fromRatio(
     width: record.width,
     height: record.height,
     z: record.z,
-    mode,
   };
 }
 

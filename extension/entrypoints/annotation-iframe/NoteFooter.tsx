@@ -18,7 +18,6 @@ import { ToggleButton } from "@kobalte/core/toggle-button";
 import { ToggleGroup } from "@kobalte/core/toggle-group";
 import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
 import { NOTE_COLORS, swatchColor, type NoteColor } from "../../lib/colors";
-import type { PositionMode } from "../../lib/positions";
 
 export default function NoteFooter(props: {
   confirmDelete: boolean;
@@ -30,8 +29,8 @@ export default function NoteFooter(props: {
   color: NoteColor;
   togglingColor: boolean;
   onColorChange: (color: NoteColor) => void;
-  mode: PositionMode;
-  onToggleMode: () => void;
+  pin: boolean;
+  onTogglePin: () => void;
 }) {
   // Whether the color swatches are shown. Local to this component (not
   // annotation.color's own state), since it's purely a UI reveal, not
@@ -63,11 +62,11 @@ export default function NoteFooter(props: {
       <ToggleButton
         class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
         onMouseDown={(e: MouseEvent) => e.preventDefault()}
-        pressed={props.mode === "page"}
-        onChange={props.onToggleMode}
-        aria-label={props.mode === "page" ? "Unpin from page" : "Pin to page"}
+        pressed={props.pin}
+        onChange={props.onTogglePin}
+        aria-label={props.pin ? "Unpin from page" : "Pin to page"}
       >
-        <Show when={props.mode === "page"} fallback={<PinOff size={16} />}>
+        <Show when={props.pin} fallback={<PinOff size={16} />}>
           <Pin size={16} />
         </Show>
       </ToggleButton>

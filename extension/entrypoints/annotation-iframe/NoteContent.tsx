@@ -8,7 +8,6 @@ import {
 } from "../../lib/annotations";
 import { toggleTaskLine } from "../../lib/markup";
 import type { AnnotationData } from "../../lib/messages";
-import type { PositionMode } from "../../lib/positions";
 import {
   DEFAULT_NOTE_COLOR,
   isNoteColor,
@@ -34,11 +33,6 @@ import NoteFooter from "./NoteFooter";
 // inside the extension's own iframe rather than the host page's DOM.
 export default function NoteContent() {
   const [annotation, setAnnotation] = createSignal<AnnotationData>();
-  // This note's position mode (follow the screen vs stay anchored to
-  // the page), reported by content.ts -- see useParentMessaging's
-  // onModeChange. Defaults to "viewport" until that first message
-  // arrives, matching every new note's actual starting mode.
-  const [mode, setMode] = createSignal<PositionMode>("viewport");
   const [editing, setEditing] = createSignal(false);
   const [draftTitle, setDraftTitle] = createSignal("");
   const [draft, setDraft] = createSignal("");
@@ -98,7 +92,10 @@ export default function NoteContent() {
     onStartEditTitle: () => startEdit("title"),
     editing,
     onBlurWhileEditing: () => saveEdit(),
-    onModeChange: setMode,
+    onPinChange: (pin) => {
+      const current = annotation();
+      if (current) setAnnotation({ ...current, pin });
+    },
   });
 
   const cancelEdit = () => {
@@ -288,8 +285,8 @@ export default function NoteContent() {
               }
               togglingColor={togglingColor()}
               onColorChange={handleColorChange}
-              mode={mode()}
-              onToggleMode={parentMessaging.sendToggleMode}
+              pin={note().pin}
+              onTogglePin={parentMessaging.sendTogglePin}
             />
           </Show>
         </div>

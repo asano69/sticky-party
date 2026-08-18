@@ -10,15 +10,14 @@ import {
   NOTE_DELETED_MESSAGE,
   NOTE_EDITING_MESSAGE,
   NOTE_FOCUS_MESSAGE,
-  NOTE_MODE_MESSAGE,
+  NOTE_PIN_MESSAGE,
   NOTE_READY_MESSAGE,
   START_EDIT_TITLE_MESSAGE,
-  TOGGLE_POSITION_MODE_MESSAGE,
+  TOGGLE_PIN_MESSAGE,
   type NoteEditingMessage,
   type ParentToNoteMessage,
 } from "../../lib/iframe-messages";
 import type { AnnotationData } from "../../lib/messages";
-import type { PositionMode } from "../../lib/positions";
 
 export function useParentMessaging(params: {
   onInit: (annotation: AnnotationData) => void;
@@ -29,10 +28,10 @@ export function useParentMessaging(params: {
   // old Shadow DOM version's focusout-to-save behavior. The caller owns
   // what "save" actually means (updateAnnotation + local state update).
   onBlurWhileEditing: () => void;
-  // Called whenever content.ts reports this note's position mode (on
-  // init, and again after every successful toggle -- see
-  // NOTE_MODE_MESSAGE).
-  onModeChange: (mode: PositionMode) => void;
+  // Called after every successful pin toggle, so the local copy of the
+  // annotation's pin state stays in sync with what content.ts actually
+  // applied -- see NOTE_PIN_MESSAGE.
+  onPinChange: (pin: boolean) => void;
 }) {
   // Receive the annotation to render, a request to start editing the
   // title (relayed from a double-click on the content script's drag
@@ -42,8 +41,8 @@ export function useParentMessaging(params: {
     if (e.data?.type === INIT_NOTE_MESSAGE) params.onInit(e.data.annotation);
     else if (e.data?.type === START_EDIT_TITLE_MESSAGE)
       params.onStartEditTitle();
-    else if (e.data?.type === NOTE_MODE_MESSAGE)
-      params.onModeChange(e.data.mode);
+    else if (e.data?.type === NOTE_PIN_MESSAGE)
+      params.onPinChange(e.data.pin);
   };
   window.addEventListener("message", onMessage);
   onCleanup(() => window.removeEventListener("message", onMessage));
@@ -88,9 +87,9 @@ export function useParentMessaging(params: {
 
   // Sent when the footer's pin button is clicked, asking content.ts to
   // flip this note between following the screen and staying anchored
-  // to the page -- see TOGGLE_POSITION_MODE_MESSAGE.
-  const sendToggleMode = () =>
-    window.parent.postMessage({ type: TOGGLE_POSITION_MODE_MESSAGE }, "*");
+  // to the page -- see TOGGLE_PIN_MESSAGE.
+  const sendTogglePin = () =>
+    window.parent.postMessage({ type: TOGGLE_PIN_MESSAGE }, "*");
 
-  return { sendFocus, sendDeleted, sendToggleMode };
+  return { sendFocus, sendDeleted, sendTogglePin };
 }

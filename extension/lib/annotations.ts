@@ -75,6 +75,32 @@ export async function setAnnotationColor(
   await pb.collection("annotations").update(id, { color });
 }
 
+// Pins (or unpins) an annotation to a fixed spot on the page. Unlike
+// hide/color above, this is written from content.ts (via the background
+// script's SET_ANNOTATION_PIN_MESSAGE handler -- see
+// entrypoints/background.ts), not directly from the iframe: only
+// content.ts knows the note's on-page pixel position, since it owns the
+// wrapper element (see entrypoints/content.ts). `coords` is only passed
+// when pinning; unpinning just clears the flag and leaves the previous
+// pin coordinates in place (harmless, since they're ignored while pin
+// is false).
+export async function setAnnotationPin(
+  id: string,
+  pin: boolean,
+  coords?: { xRatio: number; yRatio: number; width: number; height: number },
+): Promise<void> {
+  const pb = await getAuthedPb();
+  await pb.collection("annotations").update(id, {
+    pin,
+    ...(coords && {
+      pinXRatio: coords.xRatio,
+      pinYRatio: coords.yRatio,
+      pinWidth: coords.width,
+      pinHeight: coords.height,
+    }),
+  });
+}
+
 // Deletes an annotation from PocketBase. Used by the sticky note's trash
 // button, shown only while editing. The local target-list cache
 // (lib/targets.ts) is intentionally left untouched here: other

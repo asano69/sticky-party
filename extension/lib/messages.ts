@@ -37,7 +37,25 @@ export interface SavePositionMessage {
   existingId?: string;
 }
 
-export type PositionMessage = GetPositionMessage | SavePositionMessage;
+// content -> background: pin (or unpin) an annotation to a fixed spot
+// on the page. Unlike GET_POSITION_MESSAGE/SAVE_POSITION_MESSAGE, this
+// writes straight to the annotation record (see lib/annotations.ts's
+// setAnnotationPin), not the positions collection -- pin is shared by
+// every viewer, not a per-user preference. `coords` is only sent when
+// pinning (content.ts's togglePin/persistPosition); unpinning just
+// clears the flag.
+export const SET_ANNOTATION_PIN_MESSAGE = "sticky-party:set-annotation-pin";
+export interface SetAnnotationPinMessage {
+  type: typeof SET_ANNOTATION_PIN_MESSAGE;
+  annotationId: string;
+  pin: boolean;
+  coords?: { xRatio: number; yRatio: number; width: number; height: number };
+}
+
+export type PositionMessage =
+  | GetPositionMessage
+  | SavePositionMessage
+  | SetAnnotationPinMessage;
 
 // A single annotation's id (needed to save edits back to PocketBase),
 // body text, and last-updated timestamp. `updated` drives the stacking
@@ -55,6 +73,21 @@ export interface AnnotationData {
   // button in NoteContent.tsx's footer. Empty/unrecognized values fall
   // back to DEFAULT_NOTE_COLOR.
   color: string;
+  // Whether this note is pinned to a fixed spot on the page (position:
+  // absolute, so it scrolls with the page) instead of following the
+  // viewport (position: fixed, the default). Shared by every viewer --
+  // unlike ordinary position, which is per-user (see lib/positions.ts)
+  // -- so it lives on the annotation record itself, toggled via the
+  // footer's pin button (see NoteFooter.tsx/lib/annotations.ts's
+  // setAnnotationPin).
+  pin: boolean;
+  // Pinned coordinates, as ratios of the whole document (not the
+  // window) plus a fixed pixel size. Only meaningful when pin is true;
+  // ignored otherwise.
+  pinXRatio: number;
+  pinYRatio: number;
+  pinWidth: number;
+  pinHeight: number;
   updated: string;
 }
 

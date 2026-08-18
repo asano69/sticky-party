@@ -5,7 +5,6 @@
 // see entrypoints/content.ts for why the note's iframe exists at all.
 
 import type { AnnotationData } from "./messages";
-import type { PositionMode } from "./positions";
 
 // iframe -> content script, sent once the iframe's own script has
 // started and registered its message listener. The content script
@@ -23,27 +22,29 @@ export interface InitNoteMessage {
   annotation: AnnotationData;
 }
 
-// content script -> iframe, sent once on init (alongside
-// INIT_NOTE_MESSAGE) and again after every successful mode toggle, so
+// content script -> iframe, sent after every successful pin toggle, so
 // the footer's pin button (see NoteFooter.tsx) shows this note's actual
-// position mode. The mode itself lives on the position record
-// (lib/positions.ts), not the annotation, so it has to be pushed in
-// from content.ts rather than riding along with AnnotationData.
-export const NOTE_MODE_MESSAGE = "sticky-party:note-mode";
-export interface NoteModeMessage {
-  type: typeof NOTE_MODE_MESSAGE;
-  mode: PositionMode;
+// pin state. Pin itself lives on the annotation record (see
+// lib/messages.ts's AnnotationData), which the iframe already has via
+// INIT_NOTE_MESSAGE -- this message only exists because content.ts (not
+// the iframe) is what actually flips the note between fixed and
+// absolute positioning, and its local copy of the annotation's pin
+// state needs to be pushed back in afterward.
+export const NOTE_PIN_MESSAGE = "sticky-party:note-pin";
+export interface NotePinMessage {
+  type: typeof NOTE_PIN_MESSAGE;
+  pin: boolean;
 }
 
 // iframe -> content script, sent when the user clicks the footer's pin
 // button, asking to flip this note between following the screen
 // (position: fixed) and staying anchored to a fixed spot on the page
 // (position: absolute, so it scrolls with the page). content.ts owns
-// the actual coordinate conversion -- see toggleMode there.
-export const TOGGLE_POSITION_MODE_MESSAGE =
-  "sticky-party:toggle-position-mode";
-export interface TogglePositionModeMessage {
-  type: typeof TOGGLE_POSITION_MODE_MESSAGE;
+// the actual coordinate conversion and persistence -- see togglePin
+// there.
+export const TOGGLE_PIN_MESSAGE = "sticky-party:toggle-pin";
+export interface TogglePinMessage {
+  type: typeof TOGGLE_PIN_MESSAGE;
 }
 
 // iframe -> content script, sent whenever the note is interacted with,
@@ -109,11 +110,11 @@ export const TITLE_ROW_HEIGHT_PX = 32;
 export type ParentToNoteMessage =
   | InitNoteMessage
   | StartEditTitleMessage
-  | NoteModeMessage;
+  | NotePinMessage;
 export type NoteToParentMessage =
   | NoteReadyMessage
   | NoteFocusMessage
   | NoteDeletedMessage
   | NoteContentResizeMessage
   | NoteEditingMessage
-  | TogglePositionModeMessage;
+  | TogglePinMessage;

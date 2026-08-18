@@ -25,12 +25,14 @@ import {
   GET_POSITION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
   SAVE_POSITION_MESSAGE,
+  SET_ANNOTATION_PIN_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type AnnotationData,
   type AnnotationMessage,
   type CheckAnnotationMessage,
   type GetPositionMessage,
   type SavePositionMessage,
+  type SetAnnotationPinMessage,
 } from "../lib/messages";
 import {
   INIT_NOTE_MESSAGE,
@@ -38,18 +40,14 @@ import {
   NOTE_DELETED_MESSAGE,
   NOTE_EDITING_MESSAGE,
   NOTE_FOCUS_MESSAGE,
-  NOTE_MODE_MESSAGE,
+  NOTE_PIN_MESSAGE,
   NOTE_READY_MESSAGE,
   START_EDIT_TITLE_MESSAGE,
   TITLE_ROW_HEIGHT_PX,
-  TOGGLE_POSITION_MODE_MESSAGE,
-  type NoteModeMessage,
+  TOGGLE_PIN_MESSAGE,
+  type NotePinMessage,
 } from "../lib/iframe-messages";
-import type {
-  PositionMode,
-  StoredPosition,
-  ViewportInfo,
-} from "../lib/positions";
+import type { StoredPosition, ViewportInfo } from "../lib/positions";
 
 // The layout viewport's width/height in CSS px, preferring
 // window.visualViewport over window.innerWidth/innerHeight. The two
@@ -154,37 +152,51 @@ export default defineContentScript({
       // Whether this note follows the viewport (position: fixed, the
       // default for every new note) or stays anchored to a fixed spot
       // on the page itself (position: absolute, so it scrolls with the
-      // page). Toggled from the footer's pin button -- see toggleMode
-      // below.
-      let mode: PositionMode = "viewport";
+      // page). Sourced from the annotation record itself (pin is
+      // shared by every viewer, unlike ordinary position -- see
+      // lib/messages.ts's AnnotationData), not the positions
+      // collection. Toggled from the footer's pin button -- see
+      // togglePin below.
+      let pinned = annotation.pin;
 
-      try {
-        // Fetched via the background script, not directly here -- see
-        // lib/messages.ts for why a content script can't safely call
-        // PocketBase itself.
-        const saved: StoredPosition | undefined =
-          await browser.runtime.sendMessage({
-            type: GET_POSITION_MESSAGE,
-            annotationId: annotation.id,
-            viewport: currentViewport(),
-          } satisfies GetPositionMessage);
-        if (saved) {
-          positionRecordId = saved.id;
-          top = saved.top;
-          left = saved.left;
-          z = saved.z;
-          savedWidth = saved.width;
-          savedHeight = saved.height;
-          // Defaults to "viewport" if an older record predates the
-          // mode field, rather than failing to load the note.
-          mode = saved.mode ?? "viewport";
-          if (z > zCounter) zCounter = z;
-        } else {
+      if (pinned) {
+        // Pinned coordinates are ratios of the whole document, not the
+        // window, and live on the annotation record itself (see
+        // lib/annotations.ts's setAnnotationPin) -- every viewer sees
+        // the same anchor point, so there's no positions lookup here.
+        const docWidth = document.documentElement.scrollWidth;
+        const docHeight = document.documentElement.scrollHeight;
+        top = annotation.pinYRatio * docHeight;
+        left = annotation.pinXRatio * docWidth;
+        savedWidth = annotation.pinWidth || undefined;
+        savedHeight = annotation.pinHeight || undefined;
+        z = nextZ();
+      } else {
+        try {
+          // Fetched via the background script, not directly here -- see
+          // lib/messages.ts for why a content script can't safely call
+          // PocketBase itself.
+          const saved: StoredPosition | undefined =
+            await browser.runtime.sendMessage({
+              type: GET_POSITION_MESSAGE,
+              annotationId: annotation.id,
+              viewport: currentViewport(),
+            } satisfies GetPositionMessage);
+          if (saved) {
+            positionRecordId = saved.id;
+            top = saved.top;
+            left = saved.left;
+            z = saved.z;
+            savedWidth = saved.width;
+            savedHeight = saved.height;
+            if (z > zCounter) zCounter = z;
+          } else {
+            z = nextZ();
+          }
+        } catch (err) {
+          console.error("[sticky-party] failed to load position", err);
           z = nextZ();
         }
-      } catch (err) {
-        console.error("[sticky-party] failed to load position", err);
-        z = nextZ();
       }
 
       // Tracks the note's "resting" (non-editing) content height, as
@@ -227,11 +239,11 @@ export default defineContentScript({
           // blank second line under single-line notes.
           const MIN_CONTENT_HEIGHT_PX = 32;
           Object.assign(wrapper.style, {
-            // "page" mode uses absolute positioning so the note stays
-            // put in the document flow and scrolls with the page;
-            // "viewport" (default) uses fixed so it stays put on
+            // A pinned note uses absolute positioning so it stays put
+            // in the document flow and scrolls with the page; an
+            // ordinary note (default) uses fixed so it stays put on
             // screen instead.
-            position: mode === "page" ? "absolute" : "fixed",
+            position: pinned ? "absolute" : "fixed",
             top: `${top}px`,
             left: `${left}px`,
             width: savedWidth ? `${savedWidth}px` : "260px",
@@ -259,11 +271,11 @@ export default defineContentScript({
           // window when the browser window is resized (registered
           // into repositionOnResize above).
           reposition = (scaleX, scaleY) => {
-            // Page-anchored notes ignore viewport resizes entirely:
-            // their top/left are document-relative, so the browser's
-            // own scrolling and reflow already keep them in the right
-            // spot without any rescaling here.
-            if (mode === "page") return;
+            // Pinned notes ignore viewport resizes entirely: their
+            // top/left are document-relative, so the browser's own
+            // scrolling and reflow already keep them in the right spot
+            // without any rescaling here.
+            if (pinned) return;
             // top/left themselves stay pure ratio-scaled values, never
             // clamped -- clamping the state itself (not just the
             // rendered position) would permanently lose the note's true
@@ -292,10 +304,40 @@ export default defineContentScript({
             wrapper.style.zIndex = `${Z_BASE + z}`;
           };
 
+          // Saved via the background script, not directly here -- see
+          // lib/messages.ts for why a content script can't safely call
+          // PocketBase itself. Pinned notes persist to the annotation
+          // record (SET_ANNOTATION_PIN_MESSAGE); ordinary notes persist
+          // to the positions collection (SAVE_POSITION_MESSAGE) as
+          // before.
           const persistPosition = () => {
-            // Saved via the background script, not directly here -- see
-            // lib/messages.ts for why a content script can't safely call
-            // PocketBase itself.
+            if (pinned) {
+              const docWidth = document.documentElement.scrollWidth;
+              const docHeight = document.documentElement.scrollHeight;
+              browser.runtime
+                .sendMessage({
+                  type: SET_ANNOTATION_PIN_MESSAGE,
+                  annotationId: annotation.id,
+                  pin: true,
+                  coords: {
+                    xRatio: left / docWidth,
+                    yRatio: top / docHeight,
+                    width: wrapper.offsetWidth,
+                    // Use contentHeight (the resting/non-editing size),
+                    // not wrapper.offsetHeight -- the wrapper is
+                    // temporarily taller than that while editing (see
+                    // applyWrapperHeight above).
+                    height: TITLE_ROW_HEIGHT_PX + contentHeight,
+                  },
+                } satisfies SetAnnotationPinMessage)
+                .catch((err: unknown) =>
+                  console.error(
+                    "[sticky-party] failed to save pin position",
+                    err,
+                  ),
+                );
+              return;
+            }
             browser.runtime
               .sendMessage({
                 type: SAVE_POSITION_MESSAGE,
@@ -310,7 +352,6 @@ export default defineContentScript({
                   width: wrapper.offsetWidth,
                   height: TITLE_ROW_HEIGHT_PX + contentHeight,
                   z,
-                  mode,
                 },
                 viewport: currentViewport(),
                 existingId: positionRecordId,
@@ -324,26 +365,43 @@ export default defineContentScript({
           // Flips this note between following the viewport (fixed) and
           // staying anchored to a fixed spot on the page (absolute, so
           // it scrolls with the page) -- triggered by the footer's pin
-          // button (see NoteFooter.tsx/TOGGLE_POSITION_MODE_MESSAGE).
-          // Converts top/left into the new mode's coordinate space
-          // first, so the note doesn't visually jump: fixed (viewport)
-          // and absolute (page) coordinates differ by exactly the
-          // current scroll offset.
-          const toggleMode = () => {
-            mode = mode === "page" ? "viewport" : "page";
-            if (mode === "page") {
+          // button (see NoteFooter.tsx/TOGGLE_PIN_MESSAGE). Converts
+          // top/left into the new mode's coordinate space first, so the
+          // note doesn't visually jump: fixed (viewport) and absolute
+          // (page) coordinates differ by exactly the current scroll
+          // offset.
+          const togglePin = () => {
+            const nowPinned = !pinned;
+            if (nowPinned) {
               top += window.scrollY;
               left += window.scrollX;
             } else {
               top -= window.scrollY;
               left -= window.scrollX;
             }
-            wrapper.style.position = mode === "page" ? "absolute" : "fixed";
+            pinned = nowPinned;
+            wrapper.style.position = pinned ? "absolute" : "fixed";
             wrapper.style.top = `${top}px`;
             wrapper.style.left = `${left}px`;
+            if (!pinned) {
+              // Clear the pin flag on the annotation before switching
+              // this note over to the positions collection below --
+              // otherwise the annotation would keep pin: true (with
+              // now-stale coordinates) even though this note is back to
+              // following the viewport.
+              browser.runtime
+                .sendMessage({
+                  type: SET_ANNOTATION_PIN_MESSAGE,
+                  annotationId: annotation.id,
+                  pin: false,
+                } satisfies SetAnnotationPinMessage)
+                .catch((err: unknown) =>
+                  console.error("[sticky-party] failed to unpin", err),
+                );
+            }
             persistPosition();
             iframe.contentWindow?.postMessage(
-              { type: NOTE_MODE_MESSAGE, mode } satisfies NoteModeMessage,
+              { type: NOTE_PIN_MESSAGE, pin: pinned } satisfies NotePinMessage,
               iframeOrigin,
             );
           };
@@ -542,19 +600,16 @@ export default defineContentScript({
           onMessage = (e) => {
             if (e.source !== iframe.contentWindow) return;
             if (e.data?.type === NOTE_READY_MESSAGE) {
+              // The note's pin state already rides along inside
+              // `annotation` (see lib/messages.ts's AnnotationData), so
+              // no separate message is needed to seed the footer's pin
+              // button on first render.
               iframe.contentWindow?.postMessage(
                 { type: INIT_NOTE_MESSAGE, annotation },
                 iframeOrigin,
               );
-              // Lets the footer's pin button (see NoteFooter.tsx) show
-              // the right icon from the very first render, instead of
-              // always assuming "viewport" until a toggle happens.
-              iframe.contentWindow?.postMessage(
-                { type: NOTE_MODE_MESSAGE, mode } satisfies NoteModeMessage,
-                iframeOrigin,
-              );
-            } else if (e.data?.type === TOGGLE_POSITION_MODE_MESSAGE) {
-              toggleMode();
+            } else if (e.data?.type === TOGGLE_PIN_MESSAGE) {
+              togglePin();
             } else if (e.data?.type === NOTE_DELETED_MESSAGE) {
               ui.remove();
             } else if (e.data?.type === NOTE_FOCUS_MESSAGE) {
