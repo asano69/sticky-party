@@ -983,6 +983,68 @@ func init() {
 						"type": "bool"
 					},
 					{
+						"help": "",
+						"hidden": false,
+						"id": "bool3045404147",
+						"name": "pin",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"help": "",
+						"hidden": false,
+						"id": "number433697199",
+						"max": null,
+						"min": null,
+						"name": "pinXRatio",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"help": "",
+						"hidden": false,
+						"id": "number3531956746",
+						"max": null,
+						"min": null,
+						"name": "pinYRatio",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"help": "",
+						"hidden": false,
+						"id": "number1851503827",
+						"max": null,
+						"min": null,
+						"name": "pinWidth",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"help": "",
+						"hidden": false,
+						"id": "number1101273801",
+						"max": null,
+						"min": null,
+						"name": "pinHeight",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
 						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
@@ -1058,21 +1120,6 @@ func init() {
 						"required": false,
 						"system": false,
 						"type": "relation"
-					},
-					{
-						"help": "",
-						"hidden": false,
-						"id": "select2546616235",
-						"maxSelect": 0,
-						"name": "mode",
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "select",
-						"values": [
-							"viewport",
-							"page"
-						]
 					},
 					{
 						"help": "",
