@@ -43,7 +43,7 @@ export default function NoteFooter(props: {
         disabled={props.deleting}
         aria-label={props.confirmDelete ? "Confirm delete" : "Delete"}
       >
-        <Show when={props.hide} fallback={<Trash size={16} />}>
+        <Show when={props.confirmDelete} fallback={<Trash size={16} />}>
           <Shredder size={16} />
         </Show>
       </Button>
