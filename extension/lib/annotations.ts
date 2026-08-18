@@ -11,6 +11,21 @@
 import { getAuthedPb } from "./pb";
 import type { AnnotationData } from "./messages";
 
+// Returns the total annotation count across all targets, without
+// fetching any note bodies. perPage: 1 keeps the transferred payload to
+// a single record regardless of how many annotations exist; totalItems
+// comes from PocketBase's own COUNT(*) query, so this stays cheap even
+// with thousands of annotations. No filter is applied, so hidden
+// (hide: true) annotations are counted too -- this is a total count,
+// not a "visible notes" count.
+export async function fetchAnnotationCount(): Promise<number> {
+  const pb = await getAuthedPb();
+  const result = await pb.collection("annotations").getList(1, 1, {
+    fields: "id",
+  });
+  return result.totalItems;
+}
+
 export async function fetchAnnotations(url: string): Promise<AnnotationData[]> {
   const pb = await getAuthedPb();
   const records = await pb

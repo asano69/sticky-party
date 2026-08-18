@@ -1,4 +1,5 @@
 import { Show } from "solid-js";
+import { CARD } from "./classes";
 import { ToggleGroup } from "@kobalte/core/toggle-group";
 import { Button } from "@kobalte/core/button";
 import SquarePen from "lucide-solid/icons/square-pen";
@@ -31,6 +32,11 @@ export default function NavBar(props: {
   // in environments where the toolbar badge itself isn't (see
   // App.tsx).
   syncError: boolean;
+  // Total annotation count fetched on popup open (see App.tsx's
+  // checkConfigured/handleSync). undefined until the first fetch
+  // resolves -- shown as nothing rather than "0" so it's not mistaken
+  // for a real (zero) count while still loading.
+  count?: number;
 }) {
   return (
     <header class="flex items-center justify-between px-3 pt-3">
@@ -51,6 +57,11 @@ export default function NavBar(props: {
             <RefreshCw size={18} class={props.syncing ? "animate-spin" : ""} />
           </Show>
         </Button>
+        <Show when={props.count !== undefined}>
+          <span class="text-xs text-[color:var(--note-label)]">
+            {props.count}
+          </span>
+        </Show>
       </div>
 
       <ToggleGroup

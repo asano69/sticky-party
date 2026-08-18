@@ -4,6 +4,7 @@ import Settings from "./Settings";
 import Targets from "./Targets";
 import NavBar, { type View } from "./NavBar";
 import { fullSyncTargets, syncTargets } from "../../lib/targets";
+import { fetchAnnotationCount } from "../../lib/annotations";
 import { getSettings } from "../../lib/settings";
 import {
   clearSyncErrorBadge,
@@ -30,6 +31,12 @@ function App() {
   // button can show the same failure state as the toolbar badge --
   // useful wherever the badge itself isn't visible.
   const [syncError, setSyncError] = createSignal(false);
+  // Total annotation count shown next to NavBar's Sync icon. undefined
+  // until the first fetch resolves (see checkConfigured/handleSync); a
+  // failed fetch leaves the previous value in place rather than
+  // clearing it, so the number doesn't flicker away on a transient
+  // error.
+  const [annotationCount, setAnnotationCount] = createSignal<number>();
 
   // Reads Settings and unlocks Home/Targets only once backend
   // credentials are actually saved; otherwise forces the Settings view
@@ -61,6 +68,15 @@ function App() {
       console.error("[sticky-party] popup sync failed", err);
       showSyncErrorBadge();
       setSyncError(true);
+    }
+
+    try {
+      setAnnotationCount(await fetchAnnotationCount());
+    } catch (err) {
+      // Not routed through the sync-error badge: a failed count fetch
+      // is minor compared to a failed target sync, so it just logs and
+      // leaves the previous count (if any) displayed.
+      console.error("[sticky-party] failed to fetch annotation count", err);
     }
   };
 
@@ -119,12 +135,31 @@ function App() {
           tabId: activeTab.id,
         } satisfies CheckAnnotationMessage);
       }
+      // Manual sync is also a natural moment to refresh the displayed
+      // count (e.g. after annotations were added/removed elsewhere).
+      setAnnotationCount(await fetchAnnotationCount());
     } catch (err) {
       console.error("[sticky-party] full sync failed", err);
       showSyncErrorBadge();
       setSyncError(true);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // Refreshes the displayed count right after Home.tsx creates a new
+  // annotation, so it doesn't wait for the next popup open or manual
+  // sync. Not routed through the sync-error badge, same reasoning as
+  // checkConfigured's count fetch: a failed refresh here is minor and
+  // just leaves the previous count displayed.
+  const handleAnnotationCreated = async () => {
+    try {
+      setAnnotationCount(await fetchAnnotationCount());
+    } catch (err) {
+      console.error(
+        "[sticky-party] failed to refresh annotation count",
+        err,
+      );
     }
   };
 
@@ -137,6 +172,7 @@ function App() {
         onSync={handleSync}
         locked={locked()}
         syncError={syncError()}
+        count={annotationCount()}
       />
 
       <Show
@@ -147,7 +183,7 @@ function App() {
           </Show>
         }
       >
-        <Home />
+        <Home onAnnotationCreated={handleAnnotationCreated} />
       </Show>
     </div>
   );

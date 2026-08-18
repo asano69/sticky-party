@@ -22,7 +22,7 @@ import SaveButton, { type SaveStatus } from "./SaveButton";
 // cache the content script matches against (write-through; see
 // docs/architecture.md). Position data (x/y/width/height) is not
 // collected here -- that belongs to the future drag-placement flow.
-export default function Home() {
+export default function Home(props: { onAnnotationCreated?: () => void }) {
   const [url, setUrl] = createSignal("");
   const [note, setNote] = createSignal("");
   const [error, setError] = createSignal("");
@@ -79,6 +79,10 @@ export default function Home() {
           tabId: tabId(),
         } satisfies CheckAnnotationMessage);
       }
+      // Lets App.tsx refresh the displayed annotation count (see
+      // App.tsx's handleAnnotationCreated) now that one more annotation
+      // exists.
+      props.onAnnotationCreated?.();
       setNote("");
       setStatus("success");
     } catch (err) {
