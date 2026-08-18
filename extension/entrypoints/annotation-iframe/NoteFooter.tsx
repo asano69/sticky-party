@@ -11,11 +11,14 @@ import Shredder from "lucide-solid/icons/shredder";
 import Eye from "lucide-solid/icons/eye";
 import EyeOff from "lucide-solid/icons/eye-off";
 import Palette from "lucide-solid/icons/palette";
+import Pin from "lucide-solid/icons/pin";
+import PinOff from "lucide-solid/icons/pin-off";
 import { Button } from "@kobalte/core/button";
 import { ToggleButton } from "@kobalte/core/toggle-button";
 import { ToggleGroup } from "@kobalte/core/toggle-group";
 import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
 import { NOTE_COLORS, swatchColor, type NoteColor } from "../../lib/colors";
+import type { PositionMode } from "../../lib/positions";
 
 export default function NoteFooter(props: {
   confirmDelete: boolean;
@@ -27,6 +30,8 @@ export default function NoteFooter(props: {
   color: NoteColor;
   togglingColor: boolean;
   onColorChange: (color: NoteColor) => void;
+  mode: PositionMode;
+  onToggleMode: () => void;
 }) {
   // Whether the color swatches are shown. Local to this component (not
   // annotation.color's own state), since it's purely a UI reveal, not
@@ -50,10 +55,22 @@ export default function NoteFooter(props: {
         disabled={props.deleting}
         aria-label={props.confirmDelete ? "Confirm delete" : "Delete"}
       >
-        <Show when={props.confirmDelete} fallback={<Trash size={16} />}>
-          <Shredder size={16} />
+        <Show when={props.hide} fallback={<Eye size={16} />}>
+          <EyeOff size={16} />
         </Show>
-      </Button>
+        </Button>
+      {/* Same pointerdown/blur trap as the hide toggle above. */}
+      <ToggleButton
+        class="sticky-party-icon-btn flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
+        onMouseDown={(e: MouseEvent) => e.preventDefault()}
+        pressed={props.mode === "page"}
+        onChange={props.onToggleMode}
+        aria-label={props.mode === "page" ? "Unpin from page" : "Pin to page"}
+      >
+        <Show when={props.mode === "page"} fallback={<PinOff size={16} />}>
+          <Pin size={16} />
+        </Show>
+      </ToggleButton>
       {/* onMouseDown preventDefault mirrors the delete button above:
           without it, the pointerdown-before-click on this button
           would fire the iframe's window "blur" handler's saveEdit()

@@ -28,6 +28,12 @@ export interface ViewportInfo {
   screenHeight: number;
 }
 
+// "viewport": the note follows the screen (position: fixed), the
+// default for every note. "page": the note stays anchored to a fixed
+// spot on the page itself (position: absolute), so it scrolls with the
+// page -- e.g. pinning a note near the bottom of a long article.
+export type PositionMode = "viewport" | "page";
+
 // This display's resolution, so a dual-monitor setup keeps a separate
 // saved layout per screen instead of two monitors fighting over the
 // same stored position (e.g. a laptop docked to an external display
@@ -46,6 +52,7 @@ interface PositionRecord {
   width: number;
   height: number;
   z: number;
+  mode: PositionMode;
 }
 
 export interface PositionData {
@@ -54,6 +61,7 @@ export interface PositionData {
   width: number;
   height: number;
   z: number;
+  mode: PositionMode;
 }
 
 export interface StoredPosition extends PositionData {
@@ -61,6 +69,19 @@ export interface StoredPosition extends PositionData {
 }
 
 function toRatio(pos: PositionData, viewport: ViewportInfo) {
+  if (pos.mode === "page") {
+    // Page-anchored notes store raw document-relative pixels instead
+    // of a window ratio: their whole point is to stay put regardless
+    // of viewport size, so ratio-of-window math doesn't apply here.
+    return {
+      x: pos.left,
+      y: pos.top,
+      width: pos.width,
+      height: pos.height,
+      z: pos.z,
+      mode: pos.mode,
+    };
+  }
   return {
     x: pos.left / viewport.windowWidth,
     y: pos.top / viewport.windowHeight,
@@ -69,16 +90,33 @@ function toRatio(pos: PositionData, viewport: ViewportInfo) {
     // z is a stacking order, not a screen coordinate, so it's stored
     // and restored as-is rather than as a window-relative ratio.
     z: pos.z,
+    mode: pos.mode,
   };
 }
 
 // Converts a stored ratio back into pixel coordinates for the content
 // page's window, clamping so the note can't be restored off-screen --
 // e.g. after shrinking the window, or loading on a smaller device.
+// Page-mode records skip both the ratio conversion and the clamp,
+// since their x/y are already raw document pixels and aren't tied to
+// the current viewport size at all.
 function fromRatio(
   record: PositionRecord,
   viewport: ViewportInfo,
 ): PositionData {
+  // Defaults to "viewport" for records saved before the mode field
+  // existed, rather than treating them as malformed.
+  const mode: PositionMode = record.mode ?? "viewport";
+  if (mode === "page") {
+    return {
+      left: record.x,
+      top: record.y,
+      width: record.width,
+      height: record.height,
+      z: record.z,
+      mode,
+    };
+  }
   const left = record.x * viewport.windowWidth;
   const top = record.y * viewport.windowHeight;
   return {
@@ -93,6 +131,7 @@ function fromRatio(
     width: record.width,
     height: record.height,
     z: record.z,
+    mode,
   };
 }
 

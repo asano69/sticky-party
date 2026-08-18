@@ -38,11 +38,18 @@ import {
   NOTE_DELETED_MESSAGE,
   NOTE_EDITING_MESSAGE,
   NOTE_FOCUS_MESSAGE,
+  NOTE_MODE_MESSAGE,
   NOTE_READY_MESSAGE,
   START_EDIT_TITLE_MESSAGE,
   TITLE_ROW_HEIGHT_PX,
+  TOGGLE_POSITION_MODE_MESSAGE,
+  type NoteModeMessage,
 } from "../lib/iframe-messages";
-import type { StoredPosition, ViewportInfo } from "../lib/positions";
+import type {
+  PositionMode,
+  StoredPosition,
+  ViewportInfo,
+} from "../lib/positions";
 
 // The content page's own viewport/screen at the moment of the call,
 // read fresh each time rather than cached -- lib/positions.ts needs
@@ -125,6 +132,12 @@ export default defineContentScript({
       let positionRecordId: string | undefined;
       let savedWidth: number | undefined;
       let savedHeight: number | undefined;
+      // Whether this note follows the viewport (position: fixed, the
+      // default for every new note) or stays anchored to a fixed spot
+      // on the page itself (position: absolute, so it scrolls with the
+      // page). Toggled from the footer's pin button -- see toggleMode
+      // below.
+      let mode: PositionMode = "viewport";
 
       try {
         // Fetched via the background script, not directly here -- see
@@ -143,6 +156,9 @@ export default defineContentScript({
           z = saved.z;
           savedWidth = saved.width;
           savedHeight = saved.height;
+          // Defaults to "viewport" if an older record predates the
+          // mode field, rather than failing to load the note.
+          mode = saved.mode ?? "viewport";
           if (z > zCounter) zCounter = z;
         } else {
           z = nextZ();
@@ -192,7 +208,11 @@ export default defineContentScript({
           // blank second line under single-line notes.
           const MIN_CONTENT_HEIGHT_PX = 32;
           Object.assign(wrapper.style, {
-            position: "fixed",
+            // "page" mode uses absolute positioning so the note stays
+            // put in the document flow and scrolls with the page;
+            // "viewport" (default) uses fixed so it stays put on
+            // screen instead.
+            position: mode === "page" ? "absolute" : "fixed",
             top: `${top}px`,
             left: `${left}px`,
             width: savedWidth ? `${savedWidth}px` : "260px",
@@ -220,6 +240,11 @@ export default defineContentScript({
           // window when the browser window is resized (registered
           // into repositionOnResize above).
           reposition = (scaleX, scaleY) => {
+            // Page-anchored notes ignore viewport resizes entirely:
+            // their top/left are document-relative, so the browser's
+            // own scrolling and reflow already keep them in the right
+            // spot without any rescaling here.
+            if (mode === "page") return;
             // top/left themselves stay pure ratio-scaled values, never
             // clamped -- clamping the state itself (not just the
             // rendered position) would permanently lose the note's true
@@ -266,6 +291,7 @@ export default defineContentScript({
                   width: wrapper.offsetWidth,
                   height: TITLE_ROW_HEIGHT_PX + contentHeight,
                   z,
+                  mode,
                 },
                 viewport: currentViewport(),
                 existingId: positionRecordId,
@@ -274,6 +300,33 @@ export default defineContentScript({
               .catch((err: unknown) =>
                 console.error("[sticky-party] failed to save position", err),
               );
+          };
+
+          // Flips this note between following the viewport (fixed) and
+          // staying anchored to a fixed spot on the page (absolute, so
+          // it scrolls with the page) -- triggered by the footer's pin
+          // button (see NoteFooter.tsx/TOGGLE_POSITION_MODE_MESSAGE).
+          // Converts top/left into the new mode's coordinate space
+          // first, so the note doesn't visually jump: fixed (viewport)
+          // and absolute (page) coordinates differ by exactly the
+          // current scroll offset.
+          const toggleMode = () => {
+            mode = mode === "page" ? "viewport" : "page";
+            if (mode === "page") {
+              top += window.scrollY;
+              left += window.scrollX;
+            } else {
+              top -= window.scrollY;
+              left -= window.scrollX;
+            }
+            wrapper.style.position = mode === "page" ? "absolute" : "fixed";
+            wrapper.style.top = `${top}px`;
+            wrapper.style.left = `${left}px`;
+            persistPosition();
+            iframe.contentWindow?.postMessage(
+              { type: NOTE_MODE_MESSAGE, mode } satisfies NoteModeMessage,
+              iframeOrigin,
+            );
           };
 
           // Transparent overlay pinned to the title row that
@@ -474,6 +527,15 @@ export default defineContentScript({
                 { type: INIT_NOTE_MESSAGE, annotation },
                 iframeOrigin,
               );
+              // Lets the footer's pin button (see NoteFooter.tsx) show
+              // the right icon from the very first render, instead of
+              // always assuming "viewport" until a toggle happens.
+              iframe.contentWindow?.postMessage(
+                { type: NOTE_MODE_MESSAGE, mode } satisfies NoteModeMessage,
+                iframeOrigin,
+              );
+            } else if (e.data?.type === TOGGLE_POSITION_MODE_MESSAGE) {
+              toggleMode();
             } else if (e.data?.type === NOTE_DELETED_MESSAGE) {
               ui.remove();
             } else if (e.data?.type === NOTE_FOCUS_MESSAGE) {

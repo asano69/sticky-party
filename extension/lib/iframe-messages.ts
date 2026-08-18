@@ -5,6 +5,7 @@
 // see entrypoints/content.ts for why the note's iframe exists at all.
 
 import type { AnnotationData } from "./messages";
+import type { PositionMode } from "./positions";
 
 // iframe -> content script, sent once the iframe's own script has
 // started and registered its message listener. The content script
@@ -20,6 +21,29 @@ export const INIT_NOTE_MESSAGE = "sticky-party:init-note";
 export interface InitNoteMessage {
   type: typeof INIT_NOTE_MESSAGE;
   annotation: AnnotationData;
+}
+
+// content script -> iframe, sent once on init (alongside
+// INIT_NOTE_MESSAGE) and again after every successful mode toggle, so
+// the footer's pin button (see NoteFooter.tsx) shows this note's actual
+// position mode. The mode itself lives on the position record
+// (lib/positions.ts), not the annotation, so it has to be pushed in
+// from content.ts rather than riding along with AnnotationData.
+export const NOTE_MODE_MESSAGE = "sticky-party:note-mode";
+export interface NoteModeMessage {
+  type: typeof NOTE_MODE_MESSAGE;
+  mode: PositionMode;
+}
+
+// iframe -> content script, sent when the user clicks the footer's pin
+// button, asking to flip this note between following the screen
+// (position: fixed) and staying anchored to a fixed spot on the page
+// (position: absolute, so it scrolls with the page). content.ts owns
+// the actual coordinate conversion -- see toggleMode there.
+export const TOGGLE_POSITION_MODE_MESSAGE =
+  "sticky-party:toggle-position-mode";
+export interface TogglePositionModeMessage {
+  type: typeof TOGGLE_POSITION_MODE_MESSAGE;
 }
 
 // iframe -> content script, sent whenever the note is interacted with,
@@ -82,10 +106,14 @@ export interface NoteEditingMessage {
 // pixel-for-pixel.
 export const TITLE_ROW_HEIGHT_PX = 32;
 
-export type ParentToNoteMessage = InitNoteMessage | StartEditTitleMessage;
+export type ParentToNoteMessage =
+  | InitNoteMessage
+  | StartEditTitleMessage
+  | NoteModeMessage;
 export type NoteToParentMessage =
   | NoteReadyMessage
   | NoteFocusMessage
   | NoteDeletedMessage
   | NoteContentResizeMessage
-  | NoteEditingMessage;
+  | NoteEditingMessage
+  | TogglePositionModeMessage;
