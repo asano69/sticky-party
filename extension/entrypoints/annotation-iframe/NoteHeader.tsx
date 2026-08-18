@@ -10,6 +10,10 @@ import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
 
 export default function NoteHeader(props: {
   title: string;
+  // Whether content.ts is currently drawing its pin button over this
+  // row's left edge -- see NoteContent.tsx. Only affects padding; the
+  // pin button itself lives entirely in content.ts's document.
+  pinVisible: boolean;
   editing: boolean;
   draftTitle: string;
   onDraftTitleChange: (value: string) => void;
@@ -25,7 +29,7 @@ export default function NoteHeader(props: {
       // that could drift from content.ts's drag-header overlay,
       // which this row has to line up with pixel-for-pixel.
       style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
-      class="flex shrink-0 items-center box-border pl-10 pr-10 font-bold border-b border-[color:var(--note-border)]"
+      class={`flex shrink-0 items-center box-border ${props.pinVisible ? "pl-10" : "pl-2"} pr-10 font-bold border-b border-[color:var(--note-border)]`}
     >
       <Show
         when={!props.editing}

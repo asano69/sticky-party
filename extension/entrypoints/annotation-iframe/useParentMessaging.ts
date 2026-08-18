@@ -10,6 +10,7 @@ import {
   NOTE_DELETED_MESSAGE,
   NOTE_EDITING_MESSAGE,
   NOTE_FOCUS_MESSAGE,
+  NOTE_PIN_MESSAGE,
   NOTE_READY_MESSAGE,
   START_EDIT_TITLE_MESSAGE,
   type NoteEditingMessage,
@@ -26,15 +27,22 @@ export function useParentMessaging(params: {
   // old Shadow DOM version's focusout-to-save behavior. The caller owns
   // what "save" actually means (updateAnnotation + local state update).
   onBlurWhileEditing: () => void;
+  // Called after every pin toggle, so the title row (NoteHeader.tsx)
+  // can keep its left-padding in sync with whether content.ts is
+  // currently drawing a pin button over that space -- see
+  // NOTE_PIN_MESSAGE.
+  onPinChange: (pin: boolean) => void;
 }) {
-  // Receive the annotation to render, or a request to start editing the
+  // Receive the annotation to render, a request to start editing the
   // title (relayed from a double-click on the content script's drag
-  // header -- see content.ts).
+  // header -- see content.ts), or a pin-state update.
   const onMessage = (e: MessageEvent<ParentToNoteMessage>) => {
     if (e.source !== window.parent) return;
     if (e.data?.type === INIT_NOTE_MESSAGE) params.onInit(e.data.annotation);
     else if (e.data?.type === START_EDIT_TITLE_MESSAGE)
       params.onStartEditTitle();
+    else if (e.data?.type === NOTE_PIN_MESSAGE)
+      params.onPinChange(e.data.pin);
   };
   window.addEventListener("message", onMessage);
   onCleanup(() => window.removeEventListener("message", onMessage));

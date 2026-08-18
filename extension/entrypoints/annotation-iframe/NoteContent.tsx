@@ -92,6 +92,10 @@ export default function NoteContent() {
     onStartEditTitle: () => startEdit("title"),
     editing,
     onBlurWhileEditing: () => saveEdit(),
+    onPinChange: (pin) => {
+      const current = annotation();
+      if (current) setAnnotation({ ...current, pin });
+    },
   });
 
   const cancelEdit = () => {
@@ -235,6 +239,11 @@ export default function NoteContent() {
         >
           <NoteHeader
             title={note().title}
+            // Reserve left-padding only while content.ts is actually
+            // drawing its pin button over the title row -- same
+            // visibility rule as content.ts's own updatePinIcon (pinned
+            // or currently editing), kept in sync via NOTE_PIN_MESSAGE.
+            pinVisible={note().pin || editing()}
             editing={editing()}
             draftTitle={draftTitle()}
             onDraftTitleChange={setDraftTitle}

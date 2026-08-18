@@ -42,9 +42,11 @@ import {
   NOTE_DELETED_MESSAGE,
   NOTE_EDITING_MESSAGE,
   NOTE_FOCUS_MESSAGE,
+  NOTE_PIN_MESSAGE,
   NOTE_READY_MESSAGE,
   START_EDIT_TITLE_MESSAGE,
   TITLE_ROW_HEIGHT_PX,
+  type NotePinMessage,
 } from "../lib/iframe-messages";
 import type { StoredPosition, ViewportInfo } from "../lib/positions";
 
@@ -433,6 +435,10 @@ export default defineContentScript({
             }
             persistPosition();
             updatePinIcon();
+            iframe.contentWindow?.postMessage(
+              { type: NOTE_PIN_MESSAGE, pin: pinned } satisfies NotePinMessage,
+              iframeOrigin,
+            );
           };
 
           // Transparent overlay pinned to the title row that
@@ -525,19 +531,18 @@ export default defineContentScript({
             padding: "6px 8px",
             pointerEvents: "auto",
           });
-          // Visible whenever the note is pinned (a quiet, non-clickable
-          // "this note is pinned" indicator -- the pin-off icon is
-          // never shown outside edit mode, so an ordinary unpinned
-          // note's header stays uncluttered) or whenever the note is
-          // being edited (so there's something to click to pin/unpin
-          // it in the first place -- toggling is only ever allowed
-          // while editing, since pin is persisted data that shouldn't
-          // change from a stray click).
+          // Visible whenever the note is pinned (clickable any time,
+          // to unpin) or whenever the note is being edited (so there's
+          // something to click to pin it in the first place -- the
+          // pin-off icon is never shown outside edit mode, so an
+          // ordinary unpinned note's header stays uncluttered).
+          // Turning pin ON therefore only ever happens while editing,
+          // but turning it OFF is always one click away once a note is
+          // pinned, matching how a persistent "you're pinned" indicator
+          // should behave.
           const updatePinIcon = () => {
             const visible = pinned || isEditingNote;
             pinBtn.style.display = visible ? "flex" : "none";
-            pinBtn.disabled = !isEditingNote;
-            pinBtn.style.cursor = isEditingNote ? "pointer" : "default";
             pinBtn.replaceChildren(
               (pinned ? Pin({ size: 16 }) : PinOff({ size: 16 })) as unknown as Node,
             );
@@ -548,9 +553,7 @@ export default defineContentScript({
           };
           updatePinIcon();
           pinBtn.addEventListener("mouseenter", () => {
-            if (isEditingNote) {
-              pinBtn.style.background = "rgba(127, 127, 127, 0.35)";
-            }
+            pinBtn.style.background = "rgba(127, 127, 127, 0.35)";
           });
           pinBtn.addEventListener("mouseleave", () => {
             pinBtn.style.background = "transparent";
