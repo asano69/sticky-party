@@ -19,6 +19,8 @@
 // using the small protocol in lib/iframe-messages.ts.
 
 import X from "lucide-solid/icons/x";
+import Pin from "lucide-solid/icons/pin";
+import PinOff from "lucide-solid/icons/pin-off";
 
 import {
   CHECK_ANNOTATION_MESSAGE,
@@ -40,12 +42,9 @@ import {
   NOTE_DELETED_MESSAGE,
   NOTE_EDITING_MESSAGE,
   NOTE_FOCUS_MESSAGE,
-  NOTE_PIN_MESSAGE,
   NOTE_READY_MESSAGE,
   START_EDIT_TITLE_MESSAGE,
   TITLE_ROW_HEIGHT_PX,
-  TOGGLE_PIN_MESSAGE,
-  type NotePinMessage,
 } from "../lib/iframe-messages";
 import type { StoredPosition, ViewportInfo } from "../lib/positions";
 
@@ -433,10 +432,7 @@ export default defineContentScript({
                 );
             }
             persistPosition();
-            iframe.contentWindow?.postMessage(
-              { type: NOTE_PIN_MESSAGE, pin: pinned } satisfies NotePinMessage,
-              iframeOrigin,
-            );
+            updatePinIcon();
           };
 
           // Transparent overlay pinned to the title row that
@@ -457,7 +453,6 @@ export default defineContentScript({
             right: "0",
             height: `${TITLE_ROW_HEIGHT_PX}px`,
             display: "flex",
-            justifyContent: "flex-end",
             alignItems: "center",
             padding: "0 8px",
             boxSizing: "border-box",
@@ -509,6 +504,60 @@ export default defineContentScript({
           applyThemeColors();
           darkModeQuery.addEventListener("change", applyThemeColors);
 
+          // Pin/unpin toggle, mirrored at the header's left edge
+          // (dismissBtn sits at the right -- see justifyContent:
+          // space-between above). Built directly here, not inside the
+          // iframe, so it can call togglePin synchronously instead of
+          // round-tripping through postMessage like Dismiss doesn't
+          // need to either.
+          const pinBtn = document.createElement("button");
+          pinBtn.type = "button";
+          Object.assign(pinBtn.style, {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            border: "none",
+            background: "transparent",
+            borderRadius: "4px",
+            cursor: "pointer",
+            font: "inherit",
+            lineHeight: "1",
+            padding: "6px 8px",
+            pointerEvents: "auto",
+          });
+          // Visible whenever the note is pinned (a quiet, non-clickable
+          // "this note is pinned" indicator -- the pin-off icon is
+          // never shown outside edit mode, so an ordinary unpinned
+          // note's header stays uncluttered) or whenever the note is
+          // being edited (so there's something to click to pin/unpin
+          // it in the first place -- toggling is only ever allowed
+          // while editing, since pin is persisted data that shouldn't
+          // change from a stray click).
+          const updatePinIcon = () => {
+            const visible = pinned || isEditingNote;
+            pinBtn.style.display = visible ? "flex" : "none";
+            pinBtn.disabled = !isEditingNote;
+            pinBtn.style.cursor = isEditingNote ? "pointer" : "default";
+            pinBtn.replaceChildren(
+              (pinned ? Pin({ size: 16 }) : PinOff({ size: 16 })) as unknown as Node,
+            );
+            pinBtn.setAttribute(
+              "aria-label",
+              pinned ? "Unpin from page" : "Pin to page",
+            );
+          };
+          updatePinIcon();
+          pinBtn.addEventListener("mouseenter", () => {
+            if (isEditingNote) {
+              pinBtn.style.background = "rgba(127, 127, 127, 0.35)";
+            }
+          });
+          pinBtn.addEventListener("mouseleave", () => {
+            pinBtn.style.background = "transparent";
+          });
+          pinBtn.addEventListener("click", () => togglePin());
+          header.append(pinBtn);
+
           const dismissBtn = document.createElement("button");
           dismissBtn.type = "button";
           dismissBtn.setAttribute("aria-label", "Dismiss");
@@ -529,6 +578,12 @@ export default defineContentScript({
             // pointer-events:none during editing -- a child's own
             // pointer-events setting overrides its parent's.
             pointerEvents: "auto",
+            // Pins this button to the header's right edge regardless
+            // of whether pinBtn (to its left) is currently visible --
+            // justify-content: space-between would instead collapse a
+            // lone visible child to the start when pinBtn is
+            // display:none (e.g. view mode, unpinned note).
+            marginLeft: "auto",
           });
           // Solid components return a real DOM node when called directly
           // (no JSX/render() needed here), same icon as old-arch used.
@@ -657,16 +712,10 @@ export default defineContentScript({
           onMessage = (e) => {
             if (e.source !== iframe.contentWindow) return;
             if (e.data?.type === NOTE_READY_MESSAGE) {
-              // The note's pin state already rides along inside
-              // `annotation` (see lib/messages.ts's AnnotationData), so
-              // no separate message is needed to seed the footer's pin
-              // button on first render.
               iframe.contentWindow?.postMessage(
                 { type: INIT_NOTE_MESSAGE, annotation },
                 iframeOrigin,
               );
-            } else if (e.data?.type === TOGGLE_PIN_MESSAGE) {
-              togglePin();
             } else if (e.data?.type === NOTE_DELETED_MESSAGE) {
               ui.remove();
             } else if (e.data?.type === NOTE_FOCUS_MESSAGE) {
@@ -695,6 +744,9 @@ export default defineContentScript({
               // editing, so clicks reach the title input inside the
               // iframe (see the header comment above).
               header.style.pointerEvents = e.data.editing ? "none" : "auto";
+              // Entering/leaving edit mode changes whether the pin
+              // button is visible/clickable -- see updatePinIcon above.
+              updatePinIcon();
             }
           };
           window.addEventListener("message", onMessage);

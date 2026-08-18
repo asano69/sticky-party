@@ -25,7 +25,7 @@ export default function NoteHeader(props: {
       // that could drift from content.ts's drag-header overlay,
       // which this row has to line up with pixel-for-pixel.
       style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
-      class="flex shrink-0 items-center box-border pl-2 pr-10 font-bold border-b border-[color:var(--note-border)]"
+      class="flex shrink-0 items-center box-border pl-10 pr-10 font-bold border-b border-[color:var(--note-border)]"
     >
       <Show
         when={!props.editing}

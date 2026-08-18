@@ -22,31 +22,6 @@ export interface InitNoteMessage {
   annotation: AnnotationData;
 }
 
-// content script -> iframe, sent after every successful pin toggle, so
-// the footer's pin button (see NoteFooter.tsx) shows this note's actual
-// pin state. Pin itself lives on the annotation record (see
-// lib/messages.ts's AnnotationData), which the iframe already has via
-// INIT_NOTE_MESSAGE -- this message only exists because content.ts (not
-// the iframe) is what actually flips the note between fixed and
-// absolute positioning, and its local copy of the annotation's pin
-// state needs to be pushed back in afterward.
-export const NOTE_PIN_MESSAGE = "sticky-party:note-pin";
-export interface NotePinMessage {
-  type: typeof NOTE_PIN_MESSAGE;
-  pin: boolean;
-}
-
-// iframe -> content script, sent when the user clicks the footer's pin
-// button, asking to flip this note between following the screen
-// (position: fixed) and staying anchored to a fixed spot on the page
-// (position: absolute, so it scrolls with the page). content.ts owns
-// the actual coordinate conversion and persistence -- see togglePin
-// there.
-export const TOGGLE_PIN_MESSAGE = "sticky-party:toggle-pin";
-export interface TogglePinMessage {
-  type: typeof TOGGLE_PIN_MESSAGE;
-}
-
 // iframe -> content script, sent whenever the note is interacted with,
 // so the content script can bring its wrapper to the front -- clicks
 // inside the iframe don't bubble out to the wrapper's own listeners,
@@ -107,14 +82,10 @@ export interface NoteEditingMessage {
 // pixel-for-pixel.
 export const TITLE_ROW_HEIGHT_PX = 32;
 
-export type ParentToNoteMessage =
-  | InitNoteMessage
-  | StartEditTitleMessage
-  | NotePinMessage;
+export type ParentToNoteMessage = InitNoteMessage | StartEditTitleMessage;
 export type NoteToParentMessage =
   | NoteReadyMessage
   | NoteFocusMessage
   | NoteDeletedMessage
   | NoteContentResizeMessage
-  | NoteEditingMessage
-  | TogglePinMessage;
+  | NoteEditingMessage;

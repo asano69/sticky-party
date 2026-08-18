@@ -92,10 +92,6 @@ export default function NoteContent() {
     onStartEditTitle: () => startEdit("title"),
     editing,
     onBlurWhileEditing: () => saveEdit(),
-    onPinChange: (pin) => {
-      const current = annotation();
-      if (current) setAnnotation({ ...current, pin });
-    },
   });
 
   const cancelEdit = () => {
@@ -285,8 +281,6 @@ export default function NoteContent() {
               }
               togglingColor={togglingColor()}
               onColorChange={handleColorChange}
-              pin={note().pin}
-              onTogglePin={parentMessaging.sendTogglePin}
             />
           </Show>
         </div>
