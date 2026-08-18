@@ -5,6 +5,7 @@ import Targets from "./Targets";
 import NavBar, { type View } from "./NavBar";
 import { fullSyncTargets, syncTargets } from "../../lib/targets";
 import { fetchAnnotationCount } from "../../lib/annotations";
+import { formatActionTitle } from "../../lib/actionTitle";
 import { getSettings } from "../../lib/settings";
 import { getSyncError, withSyncErrorBadge } from "../../lib/syncBadge";
 import {
@@ -87,10 +88,12 @@ function App() {
   // sets a property on the action itself, which persists after the popup
   // closes and is what the hover tooltip actually reads.
   createEffect(() => {
-    const count = annotationCount();
-    browser.action.setTitle({
-      title: count === undefined ? "Sticky Party" : `Sticky Party (${count})`,
-    });
+    // No tabId here: this is the default title, applied to any tab
+    // that hasn't been given its own override by background.ts's
+    // runCheckTab (see entrypoints/background.ts) -- e.g. before the
+    // first page-match on that tab. There's no per-page numerator to
+    // add here since the popup isn't tied to a specific tab's content.
+    browser.action.setTitle({ title: formatActionTitle(annotationCount()) });
   });
 
   // Loads the current error state on open (it may already be true if

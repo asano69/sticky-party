@@ -1,6 +1,8 @@
 // See docs/architecture.md for the full sync design this implements.
 
 import { fetchAnnotations, setAnnotationPin } from "../lib/annotations";
+import { formatActionTitle } from "../lib/actionTitle";
+import { getCachedAnnotationCount } from "../lib/annotationCountCache";
 import {
   clearAnnotationCountBadge,
   showAnnotationCountBadge,
@@ -93,6 +95,19 @@ export default defineBackground(() => {
   const runCheckTab = async (tabId: number, url: string) => {
     const targets = await getCachedTargets();
 
+    // Updates this tab's hover-tooltip title with the current page's
+    // note count over the last-known total (see lib/actionTitle.ts).
+    // Reads the cached total rather than fetching it (see
+    // lib/annotationCountCache.ts), so this never adds a network call
+    // on top of what runCheckTab already does.
+    const updateTitle = async (current?: number) => {
+      const total = await getCachedAnnotationCount();
+      browser.action.setTitle({
+        tabId,
+        title: formatActionTitle(total, current),
+      });
+    };
+
     if (!isTargetMatch(url, targets)) {
       // Clears any overlay left over from the previous URL. Needed for
       // client-side route changes, where the content script isn't
@@ -101,6 +116,7 @@ export default defineBackground(() => {
         .sendMessage(tabId, { type: HIDE_ANNOTATION_MESSAGE })
         .catch(() => {});
       clearAnnotationCountBadge(tabId);
+      updateTitle();
       return;
     }
 
@@ -119,6 +135,7 @@ export default defineBackground(() => {
         // skip this URL without a network round trip.
         await removeCachedTarget(url);
         clearAnnotationCountBadge(tabId);
+        updateTitle();
         return;
       }
       await browser.tabs.sendMessage(tabId, {
@@ -129,6 +146,7 @@ export default defineBackground(() => {
       // dark gray -- distinct from the red sync-error badge, which
       // signals a connection problem rather than note count.
       showAnnotationCountBadge(tabId, annotations.length);
+      updateTitle(annotations.length);
     } catch (err) {
       // A matched URL whose annotation body couldn't be loaded (e.g.
       // backend unreachable) is exactly the kind of silent failure the
@@ -136,6 +154,7 @@ export default defineBackground(() => {
       // no sticky note and have no idea why.
       console.error("[sticky-party] failed to fetch annotation", err);
       clearAnnotationCountBadge(tabId);
+      updateTitle();
     }
   };
 

@@ -9,6 +9,7 @@
 // error case to handle here.
 
 import { getAuthedPb } from "./pb";
+import { setCachedAnnotationCount } from "./annotationCountCache";
 import type { AnnotationData } from "./messages";
 
 // Returns the total annotation count across all targets, without
@@ -18,11 +19,18 @@ import type { AnnotationData } from "./messages";
 // with thousands of annotations. No filter is applied, so hidden
 // (hide: true) annotations are counted too -- this is a total count,
 // not a "visible notes" count.
+//
+// Also mirrors the result into annotationCountCache, so
+// background.ts's per-tab title update (see entrypoints/background.ts)
+// can read a denominator without its own network call on every page
+// navigation -- every existing caller of this function (App.tsx) keeps
+// that cache fresh for free.
 export async function fetchAnnotationCount(): Promise<number> {
   const pb = await getAuthedPb();
   const result = await pb.collection("annotations").getList(1, 1, {
     fields: "id",
   });
+  await setCachedAnnotationCount(result.totalItems);
   return result.totalItems;
 }
 
