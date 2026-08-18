@@ -51,7 +51,14 @@ export default function AnnotationBody(props: {
           <span class={line.checked ? "line-through opacity-60" : undefined}>
             <For each={line.tokens}>
               {(token) =>
-                token.type === "link" ? (
+                token.type === "image" ? (
+                  <img
+                    src={token.value}
+                    alt={token.alt || ""}
+                    loading="lazy"
+                    class="my-1 block max-w-full rounded"
+                  />
+                ) : token.type === "link" ? (
                   <a
                     href={token.value}
                     target="_blank"
