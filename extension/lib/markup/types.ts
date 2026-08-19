@@ -3,8 +3,9 @@
 // module declaring its own copy.
 
 export interface InlineToken {
-  type: "text" | "link" | "image";
-  // The URL for "link"/"image" tokens; the raw text for "text" tokens.
+  type: "text" | "link" | "image" | "iframe";
+  // The URL for "link"/"image" tokens, or the src for "iframe" tokens;
+  // the raw text for "text" tokens.
   value: string;
   // Alt text for "image" tokens (from `![alt](url)`); unused otherwise.
   alt?: string;

@@ -58,6 +58,28 @@ export default function AnnotationBody(props: {
                     loading="lazy"
                     class="my-1 block max-w-full rounded"
                   />
+                ) : token.type === "iframe" ? (
+                  // Nested iframe: this component already renders inside
+                  // the note's own extension-origin iframe (see the
+                  // file-level comment in entrypoints/content.ts), and a
+                  // YouTube player is just another iframe one level
+                  // deeper -- browsers support that natively. sandbox is
+                  // kept tight (no allow-forms/allow-top-navigation)
+                  // since src is already restricted to a trusted host
+                  // allowlist (see isAllowedIframeSrc in
+                  // lib/markup/inline.ts).
+                  <div class="my-1 aspect-video w-full overflow-hidden rounded">
+                    <iframe
+                      src={token.value}
+                      title="Embedded video"
+                      loading="lazy"
+                      class="h-full w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowfullscreen
+                      sandbox="allow-scripts allow-same-origin allow-presentation"
+                      referrerpolicy="strict-origin-when-cross-origin"
+                    />
+                  </div>
                 ) : token.type === "link" ? (
                   <a
                     href={token.value}
