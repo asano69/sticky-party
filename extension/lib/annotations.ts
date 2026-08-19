@@ -10,7 +10,7 @@
 
 import type PocketBase from "pocketbase";
 
-import { getAuthedPb, withReauth } from "./pb";
+import { withReauth } from "./pb";
 import { setCachedAnnotationCount } from "./annotationCountCache";
 import type { AnnotationData } from "./messages";
 

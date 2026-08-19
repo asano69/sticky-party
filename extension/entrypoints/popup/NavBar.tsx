@@ -1,5 +1,4 @@
 import { Show } from "solid-js";
-import { CARD } from "./classes";
 import { ToggleGroup } from "@kobalte/core/toggle-group";
 import { Button } from "@kobalte/core/button";
 import SquarePen from "lucide-solid/icons/square-pen";
