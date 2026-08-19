@@ -1268,6 +1268,21 @@ func init() {
 						"type": "text"
 					},
 					{
+						"autogeneratePattern": "",
+						"help": "",
+						"hidden": false,
+						"id": "text1483516233",
+						"max": 0,
+						"min": 0,
+						"name": "userName",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
 						"help": "",
 						"hidden": false,
 						"id": "select1204587666",
