@@ -250,9 +250,11 @@ export default function NoteContent() {
     e.preventDefault();
     const textarea = e.target;
     try {
-      const url = await uploadAttachment(current.id, blob);
+      const attachmentId = await uploadAttachment(current.id, blob);
       const { selectionStart, selectionEnd, value } = textarea;
-      const insertion = `![](${url})`;
+      // Embeds by attachment id, not URL -- see lib/markup/inline.ts
+      // and lib/attachments.ts's fetchAttachmentBlobUrl for why.
+      const insertion = `![[${attachmentId}]]`;
       const next =
         value.slice(0, selectionStart) + insertion + value.slice(selectionEnd);
       const cursor = selectionStart + insertion.length;

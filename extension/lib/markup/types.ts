@@ -3,9 +3,13 @@
 // module declaring its own copy.
 
 export interface InlineToken {
-  type: "text" | "bold" | "link" | "image" | "iframe";
-  // The URL for "link"/"image" tokens, the src for "iframe" tokens, or
-  // the raw text for "text"/"bold" tokens.
+  type: "text" | "bold" | "link" | "image" | "iframe" | "attachment";
+  // The URL for "link"/"image" tokens, the src for "iframe" tokens, the
+  // raw text for "text"/"bold" tokens, or the attachments-collection
+  // record id for "attachment" tokens. Deliberately never a URL for
+  // "attachment": the image bytes live behind an auth-gated viewRule,
+  // so only the id is stored and the actual fetch happens at render
+  // time with the viewer's own credentials (see AnnotationBody.tsx).
   value: string;
   // Alt text for "image" tokens (from `![alt](url)`); unused otherwise.
   alt?: string;

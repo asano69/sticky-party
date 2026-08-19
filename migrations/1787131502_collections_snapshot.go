@@ -1327,6 +1327,92 @@ func init() {
 				"type": "base",
 				"updateRule": "@request.auth.id != ''",
 				"viewRule": "@request.auth.id != ''"
+			},
+			{
+				"createRule": "@request.auth.id != ''",
+				"deleteRule": "@request.auth.id != ''",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"help": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pbc_2353526682",
+						"help": "",
+						"hidden": false,
+						"id": "relation776224498",
+						"maxSelect": 0,
+						"minSelect": 0,
+						"name": "annotation",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"help": "",
+						"hidden": false,
+						"id": "file2359244304",
+						"maxSelect": 0,
+						"maxSize": 0,
+						"mimeTypes": [
+							"image/png",
+							"image/jpeg",
+							"image/webp",
+							"image/gif",
+							"image/avif",
+							"image/bmp",
+							"image/heif"
+						],
+						"name": "image",
+						"presentable": false,
+						"protected": true,
+						"required": false,
+						"system": false,
+						"thumbs": null,
+						"type": "file"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_3073759650",
+				"indexes": [],
+				"listRule": "@request.auth.id != ''",
+				"name": "attachments",
+				"system": false,
+				"type": "base",
+				"updateRule": "@request.auth.id != ''",
+				"viewRule": "@request.auth.id != ''"
 			}
 		]`
 

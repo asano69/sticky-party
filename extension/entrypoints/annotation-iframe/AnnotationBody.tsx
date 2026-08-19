@@ -3,10 +3,37 @@
 // ("- [ ] ..." / "- [x] ...") get a checkbox instead, and http(s) URLs
 // become clickable links.
 
-import { createResource, For, Show } from "solid-js";
+import { createResource, For, onCleanup, Show } from "solid-js";
 
 import { parseLines } from "../../lib/markup";
 import { getSettings } from "../../lib/settings";
+import { fetchAttachmentBlobUrl } from "../../lib/attachments";
+
+// Renders a single "attachment" token (![[id]], see
+// lib/markup/inline.ts) by fetching its image bytes with the viewer's
+// own credentials and displaying it as a Blob URL -- never a plain
+// <img src="pocketbase-file-url">, which wouldn't carry PocketBase's
+// auth headers and would be rejected by the attachments collection's
+// auth-gated viewRule. The Blob URL is revoked on cleanup so repeated
+// mounts (e.g. toggling blur) don't leak memory.
+function AttachmentImage(props: { attachmentId: string }) {
+  const [blobUrl] = createResource(
+    () => props.attachmentId,
+    fetchAttachmentBlobUrl,
+  );
+  onCleanup(() => {
+    const url = blobUrl();
+    if (url) URL.revokeObjectURL(url);
+  });
+
+  return (
+    <Show when={blobUrl()}>
+      {(url) => (
+        <img src={url()} loading="lazy" class="my-1 block max-w-full rounded" />
+      )}
+    </Show>
+  );
+}
 
 export default function AnnotationBody(props: {
   body: string;
@@ -56,7 +83,9 @@ export default function AnnotationBody(props: {
           <span class={line.checked ? "line-through opacity-60" : undefined}>
             <For each={line.tokens}>
               {(token) =>
-                token.type === "image" ? (
+                token.type === "attachment" ? (
+                  <AttachmentImage attachmentId={token.value} />
+                ) : token.type === "image" ? (
                   <img
                     src={token.value}
                     alt={token.alt || ""}

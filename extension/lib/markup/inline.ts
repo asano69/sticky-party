@@ -58,8 +58,16 @@ function extractIframeDimensions(tag: string): {
 // starting position. Only single-line <iframe>...</iframe> tags are
 // matched, since blocks.ts splits the body into lines before this runs
 // on each one.
+// Attachment embeds use double-bracket syntax (![[id]]), distinct from
+// markdown image syntax (![alt](url)) so the two never compete for the
+// same starting position -- image syntax requires "](" after the alt
+// text, which "![[id]]" never has. The id itself is the attachments-
+// collection record id (see lib/attachments.ts's uploadAttachment),
+// never a URL: the image bytes are auth-gated, so only the id is
+// stored here and the actual authenticated fetch happens at render
+// time (see AnnotationBody.tsx).
 const TOKEN_PATTERN =
-  /\*\*([^*]+)\*\*|!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|<iframe\b[^>]*\bsrc=["'](https?:\/\/[^"']+)["'][^>]*>[\s\S]*?<\/iframe>|(https?:\/\/\S+)/gi;
+  /\*\*([^*]+)\*\*|!\[\[([a-zA-Z0-9]+)\]\]|!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|<iframe\b[^>]*\bsrc=["'](https?:\/\/[^"']+)["'][^>]*>[\s\S]*?<\/iframe>|(https?:\/\/\S+)/gi;
 
 export function parseInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
@@ -74,22 +82,26 @@ export function parseInline(text: string): InlineToken[] {
       // Bold syntax: **text**. Deliberately flat (no nested markup
       // inside bold), matching this parser's simplicity-first approach.
       tokens.push({ type: "bold", value: match[1] });
-    } else if (match[3] !== undefined) {
-      // Image syntax: ![alt](url) -- match[2] is the alt text, match[3]
+    } else if (match[2] !== undefined) {
+      // Attachment embed: ![[id]] -- match[2] is the attachments-
+      // collection record id.
+      tokens.push({ type: "attachment", value: match[2] });
+    } else if (match[4] !== undefined) {
+      // Image syntax: ![alt](url) -- match[3] is the alt text, match[4]
       // is the URL.
-      tokens.push({ type: "image", value: match[3], alt: match[2] });
-    } else if (match[5] !== undefined) {
-      // Markdown link syntax: [label](url) -- match[4] is the display
-      // text, match[5] is the URL.
-      tokens.push({ type: "link", value: match[5], label: match[4] });
+      tokens.push({ type: "image", value: match[4], alt: match[3] });
     } else if (match[6] !== undefined) {
-      // <iframe src="..."> embed -- match[6] is the src. Falls back to
+      // Markdown link syntax: [label](url) -- match[5] is the display
+      // text, match[6] is the URL.
+      tokens.push({ type: "link", value: match[6], label: match[5] });
+    } else if (match[7] !== undefined) {
+      // <iframe src="..."> embed -- match[7] is the src. Falls back to
       // rendering the raw tag text if the host isn't on the allowlist,
       // rather than silently dropping it or embedding an untrusted origin.
-      if (isAllowedIframeSrc(match[6])) {
+      if (isAllowedIframeSrc(match[7])) {
         tokens.push({
           type: "iframe",
-          value: match[6],
+          value: match[7],
           ...extractIframeDimensions(match[0]),
         });
       } else {
@@ -97,7 +109,7 @@ export function parseInline(text: string): InlineToken[] {
       }
     } else {
       // Bare http(s) URL, no markdown syntax around it.
-      tokens.push({ type: "link", value: match[7] });
+      tokens.push({ type: "link", value: match[8] });
     }
     lastIndex = start + match[0].length;
   }
