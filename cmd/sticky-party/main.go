@@ -37,6 +37,7 @@ func main() {
 
 		serveCmd(app),
 		pbcmd.NewSuperuserCommand(app),
+		userUpsertCmd(app),
 	)
 
 	if err := app.Execute(); err != nil {
