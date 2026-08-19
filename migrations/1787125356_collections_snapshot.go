@@ -616,8 +616,8 @@ func init() {
 					"body": "<p>Hello,</p>\n<p>Click on the button below to confirm your new email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-email-change/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm new email</a>\n</p>\n<p><i>If you didn't ask to change your email address, please ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
 					"subject": "Confirm your {APP_NAME} new email address"
 				},
-				"createRule": "",
-				"deleteRule": "id = @request.auth.id",
+				"createRule": null,
+				"deleteRule": null,
 				"emailChangeToken": {
 					"duration": 1800
 				},
@@ -763,7 +763,7 @@ func init() {
 					"CREATE UNIQUE INDEX ` + "`" + `idx_tokenKey__pb_users_auth_` + "`" + ` ON ` + "`" + `users` + "`" + ` (` + "`" + `tokenKey` + "`" + `)",
 					"CREATE UNIQUE INDEX ` + "`" + `idx_email__pb_users_auth_` + "`" + ` ON ` + "`" + `users` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''"
 				],
-				"listRule": "id = @request.auth.id",
+				"listRule": null,
 				"manageRule": null,
 				"mfa": {
 					"duration": 600,
@@ -804,7 +804,7 @@ func init() {
 				},
 				"system": false,
 				"type": "auth",
-				"updateRule": "id = @request.auth.id",
+				"updateRule": null,
 				"verificationTemplate": {
 					"body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Click on the button below to verify your email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-verification/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Verify</a>\n</p>\n<p><i>If you didn't recently register, please ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
 					"subject": "Verify your {APP_NAME} email"
@@ -812,11 +812,11 @@ func init() {
 				"verificationToken": {
 					"duration": 86400
 				},
-				"viewRule": "id = @request.auth.id"
+				"viewRule": null
 			},
 			{
-				"createRule": null,
-				"deleteRule": null,
+				"createRule": "@request.auth.id != ''",
+				"deleteRule": "@request.auth.id != ''",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -886,16 +886,16 @@ func init() {
 				],
 				"id": "pbc_2769025244",
 				"indexes": [],
-				"listRule": null,
+				"listRule": "@request.auth.id != ''",
 				"name": "settings",
 				"system": false,
 				"type": "base",
-				"updateRule": null,
-				"viewRule": null
+				"updateRule": "@request.auth.id != ''",
+				"viewRule": "@request.auth.id != ''"
 			},
 			{
-				"createRule": "",
-				"deleteRule": "",
+				"createRule": "@request.auth.id != ''",
+				"deleteRule": "@request.auth.id != ''",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -1067,16 +1067,16 @@ func init() {
 				],
 				"id": "pbc_2353526682",
 				"indexes": [],
-				"listRule": "",
+				"listRule": "@request.auth.id != ''",
 				"name": "annotations",
 				"system": false,
 				"type": "base",
-				"updateRule": "",
-				"viewRule": ""
+				"updateRule": "@request.auth.id != ''",
+				"viewRule": "@request.auth.id != ''"
 			},
 			{
-				"createRule": "",
-				"deleteRule": "",
+				"createRule": "@request.auth.id != ''",
+				"deleteRule": "@request.auth.id != ''",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -1211,16 +1211,16 @@ func init() {
 				"indexes": [
 					"CREATE UNIQUE INDEX ` + "`" + `idx_4ff9gi82nk` + "`" + ` ON ` + "`" + `positions` + "`" + ` (\n  ` + "`" + `annotation` + "`" + `,\n  ` + "`" + `user` + "`" + `\n)"
 				],
-				"listRule": "",
+				"listRule": "@request.auth.id != ''",
 				"name": "positions",
 				"system": false,
 				"type": "base",
-				"updateRule": "",
-				"viewRule": ""
+				"updateRule": "@request.auth.id != ''",
+				"viewRule": "@request.auth.id != ''"
 			},
 			{
-				"createRule": "",
-				"deleteRule": "",
+				"createRule": "@request.auth.id != ''",
+				"deleteRule": "@request.auth.id != ''",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -1256,25 +1256,10 @@ func init() {
 						"autogeneratePattern": "",
 						"help": "",
 						"hidden": false,
-						"id": "text23752761052",
-						"max": 0,
-						"min": 0,
-						"name": "user",
-						"pattern": "",
-						"presentable": false,
-						"primaryKey": false,
-						"required": false,
-						"system": false,
-						"type": "text"
-					},
-					{
-						"autogeneratePattern": "",
-						"help": "",
-						"hidden": false,
 						"id": "text2375276105",
 						"max": 0,
 						"min": 0,
-						"name": "userName",
+						"name": "user",
 						"pattern": "",
 						"presentable": false,
 						"primaryKey": false,
@@ -1321,12 +1306,12 @@ func init() {
 				],
 				"id": "pbc_3068727201",
 				"indexes": [],
-				"listRule": "",
+				"listRule": "@request.auth.id != ''",
 				"name": "histories",
 				"system": false,
 				"type": "base",
-				"updateRule": "",
-				"viewRule": ""
+				"updateRule": "@request.auth.id != ''",
+				"viewRule": "@request.auth.id != ''"
 			}
 		]`
 
