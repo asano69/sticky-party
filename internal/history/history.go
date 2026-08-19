@@ -85,6 +85,14 @@ func record(app core.App, annotation *core.Record, actor *core.Record, action st
 		return err
 	}
 
+	// Snapshotted at write time -- see the func comment above. Falls
+	// back to the user's id if they have no display name set, so the
+	// row is never blank.
+	name := actor.GetString("name")
+	if name == "" {
+		name = actor.Id
+	}
+
 	// Only consecutive "update" actions are ever collapsed into one
 	// row. A "create" always gets its own permanent row (so the fact
 	// that an annotation was created is never silently absorbed by a
@@ -104,6 +112,11 @@ func record(app core.App, annotation *core.Record, actor *core.Record, action st
 				row.GetString("user") == actor.Id &&
 				time.Since(row.GetDateTime("updated").Time()) < mergeWindow {
 				row.Set("action", action)
+				// Refreshes the name too, in case the actor renamed
+				// themselves partway through this merge window --
+				// otherwise the merged row could keep showing a name
+				// that no longer matches this user.
+				row.Set("userName", name)
 				return app.Save(row)
 			}
 		}
@@ -117,13 +130,6 @@ func record(app core.App, annotation *core.Record, actor *core.Record, action st
 	// information a "delete" history row exists to preserve.
 	row.Set("annotationId", annotation.Id)
 	row.Set("user", actor.Id)
-	// Snapshotted at write time -- see the func comment above. Falls
-	// back to the user's id if they have no display name set, so the
-	// row is never blank.
-	name := actor.GetString("name")
-	if name == "" {
-		name = actor.Id
-	}
 	row.Set("userName", name)
 	row.Set("action", action)
 	return app.Save(row)
