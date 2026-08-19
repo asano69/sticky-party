@@ -154,7 +154,9 @@ export default function NoteMain(props: {
                           <td class="pr-2 align-top">{entry.userName}</td>
                           <td
                             class="align-top"
-                            classList={{ "font-bold": entry.action === "create" }}
+                            classList={{
+                              "font-bold": entry.action === "create",
+                            }}
                           >
                             {entry.action}
                           </td>

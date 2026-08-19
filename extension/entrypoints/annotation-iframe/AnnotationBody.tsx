@@ -64,23 +64,8 @@ export default function AnnotationBody(props: {
                     class="my-1 block max-w-full rounded"
                   />
                 ) : token.type === "iframe" ? (
-                  // Nested iframe: this component already renders inside
-                  // the note's own extension-origin iframe (see the
-                  // file-level comment in entrypoints/content.ts). The
-                  // target isn't loaded directly, though -- some embed
-                  // providers (YouTube in particular) refuse to serve
-                  // into a chrome-extension:// parent regardless of the
-                  // video's own embed settings. Routing through the
-                  // backend's /embed proxy (internal/serve/handler.go)
-                  // gives the target iframe a normal https origin as its
-                  // direct parent instead, which those providers accept.
                   <Show when={settings()?.backendUrl}>
                     {(backendUrl) => (
-                      // Aspect ratio comes from the pasted tag's own
-                      // width/height attributes when available (see
-                      // lib/markup/inline.ts), so a near-square Google
-                      // Maps embed isn't forced into YouTube's 16:9.
-                      // Falls back to 16:9 when the tag had no dimensions.
                       <div
                         class="my-1 w-full overflow-hidden rounded"
                         style={{
@@ -108,13 +93,15 @@ export default function AnnotationBody(props: {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    {token.value}
+                    {token.label ?? token.value}
                   </a>
+                ) : token.type === "bold" ? (
+                  <strong>{token.value}</strong>
                 ) : (
                   token.value
                 )
               }
-            </For>
+            </For>{" "}
           </span>
         </div>
       )}

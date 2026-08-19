@@ -3,12 +3,16 @@
 // module declaring its own copy.
 
 export interface InlineToken {
-  type: "text" | "link" | "image" | "iframe";
-  // The URL for "link"/"image" tokens, or the src for "iframe" tokens;
-  // the raw text for "text" tokens.
+  type: "text" | "bold" | "link" | "image" | "iframe";
+  // The URL for "link"/"image" tokens, the src for "iframe" tokens, or
+  // the raw text for "text"/"bold" tokens.
   value: string;
   // Alt text for "image" tokens (from `![alt](url)`); unused otherwise.
   alt?: string;
+  // Display text for "link" tokens written as `[label](url)`; unused
+  // otherwise. When absent, the link's own URL (value) is shown as the
+  // text, matching a bare http(s) URL with no markdown syntax.
+  label?: string;
   // Width/height (in px) read from the pasted <iframe> tag's own
   // width/height attributes, if present. Used to preserve the embed's
   // original aspect ratio (e.g. Google Maps' near-square embeds vs

@@ -41,18 +41,25 @@ function extractIframeDimensions(tag: string): {
   };
 }
 
-// Matches markdown image syntax (![alt](url)), a pasted YouTube <iframe>
-// embed tag, or a bare http(s) URL up to the next whitespace character --
+// Matches bold syntax (**text**), markdown image syntax (![alt](url)),
+// markdown link syntax ([label](url)), a pasted YouTube <iframe> embed
+// tag, or a bare http(s) URL up to the next whitespace character --
 // whichever comes first. Combined into a single pattern -- rather than
 // running separate passes -- so each match's own URL/src is consumed as
 // part of that match and never also matched by the bare-URL alternative
-// afterward. The URL inside the image parens stops at the first ")" or
-// whitespace (not greedy to the next whitespace like the bare-URL case),
-// so a normal closing paren isn't swallowed into the URL itself. Only
-// single-line <iframe>...</iframe> tags are matched, since blocks.ts
-// splits the body into lines before this runs on each one.
+// afterward. The URL inside the image/link parens stops at the first
+// ")" or whitespace (not greedy to the next whitespace like the
+// bare-URL case), so a normal closing paren isn't swallowed into the
+// URL itself. The image alternative is listed before the plain-link
+// alternative so `![alt](url)` is consumed whole rather than the link
+// alternative matching the `[alt](url)` part on its own -- but since
+// the image alternative requires a leading "!" and the link
+// alternative doesn't, the two never actually compete for the same
+// starting position. Only single-line <iframe>...</iframe> tags are
+// matched, since blocks.ts splits the body into lines before this runs
+// on each one.
 const TOKEN_PATTERN =
-  /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)|<iframe\b[^>]*\bsrc=["'](https?:\/\/[^"']+)["'][^>]*>[\s\S]*?<\/iframe>|(https?:\/\/\S+)/gi;
+  /\*\*([^*]+)\*\*|!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|<iframe\b[^>]*\bsrc=["'](https?:\/\/[^"']+)["'][^>]*>[\s\S]*?<\/iframe>|(https?:\/\/\S+)/gi;
 
 export function parseInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
@@ -63,25 +70,34 @@ export function parseInline(text: string): InlineToken[] {
     if (start > lastIndex) {
       tokens.push({ type: "text", value: text.slice(lastIndex, start) });
     }
-    if (match[2] !== undefined) {
-      // Image syntax: ![alt](url) -- match[1] is the alt text, match[2]
-      // is the URL.
-      tokens.push({ type: "image", value: match[2], alt: match[1] });
+    if (match[1] !== undefined) {
+      // Bold syntax: **text**. Deliberately flat (no nested markup
+      // inside bold), matching this parser's simplicity-first approach.
+      tokens.push({ type: "bold", value: match[1] });
     } else if (match[3] !== undefined) {
-      // <iframe src="..."> embed -- match[3] is the src. Falls back to
+      // Image syntax: ![alt](url) -- match[2] is the alt text, match[3]
+      // is the URL.
+      tokens.push({ type: "image", value: match[3], alt: match[2] });
+    } else if (match[5] !== undefined) {
+      // Markdown link syntax: [label](url) -- match[4] is the display
+      // text, match[5] is the URL.
+      tokens.push({ type: "link", value: match[5], label: match[4] });
+    } else if (match[6] !== undefined) {
+      // <iframe src="..."> embed -- match[6] is the src. Falls back to
       // rendering the raw tag text if the host isn't on the allowlist,
       // rather than silently dropping it or embedding an untrusted origin.
-      if (isAllowedIframeSrc(match[3])) {
+      if (isAllowedIframeSrc(match[6])) {
         tokens.push({
           type: "iframe",
-          value: match[3],
+          value: match[6],
           ...extractIframeDimensions(match[0]),
         });
       } else {
         tokens.push({ type: "text", value: match[0] });
       }
     } else {
-      tokens.push({ type: "link", value: match[4] });
+      // Bare http(s) URL, no markdown syntax around it.
+      tokens.push({ type: "link", value: match[7] });
     }
     lastIndex = start + match[0].length;
   }
