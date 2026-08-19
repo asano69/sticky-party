@@ -61,7 +61,17 @@ func embedHandler() func(re *core.RequestEvent) error {
 		// session/cookie data of its own (src is just echoed into an iframe
 		// attribute), so relaxing framing here doesn't expose anything.
 		re.Response.Header().Del("X-Frame-Options")
-		re.Response.Header().Set("Content-Security-Policy", "frame-ancestors *")
+		// Chrome, unlike Firefox, does NOT let the "*" wildcard match
+		// extension schemes (chrome-extension:/moz-extension:) -- per
+		// spec, "*" only matches network schemes (http/https/ws/wss) or
+		// a scheme matching `self`. Without explicit scheme-sources for
+		// the extension schemes, Chrome blocks this page from being
+		// framed inside the annotation-iframe (chrome-extension://...)
+		// even though Firefox allowed it. Listing "chrome-extension:"/
+		// "moz-extension:" as bare scheme-sources permits any origin of
+		// that scheme, regardless of the specific extension id (which
+		// varies per install/browser and isn't known server-side).
+		re.Response.Header().Set("Content-Security-Policy", "frame-ancestors * chrome-extension: moz-extension:")
 		re.Response.Header().Set("Content-Type", "text/html; charset=utf-8")
 		return embedTemplate.Execute(re.Response, struct{ Src string }{Src: u.String()})
 	}
