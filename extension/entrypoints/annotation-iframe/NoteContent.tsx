@@ -6,6 +6,7 @@ import {
   setAnnotationHide,
   updateAnnotation,
 } from "../../lib/annotations";
+import { uploadAttachment } from "../../lib/attachments";
 import { fetchHistory } from "../../lib/history";
 import { toggleTaskLine } from "../../lib/markup";
 import { continueListOnEnter } from "../../lib/listContinuation";
@@ -232,6 +233,40 @@ export default function NoteContent() {
     }
   };
 
+  // Uploads a pasted clipboard image and inserts its markdown image
+  // syntax at the cursor. Mutates the textarea directly first (same
+  // pattern as lib/listContinuation.ts's continueListOnEnter), then
+  // syncs the draft signal -- Solid leaves an already-matching value's
+  // caret untouched, so the DOM write has to happen regardless.
+  const handlePasteImage = async (e: ClipboardEvent) => {
+    const item = [...(e.clipboardData?.items ?? [])].find((i) =>
+      i.type.startsWith("image/"),
+    );
+    if (!item) return; // No image on the clipboard -- let normal text paste proceed.
+    const blob = item.getAsFile();
+    const current = annotation();
+    if (!blob || !current || !(e.target instanceof HTMLTextAreaElement)) return;
+
+    e.preventDefault();
+    const textarea = e.target;
+    try {
+      const url = await uploadAttachment(current.id, blob);
+      const { selectionStart, selectionEnd, value } = textarea;
+      const insertion = `![](${url})`;
+      const next =
+        value.slice(0, selectionStart) + insertion + value.slice(selectionEnd);
+      const cursor = selectionStart + insertion.length;
+
+      textarea.value = next;
+      textarea.selectionStart = textarea.selectionEnd = cursor;
+      setDraft(next);
+      contentHeight.resizeTextarea();
+      contentHeight.reportContentHeight();
+    } catch (err) {
+      console.error("[sticky-party] failed to upload pasted image", err);
+    }
+  };
+
   return (
     // The loading state is now shown by content.ts (which owns the
     // wrapper on the host page), so this Show has no fallback -- while
@@ -273,6 +308,7 @@ export default function NoteContent() {
             onDraftChange={setDraft}
             saving={saving()}
             onKeyDown={onEditorKeyDown}
+            onPaste={handlePasteImage}
             onStartEditBody={() => startEdit("body")}
             setContentRef={contentHeight.setContentRef}
             setTextareaRef={contentHeight.setTextareaRef}

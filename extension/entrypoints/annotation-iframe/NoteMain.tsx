@@ -33,6 +33,11 @@ export default function NoteMain(props: {
   onDraftChange: (value: string) => void;
   saving: boolean;
   onKeyDown: (e: KeyboardEvent) => void;
+  // Handles a clipboard paste on the body textarea: uploads a pasted
+  // image and inserts its markdown image syntax at the cursor, or does
+  // nothing (letting the browser's normal text paste proceed) when the
+  // clipboard has no image. See NoteContent.tsx's handlePasteImage.
+  onPaste: (e: ClipboardEvent) => void;
   onStartEditBody: () => void;
   setContentRef: (el: HTMLDivElement) => void;
   setTextareaRef: (el: HTMLTextAreaElement) => void;
@@ -89,6 +94,7 @@ export default function NoteMain(props: {
                 rows={1}
                 onInput={props.resizeTextarea}
                 onKeyDown={props.onKeyDown}
+                onPaste={props.onPaste}
                 // No min-h-full here: that would pin the textarea to
                 // the note's current (possibly larger, e.g. from a
                 // previous longer draft) height, preventing it from
