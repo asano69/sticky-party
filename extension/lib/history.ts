@@ -28,14 +28,17 @@ export async function fetchHistory(
     // internal/history), so the list's order agrees with which row a
     // new edit would actually merge into.
     sort: "-updated",
-    expand: "user",
   });
+  // userName is snapshotted onto the row at write time (see
+  // internal/history), not resolved via a "user" relation -- the
+  // "users" collection's viewRule only lets a person see their own
+  // record, so expanding "user" here would show every other person as
+  // unknown. The fallback only matters for rows written before this
+  // field existed.
   return records.map((record) => ({
     id: record.id,
     action: record.action,
     updated: record.updated,
-    // Falls back when the user was deleted (expand comes back empty)
-    // or has no name set.
-    userName: record.expand?.user?.name || "unknown",
+    userName: record.userName || "unknown",
   }));
 }

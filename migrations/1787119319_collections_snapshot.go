@@ -1253,18 +1253,19 @@ func init() {
 						"type": "text"
 					},
 					{
-						"cascadeDelete": false,
-						"collectionId": "_pb_users_auth_",
+						"autogeneratePattern": "",
 						"help": "",
 						"hidden": false,
-						"id": "relation2375276105",
-						"maxSelect": 0,
-						"minSelect": 0,
+						"id": "text2375276105",
+						"max": 0,
+						"min": 0,
 						"name": "user",
+						"pattern": "",
 						"presentable": false,
+						"primaryKey": false,
 						"required": false,
 						"system": false,
-						"type": "relation"
+						"type": "text"
 					},
 					{
 						"help": "",

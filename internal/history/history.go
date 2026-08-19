@@ -65,6 +65,13 @@ func Register(app core.App) {
 // into the most recent row for this annotation when it was written by
 // the same person within mergeWindow (see the package doc for why
 // deletes are excluded from this).
+//
+// The actor's display name is snapshotted into the row at write time
+// (rather than resolved later via a "user" relation) so the history
+// list never needs to read the "users" collection. That collection's
+// viewRule only allows a user to see their own record, so any other
+// approach (e.g. expanding a relation) would silently show other
+// users as unknown to anyone but themselves.
 func record(app core.App, annotation *core.Record, actor *core.Record, action string) error {
 	if actor == nil {
 		// Annotations require auth to write, so this should not happen
@@ -110,6 +117,14 @@ func record(app core.App, annotation *core.Record, actor *core.Record, action st
 	// information a "delete" history row exists to preserve.
 	row.Set("annotationId", annotation.Id)
 	row.Set("user", actor.Id)
+	// Snapshotted at write time -- see the func comment above. Falls
+	// back to the user's id if they have no display name set, so the
+	// row is never blank.
+	name := actor.GetString("name")
+	if name == "" {
+		name = actor.Id
+	}
+	row.Set("userName", name)
 	row.Set("action", action)
 	return app.Save(row)
 }
