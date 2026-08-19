@@ -10,6 +10,7 @@
 import { Show } from "solid-js";
 import Trash from "lucide-solid/icons/trash";
 import Shredder from "lucide-solid/icons/shredder";
+import Info from "lucide-solid/icons/info";
 import { Button } from "@kobalte/core/button";
 import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
 import type { NoteColor } from "../../lib/colors";
@@ -25,6 +26,7 @@ export default function NoteFooter(props: {
   color: NoteColor;
   togglingColor: boolean;
   onColorChange: (color: NoteColor) => void;
+  onShowHistory: () => void;
 }) {
   return (
     <footer
@@ -55,6 +57,16 @@ export default function NoteFooter(props: {
         onColorChange={props.onColorChange}
         colorDisabled={props.togglingColor}
       />
+      {/* marginLeft: auto pins this to the footer's right edge, away
+          from the delete/appearance controls on the left. */}
+      <Button
+        class="sticky-party-icon-btn ml-auto flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
+        onMouseDown={(e: MouseEvent) => e.preventDefault()}
+        onClick={props.onShowHistory}
+        aria-label="Show edit history"
+      >
+        <Info size={16} />
+      </Button>
     </footer>
   );
 }

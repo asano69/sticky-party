@@ -4,12 +4,27 @@
 // docs/note-sizing.md for how this area's height is measured -- that
 // logic lives in useContentHeight.ts, not here).
 
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
 import Lock from "lucide-solid/icons/eye-off";
 import { TextField } from "@kobalte/core/text-field";
 import { Button } from "@kobalte/core/button";
 import type { AnnotationData } from "../../lib/messages";
+import type { HistoryEntry } from "../../lib/history";
 import AnnotationBody from "./AnnotationBody";
+
+// Formats a history entry's timestamp as "YYYY-MM-DD HH:MM" in the
+// viewer's local time zone. Deliberately not using
+// toLocaleString()/Intl here: locale-dependent formatting would vary
+// the date order and separators between viewers, which isn't wanted
+// for this compact, fixed-width history list.
+function formatHistoryDate(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
 
 export default function NoteMain(props: {
   note: AnnotationData;
@@ -27,6 +42,10 @@ export default function NoteMain(props: {
   onLockClick: () => void;
   onLockDblClick: () => void;
   onToggleTask: (lineIndex: number) => void;
+  // Edit-history panel, opened from the footer's info button (see
+  // NoteFooter.tsx). undefined while the fetch is still in flight.
+  historyOpen: boolean;
+  historyEntries: HistoryEntry[] | undefined;
 }) {
   return (
     // position:relative so the lock-overlay button below can be
@@ -106,6 +125,47 @@ export default function NoteMain(props: {
           >
             <Lock size={20} />
           </Button>
+        </div>
+      </Show>
+
+      {/* Covers the whole main area (not appended below it), so
+          opening history never grows the note -- content.ts sizes the
+          wrapper off contentHeight alone, which this panel never
+          touches. Scrolls internally instead. */}
+      <Show when={props.historyOpen}>
+        <div class="absolute inset-0 z-10 overflow-y-auto bg-[color:var(--note-bg)] px-2.5 py-1.5 text-[0.85em]">
+          <Show
+            when={props.historyEntries}
+            fallback={<p class="opacity-60">Loading history…</p>}
+          >
+            {(entries) => (
+              <Show
+                when={entries().length > 0}
+                fallback={<p class="opacity-60">No history yet.</p>}
+              >
+                <table class="w-full border-collapse text-left">
+                  <tbody>
+                    <For each={entries()}>
+                      {(entry) => (
+                        <tr>
+                          <td class="whitespace-nowrap pr-2 align-top">
+                            {formatHistoryDate(entry.updated)}
+                          </td>
+                          <td class="pr-2 align-top">{entry.userName}</td>
+                          <td
+                            class="align-top"
+                            classList={{ "font-bold": entry.action === "create" }}
+                          >
+                            {entry.action}
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </Show>
+            )}
+          </Show>
         </div>
       </Show>
     </main>

@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, Show } from "solid-js";
+import { createResource, createSignal, onCleanup, Show } from "solid-js";
 
 import {
   deleteAnnotation,
@@ -6,6 +6,7 @@ import {
   setAnnotationHide,
   updateAnnotation,
 } from "../../lib/annotations";
+import { fetchHistory } from "../../lib/history";
 import { toggleTaskLine } from "../../lib/markup";
 import { continueListOnEnter } from "../../lib/listContinuation";
 import type { AnnotationData } from "../../lib/messages";
@@ -62,6 +63,16 @@ export default function NoteContent() {
   // silently doing nothing.
   const [shaking, setShaking] = createSignal(false);
   let shakeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  // Edit-history panel (see NoteMain.tsx), toggled by the footer's
+  // info button. The resource only fetches while historyOpen() is
+  // true, and re-fetches on every reopen, so the list stays current
+  // without polling while closed.
+  const [historyOpen, setHistoryOpen] = createSignal(false);
+  const [history] = createResource(
+    () => (historyOpen() ? annotation()?.id : undefined),
+    (id) => fetchHistory(id),
+  );
 
   let titleInputRef: HTMLInputElement | undefined;
 
@@ -271,6 +282,8 @@ export default function NoteContent() {
             onLockClick={triggerShake}
             onLockDblClick={() => setRevealed(true)}
             onToggleTask={handleToggleTask}
+            historyOpen={historyOpen()}
+            historyEntries={history()}
           />
 
           {/* Footer only appears while editing, so a casual click can
@@ -293,6 +306,7 @@ export default function NoteContent() {
               }
               togglingColor={togglingColor()}
               onColorChange={handleColorChange}
+              onShowHistory={() => setHistoryOpen((open) => !open)}
             />
           </Show>
         </div>

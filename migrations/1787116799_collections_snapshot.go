@@ -1219,8 +1219,8 @@ func init() {
 				"viewRule": ""
 			},
 			{
-				"createRule": null,
-				"deleteRule": null,
+				"createRule": "",
+				"deleteRule": "",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -1238,6 +1238,21 @@ func init() {
 						"type": "text"
 					},
 					{
+						"autogeneratePattern": "",
+						"help": "",
+						"hidden": false,
+						"id": "text3765828692",
+						"max": 0,
+						"min": 0,
+						"name": "annotationId",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"help": "",
@@ -1246,20 +1261,6 @@ func init() {
 						"maxSelect": 0,
 						"minSelect": 0,
 						"name": "user",
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "relation"
-					},
-					{
-						"cascadeDelete": false,
-						"collectionId": "pbc_2353526682",
-						"help": "",
-						"hidden": false,
-						"id": "relation776224498",
-						"maxSelect": 0,
-						"minSelect": 0,
-						"name": "annotation",
 						"presentable": false,
 						"required": false,
 						"system": false,
@@ -1304,12 +1305,12 @@ func init() {
 				],
 				"id": "pbc_3068727201",
 				"indexes": [],
-				"listRule": null,
+				"listRule": "",
 				"name": "histories",
 				"system": false,
 				"type": "base",
-				"updateRule": null,
-				"viewRule": null
+				"updateRule": "",
+				"viewRule": ""
 			}
 		]`
 

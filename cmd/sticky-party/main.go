@@ -8,6 +8,8 @@ import (
 
 	_ "github.com/asano69/sticky-party/migrations"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
+
+	"github.com/asano69/sticky-party/internal/history"
 )
 
 func main() {
@@ -20,6 +22,10 @@ func main() {
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
 		Automigrate: false,
 	})
+
+	// Writes an audit trail into "histories" for every annotation
+	// create/update/delete -- see internal/history for the merge rule.
+	history.Register(app)
 
 	root := app.RootCmd
 	root.Use = "sticky-party"
