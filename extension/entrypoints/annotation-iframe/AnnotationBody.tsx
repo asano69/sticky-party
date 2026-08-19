@@ -3,9 +3,10 @@
 // ("- [ ] ..." / "- [x] ...") get a checkbox instead, and http(s) URLs
 // become clickable links.
 
-import { For, Show } from "solid-js";
+import { createResource, For, Show } from "solid-js";
 
 import { parseLines } from "../../lib/markup";
+import { getSettings } from "../../lib/settings";
 
 export default function AnnotationBody(props: {
   body: string;
@@ -15,6 +16,10 @@ export default function AnnotationBody(props: {
   // lib/markup's TASK_PATTERN.
   onToggleTask?: (lineIndex: number) => void;
 }) {
+  // Needed to build the /embed proxy URL for iframe tokens below -- see
+  // that block's comment for why the proxy exists at all.
+  const [settings] = createResource(getSettings);
+
   return (
     <For each={parseLines(props.body)}>
       {(line, index) => (
@@ -61,25 +66,29 @@ export default function AnnotationBody(props: {
                 ) : token.type === "iframe" ? (
                   // Nested iframe: this component already renders inside
                   // the note's own extension-origin iframe (see the
-                  // file-level comment in entrypoints/content.ts), and a
-                  // YouTube player is just another iframe one level
-                  // deeper -- browsers support that natively. sandbox is
-                  // kept tight (no allow-forms/allow-top-navigation)
-                  // since src is already restricted to a trusted host
-                  // allowlist (see isAllowedIframeSrc in
-                  // lib/markup/inline.ts).
-                  <div class="my-1 aspect-video w-full overflow-hidden rounded">
-                    <iframe
-                      src={token.value}
-                      title="Embedded video"
-                      loading="lazy"
-                      class="h-full w-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowfullscreen
-                      sandbox="allow-scripts allow-same-origin allow-presentation"
-                      referrerpolicy="strict-origin-when-cross-origin"
-                    />
-                  </div>
+                  // file-level comment in entrypoints/content.ts). The
+                  // target isn't loaded directly, though -- some embed
+                  // providers (YouTube in particular) refuse to serve
+                  // into a chrome-extension:// parent regardless of the
+                  // video's own embed settings. Routing through the
+                  // backend's /embed proxy (internal/serve/handler.go)
+                  // gives the target iframe a normal https origin as its
+                  // direct parent instead, which those providers accept.
+                  <Show when={settings()?.backendUrl}>
+                    {(backendUrl) => (
+                      <div class="my-1 aspect-video w-full overflow-hidden rounded">
+                        <iframe
+                          src={`${backendUrl()}/embed?src=${encodeURIComponent(token.value)}`}
+                          title="Embedded content"
+                          loading="lazy"
+                          class="h-full w-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowfullscreen
+                          sandbox="allow-scripts allow-same-origin allow-presentation"
+                        />
+                      </div>
+                    )}
+                  </Show>
                 ) : token.type === "link" ? (
                   <a
                     href={token.value}

@@ -31,6 +31,9 @@ func Run(app *pocketbase.PocketBase, cfg *config.Config) error {
 			return re.Redirect(http.StatusFound, "/_/")
 		})
 
+		// See internal/serve/handler.go's embedHandler for why this exists.
+		e.Router.GET("/embed", embedHandler())
+
 		return e.Next()
 	})
 

@@ -6,8 +6,9 @@ import type { InlineToken } from "./types";
 
 function isAllowedIframeSrc(src: string): boolean {
   try {
-    new URL(src);
-    return true;
+    // Restricted to https since the backend's /embed proxy (see
+    // internal/serve/handler.go) requires it too.
+    return new URL(src).protocol === "https:";
   } catch {
     return false;
   }
