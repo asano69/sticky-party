@@ -306,6 +306,7 @@ export default function NoteContent() {
               }
               togglingColor={togglingColor()}
               onColorChange={handleColorChange}
+              historyOpen={historyOpen()}
               // Every open of the history panel explicitly refetches,
               // so the info button always shows up-to-date history --
               // not just the last-cached fetch from when the panel was

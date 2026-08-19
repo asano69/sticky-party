@@ -10,7 +10,8 @@
 import { Show } from "solid-js";
 import Trash from "lucide-solid/icons/trash";
 import Shredder from "lucide-solid/icons/shredder";
-import Info from "lucide-solid/icons/info";
+import FileClock from "lucide-solid/icons/file-clock";
+import ArrowLeft from "lucide-solid/icons/arrow-left";
 import { Button } from "@kobalte/core/button";
 import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
 import type { NoteColor } from "../../lib/colors";
@@ -26,6 +27,13 @@ export default function NoteFooter(props: {
   color: NoteColor;
   togglingColor: boolean;
   onColorChange: (color: NoteColor) => void;
+  // Whether the history panel (NoteMain.tsx) is currently open. Drives
+  // this footer's rightmost button: an info icon that opens history,
+  // or -- once open -- an arrow-left icon that closes it and returns
+  // to the normal edit view. onShowHistory itself already toggles
+  // either direction (see NoteContent.tsx), so only the icon/label
+  // need to reflect which direction this click will go.
+  historyOpen: boolean;
   onShowHistory: () => void;
 }) {
   return (
@@ -63,9 +71,11 @@ export default function NoteFooter(props: {
         class="sticky-party-icon-btn ml-auto flex items-center justify-center border-none bg-transparent cursor-pointer px-2 py-1.5 rounded"
         onMouseDown={(e: MouseEvent) => e.preventDefault()}
         onClick={props.onShowHistory}
-        aria-label="Show edit history"
+        aria-label={props.historyOpen ? "Back to note" : "Show edit history"}
       >
-        <Info size={16} />
+        <Show when={props.historyOpen} fallback={<FileClock size={16} />}>
+          <ArrowLeft size={16} />
+        </Show>
       </Button>
     </footer>
   );
