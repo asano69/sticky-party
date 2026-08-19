@@ -2,7 +2,7 @@
   "name": "Sticky Party",
   "description": "Secure, self-hosted, server-synced sticky notes for web pages",
   "private": true,
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "scripts": {
     "dev": "wxt",
