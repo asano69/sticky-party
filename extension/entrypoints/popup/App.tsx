@@ -5,6 +5,7 @@ import Targets from "./Targets";
 import NavBar, { type View } from "./NavBar";
 import { fullSyncTargets, syncTargets } from "../../lib/targets";
 import { fetchAnnotationCount } from "../../lib/annotations";
+import { getAuthedPb } from "../../lib/pb";
 import { formatActionTitle } from "../../lib/actionTitle";
 import { getSettings } from "../../lib/settings";
 import { getSyncError, withSyncErrorBadge } from "../../lib/syncBadge";
@@ -97,7 +98,7 @@ function App() {
     }
 
     try {
-      setAnnotationCount(await fetchAnnotationCount());
+      setAnnotationCount(await fetchAnnotationCount(await getAuthedPb()));
     } catch (err) {
       // Not routed through the sync-error badge: a failed count fetch
       // is minor compared to a failed target sync, so it just logs and
@@ -178,7 +179,7 @@ function App() {
       }
       // Manual sync is also a natural moment to refresh the displayed
       // count (e.g. after annotations were added/removed elsewhere).
-      setAnnotationCount(await fetchAnnotationCount());
+      setAnnotationCount(await fetchAnnotationCount(await getAuthedPb()));
     } catch (err) {
       console.error("[sticky-party] full sync failed", err);
       setSyncError(true);
@@ -194,7 +195,7 @@ function App() {
   // just leaves the previous count displayed.
   const handleAnnotationCreated = async () => {
     try {
-      setAnnotationCount(await fetchAnnotationCount());
+      setAnnotationCount(await fetchAnnotationCount(await getAuthedPb()));
     } catch (err) {
       console.error("[sticky-party] failed to refresh annotation count", err);
     }

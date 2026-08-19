@@ -1,4 +1,4 @@
-import { createResource, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createResource, createSignal, onCleanup, Show } from "solid-js";
 
 import {
   deleteAnnotation,
@@ -16,6 +16,7 @@ import {
   isNoteColor,
   type NoteColor,
 } from "../../lib/colors";
+import { useAuthedPb } from "./useAuthedPb";
 import { useContentHeight } from "./useContentHeight";
 import { useParentMessaging } from "./useParentMessaging";
 import NoteHeader from "./NoteHeader";
@@ -35,7 +36,13 @@ import NoteFooter from "./NoteFooter";
 // only part of the UI that does, since it's the only part rendered
 // inside the extension's own iframe rather than the host page's DOM.
 export default function NoteContent() {
+  const pb = useAuthedPb();
   const [annotation, setAnnotation] = createSignal<AnnotationData>();
+  // Set when a realtime update for this note arrives while the person
+  // is mid-edit -- applying it immediately would clobber their unsaved
+  // draft. Held here and applied once editing ends instead (see
+  // cancelEdit/saveEdit below).
+  const [pendingRemote, setPendingRemote] = createSignal<AnnotationData>();
   const [editing, setEditing] = createSignal(false);
   const [draftTitle, setDraftTitle] = createSignal("");
   const [draft, setDraft] = createSignal("");
@@ -81,6 +88,36 @@ export default function NoteContent() {
   // useContentHeight.ts (and docs/note-sizing.md for the full spec).
   const contentHeight = useContentHeight({ editing, draft, draftTitle });
 
+  // Subscribes to this note's own record so other users' edits (title,
+  // body, color, hide, pin) show up live, without a full re-fetch.
+  // Scoped to a single record (not the whole "annotations" collection),
+  // and only runs while this iframe -- and therefore this SSE
+  // connection -- is actually mounted; see useAuthedPb.ts for why this
+  // is fine here but was rejected for background.ts (MV3 service
+  // workers get killed and lose any live connection -- see
+  // docs/architecture.md).
+  createEffect(() => {
+    const client = pb();
+    const id = annotation()?.id;
+    if (!client || !id) return;
+
+    client.collection("annotations").subscribe<AnnotationData>(id, (e) => {
+      if (editing()) {
+        // Don't overwrite the person's in-progress draft; apply this
+        // once they finish editing instead.
+        setPendingRemote(e.record);
+        return;
+      }
+      setAnnotation(e.record);
+      // The remote change may have altered the note's required height
+      // (e.g. someone else added a line); report it since this path is
+      // outside useContentHeight's own draft-driven effect.
+      contentHeight.reportContentHeight();
+    });
+
+    onCleanup(() => client.collection("annotations").unsubscribe(id));
+  });
+
   const startEdit = (field: "title" | "body" = "body") => {
     const current = annotation();
     if (!current) return;
@@ -111,9 +148,22 @@ export default function NoteContent() {
     },
   });
 
+  // Applies a realtime update that arrived mid-edit, once editing has
+  // actually ended (see the subscribe effect above). Last-write-wins:
+  // the incoming record simply replaces local state, matching the
+  // storage layer's own concurrency policy elsewhere in this project.
+  const applyPendingRemote = () => {
+    const pending = pendingRemote();
+    if (!pending) return;
+    setAnnotation(pending);
+    setPendingRemote(undefined);
+    contentHeight.reportContentHeight();
+  };
+
   const cancelEdit = () => {
     setEditing(false);
     setConfirmDelete(false);
+    applyPendingRemote();
   };
 
   // Restarts the shake animation on every single click of the lock
@@ -131,15 +181,20 @@ export default function NoteContent() {
 
   const saveEdit = async () => {
     const current = annotation();
-    if (!current) return;
+    const client = pb();
+    if (!current || !client) return;
     setSaving(true);
     try {
-      await updateAnnotation(current.id, {
+      await updateAnnotation(client, current.id, {
         title: draftTitle(),
         body: draft(),
       });
       setAnnotation({ ...current, title: draftTitle(), body: draft() });
       setEditing(false);
+      // This save is itself the newest state, so any remote update
+      // queued while editing is now stale -- discard it rather than
+      // applying it on top.
+      setPendingRemote(undefined);
     } catch (err) {
       console.error("[sticky-party] failed to save annotation", err);
     } finally {
@@ -168,10 +223,11 @@ export default function NoteContent() {
       return;
     }
     const current = annotation();
-    if (!current) return;
+    const client = pb();
+    if (!current || !client) return;
     setDeleting(true);
     try {
-      await deleteAnnotation(current.id);
+      await deleteAnnotation(client, current.id);
       parentMessaging.sendDeleted();
     } catch (err) {
       console.error("[sticky-party] failed to delete annotation", err);
@@ -186,10 +242,11 @@ export default function NoteContent() {
   // save step for this control.
   const handleToggleHide = async (next: boolean) => {
     const current = annotation();
-    if (!current) return;
+    const client = pb();
+    if (!current || !client) return;
     setTogglingHide(true);
     try {
-      await setAnnotationHide(current.id, next);
+      await setAnnotationHide(client, current.id, next);
       setAnnotation({ ...current, hide: next });
       if (next) setRevealed(false);
     } catch (err) {
@@ -204,10 +261,11 @@ export default function NoteContent() {
   // step for footer controls.
   const handleColorChange = async (color: NoteColor) => {
     const current = annotation();
-    if (!current) return;
+    const client = pb();
+    if (!current || !client) return;
     setTogglingColor(true);
     try {
-      await setAnnotationColor(current.id, color);
+      await setAnnotationColor(client, current.id, color);
       setAnnotation({ ...current, color });
     } catch (err) {
       console.error("[sticky-party] failed to change color", err);
@@ -223,10 +281,11 @@ export default function NoteContent() {
   // other line is left untouched.
   const handleToggleTask = async (lineIndex: number) => {
     const current = annotation();
-    if (!current) return;
+    const client = pb();
+    if (!current || !client) return;
     const body = toggleTaskLine(current.body, lineIndex);
     try {
-      await updateAnnotation(current.id, { title: current.title, body });
+      await updateAnnotation(client, current.id, { title: current.title, body });
       setAnnotation({ ...current, body });
     } catch (err) {
       console.error("[sticky-party] failed to toggle task", err);

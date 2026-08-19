@@ -1,6 +1,7 @@
 // See docs/architecture.md for the full sync design this implements.
 
 import { fetchAnnotations, setAnnotationPin } from "../lib/annotations";
+import { getAuthedPb } from "../lib/pb";
 import { formatActionTitle } from "../lib/actionTitle";
 import { getCachedAnnotationCount } from "../lib/annotationCountCache";
 import {
@@ -124,7 +125,10 @@ export default defineBackground(() => {
       // withSyncErrorBadge retries once before it lets a failure
       // through, so a transient hiccup right as the page loads doesn't
       // flash the badge red -- see lib/syncBadge.ts.
-      const annotations = await withSyncErrorBadge(() => fetchAnnotations(url));
+      const annotations = await withSyncErrorBadge(async () => {
+        const pb = await getAuthedPb();
+        return fetchAnnotations(pb, url);
+      });
       if (annotations.length === 0) {
         // The cache said this URL had an annotation, but the DB has
         // none -- most likely it was deleted since the last sync (a
@@ -200,10 +204,8 @@ export default defineBackground(() => {
       );
     }
     if (message?.type === SET_ANNOTATION_PIN_MESSAGE) {
-      return setAnnotationPin(
-        message.annotationId,
-        message.pin,
-        message.coords,
+      return getAuthedPb().then((pb) =>
+        setAnnotationPin(pb, message.annotationId, message.pin, message.coords),
       );
     }
   });
