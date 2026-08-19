@@ -69,7 +69,7 @@ export default function NoteContent() {
   // true, and re-fetches on every reopen, so the list stays current
   // without polling while closed.
   const [historyOpen, setHistoryOpen] = createSignal(false);
-  const [history] = createResource(
+  const [history, { refetch: refetchHistory }] = createResource(
     () => (historyOpen() ? annotation()?.id : undefined),
     (id) => fetchHistory(id),
   );
@@ -306,7 +306,16 @@ export default function NoteContent() {
               }
               togglingColor={togglingColor()}
               onColorChange={handleColorChange}
-              onShowHistory={() => setHistoryOpen((open) => !open)}
+              // Every open of the history panel explicitly refetches,
+              // so the info button always shows up-to-date history --
+              // not just the last-cached fetch from when the panel was
+              // previously opened. No refetch on close: there's
+              // nothing to refresh once the panel is hidden.
+              onShowHistory={() => {
+                const opening = !historyOpen();
+                setHistoryOpen(opening);
+                if (opening) refetchHistory();
+              }}
             />
           </Show>
         </div>
