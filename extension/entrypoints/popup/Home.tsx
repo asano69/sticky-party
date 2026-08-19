@@ -4,6 +4,7 @@ import { TextField } from "@kobalte/core/text-field";
 import { getAuthedPb } from "../../lib/pb";
 import { getDraftNote, saveDraftNote } from "../../lib/draft";
 import { continueListOnEnter } from "../../lib/listContinuation";
+import { linkAttachment, uploadAttachment } from "../../lib/attachments";
 import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
@@ -40,6 +41,12 @@ export default function Home(props: {
   const [note, setNote] = createSignal("");
   const [error, setError] = createSignal("");
   const [status, setStatus] = createSignal<SaveStatus>("idle");
+  // Ids of attachments uploaded while composing this note, before the
+  // annotation itself exists yet (see lib/attachments.ts). Linked to
+  // the real annotation once handleSave actually creates it; cleared
+  // after saving, same as the note body itself.
+ const [pendingAttachmentIds, setPendingAttachmentIds] =
+  createSignal<string[]>([]);
   // Needed after save to ask the background script to re-check this tab
   // (see handleSave below); captured once here since the popup has no
   // sender.tab context of its own to fall back on.
@@ -92,6 +99,44 @@ export default function Home(props: {
     if (next !== undefined) updateNote(next);
   };
 
+  // Uploads a pasted clipboard image and inserts its embed syntax at
+  // the cursor, mirroring annotation-iframe/NoteContent.tsx's
+  // handlePasteImage. No preview here (unlike the iframe editor) --
+  // just the placeholder text -- since the popup is a small, one-shot
+  // compose form rather than something people leave open. The
+  // annotation doesn't exist yet at this point, so the upload has no
+  // annotationId; the attachment is linked once handleSave actually
+  // creates the annotation (see lib/attachments.ts's linkAttachment).
+  const onNotePaste = async (e: ClipboardEvent) => {
+    const item = [...(e.clipboardData?.items ?? [])].find((i) =>
+      i.type.startsWith("image/"),
+    );
+    if (!item) return; // No image on the clipboard -- let normal text paste proceed.
+    const blob = item.getAsFile();
+    if (!blob || !(e.target instanceof HTMLTextAreaElement)) return;
+
+    e.preventDefault();
+    const textarea = e.target;
+    try {
+      const attachmentId = await uploadAttachment(blob);
+      setPendingAttachmentIds((ids) => [...ids, attachmentId]);
+      const { selectionStart, selectionEnd, value } = textarea;
+      const insertion = `![[${attachmentId}]]`;
+      const next =
+        value.slice(0, selectionStart) + insertion + value.slice(selectionEnd);
+      const cursor = selectionStart + insertion.length;
+
+      // No input event fires for a prevented paste, so the textarea's
+      // own value/caret must be updated by hand, same as
+      // continueListOnEnter above.
+      textarea.value = next;
+      textarea.selectionStart = textarea.selectionEnd = cursor;
+      updateNote(next);
+    } catch (err) {
+      console.error("[sticky-party] failed to upload pasted image", err);
+    }
+  };
+
   const handleSave = async (e: Event) => {
     e.preventDefault();
     setError("");
@@ -117,6 +162,19 @@ export default function Home(props: {
         color: props.color,
       });
       await addCachedTarget(target, created.updated);
+      // Link any images pasted before the annotation existed (see
+      // onNotePaste above) to the now-saved annotation. Best-effort: a
+      // failure here just leaves that attachment permanently unlinked
+      // (same accepted tradeoff as an unsaved/cancelled edit -- see
+      // lib/attachments.ts), so it doesn't block the rest of save.
+      for (const attachmentId of pendingAttachmentIds()) {
+        try {
+          await linkAttachment(attachmentId, created.id);
+        } catch (err) {
+          console.error("[sticky-party] failed to link attachment", err);
+        }
+      }
+      setPendingAttachmentIds([]);
       // The note was saved to the DB, so the local draft is no longer
       // needed.
       await saveDraftNote("");
@@ -161,6 +219,7 @@ export default function Home(props: {
           rows={4}
           placeholder="Write a note for this page…"
           onKeyDown={onNoteKeyDown}
+          onPaste={onNotePaste}
         />
       </TextField>
 

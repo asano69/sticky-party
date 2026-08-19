@@ -250,7 +250,7 @@ export default function NoteContent() {
     e.preventDefault();
     const textarea = e.target;
     try {
-      const attachmentId = await uploadAttachment(current.id, blob);
+      const attachmentId = await uploadAttachment(blob, current.id);
       const { selectionStart, selectionEnd, value } = textarea;
       // Embeds by attachment id, not URL -- see lib/markup/inline.ts
       // and lib/attachments.ts's fetchAttachmentBlobUrl for why.
