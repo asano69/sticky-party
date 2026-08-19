@@ -57,7 +57,7 @@ export interface MountNoteDeps {
 }
 
 export async function mountNote(
-  ctx: ContentScriptContext,
+  ctx: InstanceType<typeof ContentScriptContext>,
   annotation: AnnotationData,
   index: number,
   deps: MountNoteDeps,
