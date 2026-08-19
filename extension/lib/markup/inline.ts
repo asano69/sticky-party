@@ -14,6 +14,33 @@ function isAllowedIframeSrc(src: string): boolean {
   }
 }
 
+// Reads the width/height off a matched <iframe> tag (e.g.
+// `<iframe width="600" height="450" ...>`), so AnnotationBody.tsx can
+// render the embed at its original aspect ratio instead of a fixed
+// one. Most embed providers (YouTube, Google Maps, etc.) already
+// include these on the tag people paste in, so no per-provider special
+// casing is needed here.
+//
+// Uses DOMParser instead of a hand-rolled regex: attribute order,
+// quote style (single/double), and extra whitespace all vary between
+// what different sites hand out for "copy embed code", and a real HTML
+// parser handles all of that for free instead of chasing edge cases in
+// a regex.
+function extractIframeDimensions(tag: string): {
+  width?: number;
+  height?: number;
+} {
+  const iframe = new DOMParser()
+    .parseFromString(tag, "text/html")
+    .querySelector("iframe");
+  const width = iframe?.getAttribute("width");
+  const height = iframe?.getAttribute("height");
+  return {
+    width: width ? Number(width) : undefined,
+    height: height ? Number(height) : undefined,
+  };
+}
+
 // Matches markdown image syntax (![alt](url)), a pasted YouTube <iframe>
 // embed tag, or a bare http(s) URL up to the next whitespace character --
 // whichever comes first. Combined into a single pattern -- rather than
@@ -45,7 +72,11 @@ export function parseInline(text: string): InlineToken[] {
       // rendering the raw tag text if the host isn't on the allowlist,
       // rather than silently dropping it or embedding an untrusted origin.
       if (isAllowedIframeSrc(match[3])) {
-        tokens.push({ type: "iframe", value: match[3] });
+        tokens.push({
+          type: "iframe",
+          value: match[3],
+          ...extractIframeDimensions(match[0]),
+        });
       } else {
         tokens.push({ type: "text", value: match[0] });
       }

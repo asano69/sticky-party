@@ -76,7 +76,20 @@ export default function AnnotationBody(props: {
                   // direct parent instead, which those providers accept.
                   <Show when={settings()?.backendUrl}>
                     {(backendUrl) => (
-                      <div class="my-1 aspect-video w-full overflow-hidden rounded">
+                      // Aspect ratio comes from the pasted tag's own
+                      // width/height attributes when available (see
+                      // lib/markup/inline.ts), so a near-square Google
+                      // Maps embed isn't forced into YouTube's 16:9.
+                      // Falls back to 16:9 when the tag had no dimensions.
+                      <div
+                        class="my-1 w-full overflow-hidden rounded"
+                        style={{
+                          "aspect-ratio":
+                            token.width && token.height
+                              ? `${token.width} / ${token.height}`
+                              : "16 / 9",
+                        }}
+                      >
                         <iframe
                           src={`${backendUrl()}/embed?src=${encodeURIComponent(token.value)}`}
                           title="Embedded content"

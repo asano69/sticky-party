@@ -9,6 +9,13 @@ export interface InlineToken {
   value: string;
   // Alt text for "image" tokens (from `![alt](url)`); unused otherwise.
   alt?: string;
+  // Width/height (in px) read from the pasted <iframe> tag's own
+  // width/height attributes, if present. Used to preserve the embed's
+  // original aspect ratio (e.g. Google Maps' near-square embeds vs
+  // YouTube's 16:9) instead of forcing every iframe token to the same
+  // ratio. Undefined when the tag had no such attributes.
+  width?: number;
+  height?: number;
 }
 
 export interface Line {
