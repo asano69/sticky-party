@@ -108,8 +108,11 @@ export function parseInline(text: string): InlineToken[] {
         tokens.push({ type: "text", value: match[0] });
       }
     } else {
-      // Bare http(s) URL, no markdown syntax around it.
-      tokens.push({ type: "link", value: match[8] });
+      // Bare http(s) URL, no markdown syntax around it. Non-null
+      // assertion is safe: this branch is only reached when none of
+      // the earlier groups matched, so group 8 (the final alternative)
+      // is guaranteed to have matched instead.
+      tokens.push({ type: "link", value: match[8]! });
     }
     lastIndex = start + match[0].length;
   }

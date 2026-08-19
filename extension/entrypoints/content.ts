@@ -112,7 +112,7 @@ export default defineContentScript({
 
     // The notes currently on screen. Replaced wholesale on every
     // SHOW_ANNOTATION_MESSAGE, mirroring the old AnnotationBoard.
-    let mountedNotes: ReturnType<typeof mountNote>[] = [];
+    let mountedNotes: Awaited<ReturnType<typeof mountNote>>[] = [];
 
     // Shared stacking counter: each note starts at mount order, but any
     // note the user interacts with (drag, or a click inside its iframe)

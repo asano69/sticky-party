@@ -39,7 +39,7 @@ export default function NoteMain(props: {
   // clipboard has no image. See NoteContent.tsx's handlePasteImage.
   onPaste: (e: ClipboardEvent) => void;
   onStartEditBody: () => void;
-  setContentRef: (el: HTMLDivElement) => void;
+  setContentRef: (el: HTMLElement) => void;
   setTextareaRef: (el: HTMLTextAreaElement) => void;
   resizeTextarea: () => void;
   revealed: boolean;

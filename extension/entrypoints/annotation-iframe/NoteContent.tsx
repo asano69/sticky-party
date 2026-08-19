@@ -35,6 +35,13 @@ import NoteFooter from "./NoteFooter";
 // this component only ever handles the note's title/body, and it's the
 // only part of the UI that does, since it's the only part rendered
 // inside the extension's own iframe rather than the host page's DOM.
+// Resolves an annotation's stored color string to a valid NoteColor,
+// falling back to DEFAULT_NOTE_COLOR for empty/unrecognized values
+// (e.g. annotations created before the color field existed).
+function resolveNoteColor(color: string): NoteColor {
+  return isNoteColor(color) ? color : DEFAULT_NOTE_COLOR;
+}
+
 export default function NoteContent() {
   const pb = useAuthedPb();
   const [annotation, setAnnotation] = createSignal<AnnotationData>();
@@ -293,8 +300,8 @@ export default function NoteContent() {
           // to DEFAULT_NOTE_COLOR for empty/unrecognized values (e.g.
           // annotations created before the color field existed).
           style={{
-            "--note-bg": `var(--note-color-${isNoteColor(note().color) ? note().color : DEFAULT_NOTE_COLOR}-bg)`,
-            "--note-text": `var(--note-color-${isNoteColor(note().color) ? note().color : DEFAULT_NOTE_COLOR}-text)`,
+            "--note-bg": `var(--note-color-${resolveNoteColor(note().color)}-bg)`,
+            "--note-text": `var(--note-color-${resolveNoteColor(note().color)}-text)`,
           }}
           class="flex h-full flex-col box-border bg-[color:var(--note-bg)] text-[color:var(--note-text)] font-[system-ui,-apple-system,sans-serif] text-[14px] leading-[1.4]"
         >
@@ -346,9 +353,7 @@ export default function NoteContent() {
               hide={note().hide}
               togglingHide={togglingHide()}
               onToggleHide={handleToggleHide}
-              color={
-                isNoteColor(note().color) ? note().color : DEFAULT_NOTE_COLOR
-              }
+              color={resolveNoteColor(note().color)}
               togglingColor={togglingColor()}
               onColorChange={handleColorChange}
               historyOpen={historyOpen()}

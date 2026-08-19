@@ -104,7 +104,7 @@ export function isTargetMatch(url: string, targets: CachedTarget[]): boolean {
 // sync to diff against -- see syncTargets below) and by the popup's
 // manual refresh button, which wants a guaranteed full resync rather
 // than a differential one.
-export async function fullSyncTargets(): Promise<string[]> {
+export async function fullSyncTargets(): Promise<CachedTarget[]> {
   // Captured before the fetch so a later differential sync (syncTargets)
   // starts from this point, not from whenever the fetch happened to
   // finish.
@@ -146,7 +146,7 @@ export async function fullSyncTargets(): Promise<string[]> {
 // removed lazily, the next time a page actually matches it and the DB
 // turns out to have no annotation (see removeCachedTarget and
 // background.ts's checkTab). Until then it's a harmless false positive.
-export async function syncTargets(): Promise<string[]> {
+export async function syncTargets(): Promise<CachedTarget[]> {
   const since = await getLastSyncedAt();
   if (!since) return fullSyncTargets();
 

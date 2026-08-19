@@ -13,7 +13,9 @@ export function useContentHeight(params: {
   draftTitle: () => string;
 }) {
   let textareaRef: HTMLTextAreaElement | undefined;
-  let contentRef: HTMLDivElement | undefined;
+  // HTMLElement, not HTMLDivElement: this is attached to NoteMain.tsx's
+  // <main>, which is an HTMLElement, not an HTMLDivElement.
+  let contentRef: HTMLElement | undefined;
 
   // Grows the textarea to fit its content, with a 4-line floor (see
   // rows={4} in NoteContent.tsx) so a short note still gets a
@@ -82,7 +84,7 @@ export function useContentHeight(params: {
     resizeTextarea();
   };
 
-  const setContentRef = (el: HTMLDivElement) => {
+  const setContentRef = (el: HTMLElement) => {
     contentRef = el;
     // Reports the note's initial (non-editing) content height once on
     // mount. The createEffect above only reports while editing (see

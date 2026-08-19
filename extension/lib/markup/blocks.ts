@@ -19,15 +19,18 @@ export function parseLines(body: string): Line[] {
   return body.split("\n").map((raw) => {
     const bulletMatch = raw.match(BULLET_PATTERN);
     if (bulletMatch) {
-      const taskMatch = bulletMatch[1].match(TASK_PATTERN);
+      // Non-null assertions below are safe: BULLET_PATTERN/TASK_PATTERN
+      // each have exactly one capture group with no "?" quantifier, so
+      // a successful match always populates it.
+      const taskMatch = bulletMatch[1]!.match(TASK_PATTERN);
       if (taskMatch) {
         return {
           bullet: false,
-          checked: taskMatch[1].toLowerCase() === "x",
-          tokens: parseInline(taskMatch[2]),
+          checked: taskMatch[1]!.toLowerCase() === "x",
+          tokens: parseInline(taskMatch[2]!),
         };
       }
-      return { bullet: true, tokens: parseInline(bulletMatch[1]) };
+      return { bullet: true, tokens: parseInline(bulletMatch[1]!) };
     }
     return { bullet: false, tokens: parseInline(raw) };
   });
@@ -66,6 +69,8 @@ const LIST_MARKER_PATTERN = /^([*-]\s+)(.*)$/;
 export function listContinuationPrefix(line: string): string | undefined {
   const markerMatch = line.match(LIST_MARKER_PATTERN);
   if (!markerMatch) return undefined;
+  // Non-null assertion is safe: LIST_MARKER_PATTERN's two capture
+  // groups always populate on a successful match.
   const [, marker, rest] = markerMatch;
-  return TASK_PATTERN.test(rest) ? `${marker}[ ] ` : marker;
+  return TASK_PATTERN.test(rest!) ? `${marker}[ ] ` : marker;
 }
