@@ -33,7 +33,7 @@ import {
   type GetPositionMessage,
   type SavePositionMessage,
   type SetAnnotationPinMessage,
-} from "../lib/messages";
+} from "../../lib/messages";
 import {
   INIT_NOTE_MESSAGE,
   NOTE_CONTENT_RESIZE_MESSAGE,
@@ -46,45 +46,9 @@ import {
   TITLE_ROW_HEIGHT_PX,
   TOGGLE_PIN_MESSAGE,
   type NotePinMessage,
-} from "../lib/iframe-messages";
-import type { StoredPosition, ViewportInfo } from "../lib/positions";
-
-// The layout viewport's width/height in CSS px, preferring
-// window.visualViewport over window.innerWidth/innerHeight. The two
-// normally agree, but visualViewport reports sub-pixel float values
-// while innerWidth/innerHeight are integers -- at some zoom levels that
-// rounding alone is enough for the position ratio math below to drift
-// after repeated zoom changes. visualViewport also fires its own
-// 'resize' event on pinch-zoom, which the plain window 'resize' event
-// doesn't always cover. Falls back to innerWidth/innerHeight for older
-// browsers without visualViewport support.
-function viewportSize(): { width: number; height: number } {
-  const vv = window.visualViewport;
-  return vv
-    ? { width: vv.width, height: vv.height }
-    : { width: window.innerWidth, height: window.innerHeight };
-}
-
-// The content page's own viewport at the moment of the call, read
-// fresh each time rather than cached -- lib/positions.ts needs this
-// because it runs in the background script (see that file's header
-// comment), which has no access to the content page's real `window`.
-function currentViewport(): ViewportInfo {
-  const { width, height } = viewportSize();
-  return {
-    windowWidth: width,
-    windowHeight: height,
-  };
-}
-
-// The whole document's size in CSS px, used for pinned notes' ratio
-// math (see persistPosition/togglePin below). Unlike viewportSize,
-// this isn't clamped to the visible area -- a pinned note anchors to a
-// point in the whole document, not just the window.
-function documentSize(): { width: number; height: number } {
-  const el = document.documentElement;
-  return { width: el.scrollWidth, height: el.scrollHeight };
-}
+} from "../../lib/iframe-messages";
+import type { StoredPosition } from "../../lib/positions";
+import { createResizeRegistry, currentViewport, documentSize } from "./viewport";
 
 const IFRAME_PAGE = "/annotation-iframe.html";
 
@@ -124,27 +88,10 @@ export default defineContentScript({
     // ratio of the window's size (see lib/positions.ts's toRatio), so a
     // manual browser resize should keep each note in the same relative
     // spot instead of leaving it pinned to its old pixel offset.
-    // Rescaling top/left by the window's size delta on every resize
-    // keeps position/windowSize constant -- equivalent to reapplying
-    // the original saved ratio -- so no DB round trip is needed here.
-    const repositionOnResize = new Set<
-      (scaleX: number, scaleY: number) => void
-    >();
-    let prevViewport = viewportSize();
-    const onViewportResize = () => {
-      const next = viewportSize();
-      const scaleX = next.width / prevViewport.width;
-      const scaleY = next.height / prevViewport.height;
-      prevViewport = next;
-      for (const reposition of repositionOnResize) reposition(scaleX, scaleY);
-    };
-    // Both listeners are registered: window 'resize' covers ordinary
-    // window resizing, and visualViewport 'resize' covers zoom changes
-    // (page zoom and pinch-zoom) that don't always fire window
-    // 'resize'. When both fire for the same change, the second call is
-    // a harmless no-op (scaleX/scaleY come out as 1).
-    window.addEventListener("resize", onViewportResize);
-    window.visualViewport?.addEventListener("resize", onViewportResize);
+    // createResizeRegistry (see ./viewport) owns the actual resize
+    // listeners and rescale math; mountNote just adds/removes its own
+    // reposition callback from the returned Set.
+    const repositionOnResize = createResizeRegistry();
     async function mountNote(annotation: AnnotationData, index: number) {
       // Cascade defaults, used only if this device has no saved
       // position yet. Resolved before the iframe UI is created below,
