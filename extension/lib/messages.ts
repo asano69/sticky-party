@@ -123,3 +123,14 @@ export interface CheckAnnotationMessage {
   // sender.tab.id instead (see background.ts's listener).
   tabId?: number;
 }
+
+// content -> background: relayed from the realtime-orchestrator (see
+// lib/realtime-messages.ts's TARGET_HISTORY_CREATED_MESSAGE) when a new
+// annotation's target appears anywhere, not just the current page. Only
+// background.ts can act on it, since it owns lib/targets.ts's cache.
+export const ADD_CACHED_TARGET_MESSAGE = "sticky-party:add-cached-target";
+export interface AddCachedTargetMessage {
+  type: typeof ADD_CACHED_TARGET_MESSAGE;
+  target: string;
+  updated: string;
+}

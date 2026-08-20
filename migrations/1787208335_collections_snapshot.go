@@ -1299,6 +1299,21 @@ func init() {
 						]
 					},
 					{
+						"autogeneratePattern": "",
+						"help": "",
+						"hidden": false,
+						"id": "text1181691900",
+						"max": 0,
+						"min": 0,
+						"name": "target",
+						"pattern": "^https?://.+$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
 						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",

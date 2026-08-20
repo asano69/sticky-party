@@ -129,6 +129,14 @@ func record(app core.App, annotation *core.Record, actor *core.Record, action st
 	// instead of deleting this row), which would destroy exactly the
 	// information a "delete" history row exists to preserve.
 	row.Set("annotationId", annotation.Id)
+	// Snapshotted alongside annotationId, not re-derived later: lets a
+	// target-agnostic realtime subscribe on "create" rows (see
+	// docs/target-list-sync.md) know which target just gained an
+	// annotation without joining back to the annotations collection,
+	// which may already be gone by the time a "delete" row is read.
+	// Never re-set on the merge path above -- an annotation's target
+	// never changes after creation (see docs/architecture.md).
+	row.Set("target", annotation.GetString("target"))
 	row.Set("user", actor.Id)
 	row.Set("userName", name)
 	row.Set("action", action)

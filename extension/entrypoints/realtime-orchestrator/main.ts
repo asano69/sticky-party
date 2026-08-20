@@ -14,11 +14,13 @@ import {
   ANNOTATION_POSITION_UPDATED_MESSAGE,
   INIT_ORCHESTRATOR_MESSAGE,
   ORCHESTRATOR_READY_MESSAGE,
+  TARGET_HISTORY_CREATED_MESSAGE,
   type AnnotationCreatedMessage,
   type AnnotationDeletedMessage,
   type AnnotationPositionUpdatedMessage,
   type ParentToOrchestratorMessage,
   type RealtimeUpdatePayload,
+  type TargetHistoryCreatedMessage,
 } from "../../lib/realtime-messages";
 import { realtimeChannelName } from "../../lib/realtime-channel";
 import { getAuthedPb } from "../../lib/pb";
@@ -43,6 +45,17 @@ let unsubscribe: (() => void) | undefined;
 // a newer target has already taken over can detect it's stale and
 // unsubscribe itself instead of delivering events for the wrong page.
 let generation = 0;
+
+// A "histories" row, as needed by the target-list subscribe below --
+// see docs/target-list-sync.md. `action` here is the row's own field
+// recording what happened to the annotation (create/update/delete),
+// not the realtime event's action.
+interface HistoryRecord {
+  id: string;
+  target: string;
+  action: "create" | "update" | "delete";
+  updated: string;
+}
 
 function teardown() {
   unsubscribe?.();
@@ -129,6 +142,47 @@ function handleEvent(e: RecordSubscription<AnnotationData>) {
   }
 }
 
+// Subscribes once for the lifetime of this orchestrator iframe,
+// independently of subscribeTarget's per-target lifecycle above: it is
+// never torn down or re-subscribed when the page's matched target
+// changes, since it exists purely to notice a target appearing
+// *anywhere*, not just on this page (see docs/target-list-sync.md).
+// Filtered server-side to "create" rows only -- update/delete rows
+// don't represent a target newly gaining an annotation, so relaying
+// them would only add noise to the local target cache (see
+// entrypoints/background.ts's handling of ADD_CACHED_TARGET_MESSAGE).
+async function subscribeTargetHistory(attempt = 0) {
+  try {
+    const pb = await getAuthedPb();
+    await pb
+      .collection("histories")
+      .subscribe<HistoryRecord>(
+        "*",
+        (e) => {
+          if (!e.record.target) return;
+          window.parent.postMessage(
+            {
+              type: TARGET_HISTORY_CREATED_MESSAGE,
+              target: e.record.target,
+              updated: e.record.updated,
+            } satisfies TargetHistoryCreatedMessage,
+            "*",
+          );
+        },
+        { filter: "action = 'create'" },
+      );
+  } catch (err) {
+    console.error(
+      "[sticky-party] target-history subscribe failed",
+      err,
+    );
+    const delay = INITIAL_RETRY_DELAYS_MS[attempt];
+    if (delay !== undefined) {
+      setTimeout(() => subscribeTargetHistory(attempt + 1), delay);
+    }
+  }
+}
+
 window.addEventListener(
   "message",
   (ev: MessageEvent<ParentToOrchestratorMessage>) => {
@@ -141,4 +195,5 @@ window.addEventListener(
   },
 );
 
+subscribeTargetHistory();
 window.parent.postMessage({ type: ORCHESTRATOR_READY_MESSAGE }, "*");

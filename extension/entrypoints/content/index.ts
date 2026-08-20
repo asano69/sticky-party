@@ -26,9 +26,11 @@
 // ./mountNote instead -- see that file for the actual per-note logic.
 
 import {
+  ADD_CACHED_TARGET_MESSAGE,
   CHECK_ANNOTATION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
+  type AddCachedTargetMessage,
   type AnnotationData,
   type AnnotationMessage,
   type CheckAnnotationMessage,
@@ -37,6 +39,7 @@ import {
   ANNOTATION_CREATED_MESSAGE,
   ANNOTATION_DELETED_MESSAGE,
   ANNOTATION_POSITION_UPDATED_MESSAGE,
+  TARGET_HISTORY_CREATED_MESSAGE,
   type OrchestratorToParentMessage,
 } from "../../lib/realtime-messages";
 import { createResizeRegistry } from "./viewport";
@@ -203,6 +206,15 @@ export default defineContentScript({
             width: e.data.width,
             height: e.data.height,
           });
+        } else if (e.data?.type === TARGET_HISTORY_CREATED_MESSAGE) {
+          // Not scoped to this page's own target -- just forwarded on
+          // to background.ts, which owns the local target cache (see
+          // lib/targets.ts and entrypoints/background.ts).
+          browser.runtime.sendMessage({
+            type: ADD_CACHED_TARGET_MESSAGE,
+            target: e.data.target,
+            updated: e.data.updated,
+          } satisfies AddCachedTargetMessage);
         }
       },
     );

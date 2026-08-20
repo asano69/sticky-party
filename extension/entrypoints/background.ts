@@ -10,17 +10,20 @@ import {
   withSyncErrorBadge,
 } from "../lib/syncBadge";
 import {
+  ADD_CACHED_TARGET_MESSAGE,
   CHECK_ANNOTATION_MESSAGE,
   GET_POSITION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
   SAVE_POSITION_MESSAGE,
   SET_ANNOTATION_PIN_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
+  type AddCachedTargetMessage,
   type CheckAnnotationMessage,
   type PositionMessage,
 } from "../lib/messages";
 import { fetchPosition, savePosition } from "../lib/positions";
 import {
+  addCachedTarget,
   getCachedTargets,
   isTargetMatch,
   normalizeTarget,
@@ -208,6 +211,19 @@ export default defineBackground(() => {
       return getAuthedPb().then((pb) =>
         setAnnotationPin(pb, message.annotationId, message.pin, message.coords),
       );
+    }
+  });
+
+  // Relayed from content.ts (see lib/realtime-messages.ts's
+  // TARGET_HISTORY_CREATED_MESSAGE): a new annotation's target appeared
+  // somewhere, learned via the realtime-orchestrator's target-agnostic
+  // subscribe on "histories" (see docs/target-list-sync.md). Reuses the
+  // same write-through helper the popup uses on save (lib/targets.ts),
+  // so this just closes the gap between that and the 5-minute periodic
+  // sync above.
+  browser.runtime.onMessage.addListener((message: AddCachedTargetMessage) => {
+    if (message?.type === ADD_CACHED_TARGET_MESSAGE) {
+      addCachedTarget(message.target, message.updated);
     }
   });
 });

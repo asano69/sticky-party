@@ -43,11 +43,30 @@ export interface AnnotationDeletedMessage {
   annotationId: string;
 }
 
+// orchestrator -> content.ts: a new annotation was created for some
+// target, detected via a target-agnostic subscribe on the "histories"
+// collection filtered to action="create" rows only (see
+// docs/target-list-sync.md). Unlike ANNOTATION_CREATED_MESSAGE above,
+// this isn't scoped to the current page's target -- it exists purely to
+// let the local target cache (lib/targets.ts) learn about a target
+// created anywhere, not just here. content.ts has no direct access to
+// that cache (it lives in background.ts), so it only relays this
+// message onward -- see entrypoints/background.ts's handling of
+// ADD_CACHED_TARGET_MESSAGE.
+export const TARGET_HISTORY_CREATED_MESSAGE =
+  "sticky-party:target-history-created";
+export interface TargetHistoryCreatedMessage {
+  type: typeof TARGET_HISTORY_CREATED_MESSAGE;
+  target: string;
+  updated: string;
+}
+
 export type OrchestratorToParentMessage =
   | OrchestratorReadyMessage
   | AnnotationCreatedMessage
   | AnnotationDeletedMessage
-  | AnnotationPositionUpdatedMessage;
+  | AnnotationPositionUpdatedMessage
+  | TargetHistoryCreatedMessage;
 export type ParentToOrchestratorMessage = InitOrchestratorMessage;
 
 // The payload broadcast on a target-scoped BroadcastChannel for
