@@ -7,12 +7,17 @@
 // exists at all.
 //
 // Position/size/pin/z are all shared across every viewer now (see
-// lib/positions.ts): x/y are stored as a ratio of the whole document,
-// used as-is whether the note is pinned (position: absolute) or not
-// (position: fixed) -- the two modes only differ in how the browser
-// then renders that anchor as the page scrolls, not in how the anchor
-// itself is computed or stored. That's what makes togglePin below a
-// pure metadata flip with no coordinate math.
+// lib/positions.ts): x/y are stored as a ratio, but the ratio's basis
+// depends on pin mode -- the whole document for a pinned note
+// (position: absolute), the current viewport for an unpinned note
+// (position: fixed). This matches how the browser actually anchors
+// each mode: a fixed element is positioned relative to the viewport
+// regardless of scroll, so basing its ratio on the much larger
+// document size could place its header outside the viewport
+// entirely, on any resolution, with no way to drag it back. Because
+// the two modes use different bases, togglePin below has to actually
+// convert top/left between them (accounting for scroll), not just
+// flip a flag.
 
 import X from "lucide-solid/icons/x";
 
@@ -37,7 +42,7 @@ import {
   type NotePinMessage,
 } from "../../lib/iframe-messages";
 import type { StoredPosition } from "../../lib/positions";
-import { documentSize, pxToRem, remToPx } from "./viewport";
+import { documentSize, pxToRem, remToPx, viewportSize } from "./viewport";
 import { animateMove } from "./moveAnimation";
 import { removeFaded, removeShredded } from "./removeAnimation";
 
@@ -104,9 +109,10 @@ export async function mountNote(
       xRatio = saved.x;
       yRatio = saved.y;
       savedWidthPx = remToPx(saved.width);
-      const doc = documentSize();
-      top = saved.y * doc.height;
-      left = saved.x * doc.width;
+      // Basis matches this note's pin mode -- see header comment.
+      const basis = pinned ? documentSize() : viewportSize();
+      top = saved.y * basis.height;
+      left = saved.x * basis.width;
       z = saved.z;
       deps.bumpZCounter(z);
     } else {
@@ -119,11 +125,12 @@ export async function mountNote(
 
   if (positionRecordId === undefined) {
     // No saved position: derive the initial ratio from the cascade
-    // default so the document-resize observer below has a sane anchor
-    // to work from until the first persistPosition() call.
-    const doc = documentSize();
-    xRatio = doc.width ? left / doc.width : 0;
-    yRatio = doc.height ? top / doc.height : 0;
+    // default so the resize handling below has a sane anchor to work
+    // from until the first persistPosition() call. A brand-new note
+    // is never pinned yet, so this always uses the viewport basis.
+    const basis = viewportSize();
+    xRatio = basis.width ? left / basis.width : 0;
+    yRatio = basis.height ? top / basis.height : 0;
   }
 
   // Tracks the note's "resting" (non-editing) content height in px, as
@@ -138,13 +145,13 @@ export async function mountNote(
 
   let resizeObserver: ResizeObserver | undefined;
   let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
-  // Watches the whole document so this note's on-screen position can
-  // be redrawn from xRatio/yRatio whenever the document's size changes,
-  // for any reason (window resize, images/fonts finishing loading,
-  // lazily-mounted content). Applies to every note now, pinned or
-  // not -- see this file's header comment.
+  // Redraws this note's on-screen position from xRatio/yRatio whenever
+  // its basis changes -- document size for a pinned note, viewport
+  // size for an unpinned one -- see this file's header comment and
+  // the recomputePosition function below.
   let docResizeObserver: ResizeObserver | undefined;
   let docResizeTimer: ReturnType<typeof setTimeout> | undefined;
+  let onWindowResize: (() => void) | undefined;
   let onMessage: ((e: MessageEvent) => void) | undefined;
   // Hoisted out of onMount so applyRemotePosition (defined below, and
   // exposed on the returned handle) can reach the wrapper element and
@@ -222,9 +229,11 @@ export async function mountNote(
       // the values the document ResizeObserver below relies on must
       // be refreshed here too.
       const persistPosition = () => {
-        const doc = documentSize();
-        xRatio = doc.width ? left / doc.width : xRatio;
-        yRatio = doc.height ? top / doc.height : yRatio;
+        // Basis matches this note's current pin mode -- see header
+        // comment.
+        const basis = pinned ? documentSize() : viewportSize();
+        xRatio = basis.width ? left / basis.width : xRatio;
+        yRatio = basis.height ? top / basis.height : yRatio;
         browser.runtime
           .sendMessage({
             type: SAVE_POSITION_MESSAGE,
@@ -256,7 +265,22 @@ export async function mountNote(
       // same document-relative x/y (see this file's header comment),
       // so this is purely a metadata flip -- no coordinate conversion.
       const togglePin = () => {
+        // top/left are pixel values in the *old* mode's coordinate
+        // system (document-relative while absolute, viewport-relative
+        // while fixed) -- switching position modes without adjusting
+        // them would visually jump the note by the current scroll
+        // offset. Converting here keeps the note exactly where it
+        // was on screen at the moment of the toggle.
+        if (pinned) {
+          top -= window.scrollY;
+          left -= window.scrollX;
+        } else {
+          top += window.scrollY;
+          left += window.scrollX;
+        }
         pinned = !pinned;
+        wrapper.style.top = `${top}px`;
+        wrapper.style.left = `${left}px`;
         wrapper.style.position = pinned ? "absolute" : "fixed";
         persistPosition();
         iframe.contentWindow?.postMessage(
@@ -403,10 +427,43 @@ export async function mountNote(
         dragStart = { x: e.clientX, y: e.clientY, top, left };
         header.setPointerCapture(e.pointerId);
       });
+      // Keeps the header row draggable within the currently visible
+      // area, so it can never be dragged out where the user could no
+      // longer grab it -- the actual root cause fixed separately (see
+      // recomputePosition above) only guards against a stale saved
+      // ratio; this guards the drag gesture itself, at the moment it
+      // happens. Clamped against the viewport either way: even a
+      // pinned (position: absolute) note is being dragged relative to
+      // what the user can currently see, so the bound is the visible
+      // viewport shifted by the current scroll offset, not the whole
+      // document.
+      //
+      // Only the header's minimum horizontal visibility is enforced
+      // (MIN_VISIBLE_PX), not the whole note width -- a note can be
+      // wider than the viewport itself, so requiring full horizontal
+      // visibility would make it impossible to drag at all in that
+      // case. Vertically the full header height is enforced since
+      // that's fixed at TITLE_ROW_HEIGHT_PX regardless of note width.
+      const MIN_VISIBLE_PX = 40;
+      const clampDragPosition = (nextTop: number, nextLeft: number) => {
+        const offsetX = pinned ? window.scrollX : 0;
+        const offsetY = pinned ? window.scrollY : 0;
+        const maxTop = offsetY + window.innerHeight - TITLE_ROW_HEIGHT_PX;
+        const minLeft = offsetX - (wrapper.offsetWidth - MIN_VISIBLE_PX);
+        const maxLeft = offsetX + window.innerWidth - MIN_VISIBLE_PX;
+        return {
+          top: Math.min(Math.max(nextTop, offsetY), Math.max(maxTop, offsetY)),
+          left: Math.min(Math.max(nextLeft, minLeft), Math.max(maxLeft, minLeft)),
+        };
+      };
       header.addEventListener("pointermove", (e) => {
         if (!dragStart) return;
-        top = dragStart.top + (e.clientY - dragStart.y);
-        left = dragStart.left + (e.clientX - dragStart.x);
+        const next = clampDragPosition(
+          dragStart.top + (e.clientY - dragStart.y),
+          dragStart.left + (e.clientX - dragStart.x),
+        );
+        top = next.top;
+        left = next.left;
         wrapper.style.top = `${top}px`;
         wrapper.style.left = `${left}px`;
       });
@@ -457,31 +514,34 @@ export async function mountNote(
       });
       resizeObserver.observe(wrapper);
 
-      // A pinned note's position is a ratio of the whole document
-      // (pinRatioX/pinRatioY), not raw pixels, so it must be
-      // recalculated whenever the document's size changes -- not
-      // just on window resize, but also as images, web fonts, or
-      // lazily-mounted content shift the page's layout after this
-      // script first ran. Watching documentElement catches all of
-      // these causes uniformly, instead of trying to guess the one
-      // "correct" moment to measure once. Debounced like
-      // resizeObserver above, since a page still loading can
-      // resize many times in quick succession.
-
-      // Redraws top/left from xRatio/yRatio whenever the document's
-      // size changes, for every note (see this file's header
-      // comment) -- not just pinned ones as before.
+      // A note's position is a ratio (xRatio/yRatio), not raw pixels,
+      // so it must be recalculated whenever its basis changes: the
+      // whole document for a pinned note, or the viewport for an
+      // unpinned one (see this file's header comment). Document size
+      // can shift as images, web fonts, or lazily-mounted content
+      // change the page's layout; viewport size changes on an
+      // ordinary browser window resize. Both are watched so a note
+      // never drifts outside the visible area regardless of pin mode.
+      // Debounced like resizeObserver above, since a page still
+      // loading (or a window being dragged to resize) can fire many
+      // times in quick succession.
+      const recomputePosition = () => {
+        const basis = pinned ? documentSize() : viewportSize();
+        top = yRatio * basis.height;
+        left = xRatio * basis.width;
+        wrapper.style.top = `${top}px`;
+        wrapper.style.left = `${left}px`;
+      };
       docResizeObserver = new ResizeObserver(() => {
         clearTimeout(docResizeTimer);
-        docResizeTimer = setTimeout(() => {
-          const doc = documentSize();
-          top = yRatio * doc.height;
-          left = xRatio * doc.width;
-          wrapper.style.top = `${top}px`;
-          wrapper.style.left = `${left}px`;
-        }, 300);
+        docResizeTimer = setTimeout(recomputePosition, 300);
       });
       docResizeObserver.observe(document.documentElement);
+      onWindowResize = () => {
+        clearTimeout(docResizeTimer);
+        docResizeTimer = setTimeout(recomputePosition, 300);
+      };
+      window.addEventListener("resize", onWindowResize);
 
       // Hand the annotation to the iframe once it reports itself
       // ready, rather than on the iframe's 'load' event -- 'load'
@@ -550,6 +610,7 @@ export async function mountNote(
       clearTimeout(resizeSaveTimer);
       docResizeObserver?.disconnect();
       clearTimeout(docResizeTimer);
+      if (onWindowResize) window.removeEventListener("resize", onWindowResize);
       wrapperEl = undefined;
       applyWrapperHeight = undefined;
     },
@@ -578,9 +639,11 @@ export async function mountNote(
     pinned = update.pin;
     xRatio = update.x;
     yRatio = update.y;
-    const doc = documentSize();
-    top = update.y * doc.height;
-    left = update.x * doc.width;
+    // Basis matches the pin mode this update carries -- see header
+    // comment.
+    const basis = pinned ? documentSize() : viewportSize();
+    top = update.y * basis.height;
+    left = update.x * basis.width;
     contentHeight = Math.max(0, remToPx(update.height) - TITLE_ROW_HEIGHT_PX);
     z = Math.max(z, update.z);
 

@@ -20,7 +20,9 @@
 //
 // pin (fixed vs. absolute) now lives here too, alongside x/y/width/
 // height/z, rather than as separate fields on the annotation record --
-// see docs/architecture.md.
+// see docs/architecture.md. The ratio's basis (document vs. viewport)
+// depends on pin mode -- see entrypoints/content/mountNote.ts and
+// entrypoints/content/viewport.ts for where that's applied.
 
 import { ClientResponseError } from "pocketbase";
 
