@@ -642,34 +642,89 @@ export async function mountNote(
     },
   });
 
-  // Applies a pinned note's position/size after another tab/user moved
-  // it, relayed by the realtime orchestrator (see
-  // entrypoints/content/index.ts's handling of
-  // ANNOTATION_POSITION_UPDATED_MESSAGE). A no-op for an unpinned note
-  // or before/after this note's wrapper exists -- unpinned position is
-  // per-viewer and never travels through this path at all (see
-  // lib/realtime-messages.ts's ANNOTATION_POSITION_UPDATED_MESSAGE).
-  //
-  // Doesn't call persistPosition(): this data came from the DB in the
-  // first place, so writing it straight back would be a redundant
-  // round trip.
-  function applyRemotePin(coords: {
+  // Applies a remote pin-state/position change relayed by the realtime
+  // orchestrator (see entrypoints/content/index.ts's handling of
+  // ANNOTATION_POSITION_UPDATED_MESSAGE). Compares the incoming pin
+  // flag against this note's own local `pinned` to cover three cases:
+  //   - pin turned on (locally still unpinned): switch this wrapper to
+  //     document-anchored (absolute) mode using the given coords, same
+  //     as if this viewer had pinned it themselves.
+  //   - pin stays on: just refresh the coords (another tab/user moved
+  //     or resized it further).
+  //   - pin turned off (locally still pinned): switch back to
+  //     viewport-following (fixed) mode using this viewer's own saved
+  //     position, the same source read on initial mount (see the
+  //     GET_POSITION_MESSAGE call above this function) -- pin is
+  //     shared by every viewer, but ordinary position is per-user, so
+  //     there's no "correct" unpinned position in the incoming event
+  //     itself to derive from.
+  // A no-op once this note's wrapper no longer exists (removed while
+  // this was in flight -- checked both up front and again after the
+  // GET_POSITION_MESSAGE round trip below). Never calls
+  // persistPosition(): both the pinned coords and (when unpinning) the
+  // fetched saved position already came from the DB, so writing either
+  // straight back would just be a redundant round trip.
+  async function applyRemotePin(update: {
+    pin: boolean;
     xRatio: number;
     yRatio: number;
     width: number;
     height: number;
   }) {
-    if (!pinned || !wrapperEl || !applyWrapperHeight) return;
-    pinRatioX = coords.xRatio;
-    pinRatioY = coords.yRatio;
-    const doc = documentSize();
-    top = coords.yRatio * doc.height;
-    left = coords.xRatio * doc.width;
-    contentHeight = Math.max(0, coords.height - TITLE_ROW_HEIGHT_PX);
-    wrapperEl.style.top = `${top}px`;
-    wrapperEl.style.left = `${left}px`;
-    wrapperEl.style.width = `${coords.width}px`;
-    applyWrapperHeight();
+    const wrapper = wrapperEl;
+    const applyHeight = applyWrapperHeight;
+    if (!wrapper || !applyHeight) return;
+
+    if (update.pin) {
+      pinned = true;
+      pinRatioX = update.xRatio;
+      pinRatioY = update.yRatio;
+      const doc = documentSize();
+      top = update.yRatio * doc.height;
+      left = update.xRatio * doc.width;
+      contentHeight = Math.max(0, update.height - TITLE_ROW_HEIGHT_PX);
+      wrapper.style.position = "absolute";
+      wrapper.style.top = `${top}px`;
+      wrapper.style.left = `${left}px`;
+      wrapper.style.width = `${update.width}px`;
+      applyHeight();
+      return;
+    }
+
+    if (!pinned) return; // already unpinned locally, nothing to do
+    pinned = false;
+    wrapper.style.position = "fixed";
+
+    try {
+      const saved: StoredPosition | undefined =
+        await browser.runtime.sendMessage({
+          type: GET_POSITION_MESSAGE,
+          annotationId: annotation.id,
+          viewport: currentViewport(),
+        } satisfies GetPositionMessage);
+      if (wrapperEl !== wrapper) return; // removed while awaiting
+      if (saved) {
+        positionRecordId = saved.id;
+        top = saved.top;
+        left = saved.left;
+        contentHeight = Math.max(0, saved.height - TITLE_ROW_HEIGHT_PX);
+        wrapper.style.width = `${saved.width}px`;
+      } else {
+        top = 12 + index * 24;
+        left = 12 + index * 24;
+      }
+    } catch (err) {
+      console.error(
+        "[sticky-party] failed to load position after unpin",
+        err,
+      );
+      if (wrapperEl !== wrapper) return;
+      top = 12 + index * 24;
+      left = 12 + index * 24;
+    }
+    wrapper.style.top = `${top}px`;
+    wrapper.style.left = `${left}px`;
+    applyHeight();
   }
 
   ui.mount();

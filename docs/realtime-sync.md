@@ -126,6 +126,7 @@ PocketBase JS SDKの`RealtimeService`はSSE切断時に自動再接続し、そ�
 | action | 配送先 | 経路 | 理由 |
 |---|---|---|---|
 | update | 対象annotationIdを持つNoteContent | target-scoped BroadcastChannel（直接） | 同一オリジンのiframe同士なのでcontent.tsを経由する必要がない |
+| update（`pin`/位置） | content.ts | postMessage (`window.parent`, `ANNOTATION_POSITION_UPDATED_MESSAGE`) | wrapper要素のfixed/absolute切り替えと座標適用はcontent.tsしかできない。`pin`フラグ自体も毎回のせるので、他ユーザーによるpin/unpinの状態遷移もcontent.ts側で検知できる（`entrypoints/content/mountNote.ts`のapplyRemotePin参照） |
 | create | content.ts | postMessage (`window.parent`) | wrapper要素のmountはcontent.tsしかできない |
 | delete | content.ts | postMessage (`window.parent`) | wrapper要素のunmountはcontent.tsしかできない |
 

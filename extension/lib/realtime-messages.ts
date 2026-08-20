@@ -58,18 +58,23 @@ export interface RealtimeUpdatePayload {
   record: AnnotationData;
 }
 
-// orchestrator -> content.ts: a pinned annotation's position/size
-// changed (another tab/user dragged or resized it). Only pinned notes
-// need this: an unpinned note's position is per-viewer and lives in
-// the positions collection, which this event never touches. Only
-// content.ts can act on it, since it owns the wrapper element and is
-// the sole place a pinned note's on-screen position is applied (see
-// entrypoints/content/mountNote.ts's applyRemotePin).
+// orchestrator -> content.ts: an annotation's pin state and/or pinned
+// position/size changed. Carries the raw `pin` flag (not just
+// coordinates) so content.ts can detect the pin flag itself flipping
+// -- another tab/user pinning or unpinning the note -- not only a
+// position/size change on an already-pinned one. Only content.ts can
+// act on this: it owns the wrapper element and is the sole place a
+// note's fixed/absolute positioning mode is applied (see
+// entrypoints/content/mountNote.ts's applyRemotePin). Unpinned
+// position (per-viewer, stored in the positions collection) never
+// travels through this message -- see applyRemotePin for how the
+// unpin case is handled instead.
 export const ANNOTATION_POSITION_UPDATED_MESSAGE =
   "sticky-party:annotation-position-updated";
 export interface AnnotationPositionUpdatedMessage {
   type: typeof ANNOTATION_POSITION_UPDATED_MESSAGE;
   annotationId: string;
+  pin: boolean;
   xRatio: number;
   yRatio: number;
   width: number;

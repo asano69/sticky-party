@@ -197,6 +197,7 @@ export default defineContentScript({
           mountedNotes.delete(e.data.annotationId);
         } else if (e.data?.type === ANNOTATION_POSITION_UPDATED_MESSAGE) {
           mountedNotes.get(e.data.annotationId)?.applyRemotePin({
+            pin: e.data.pin,
             xRatio: e.data.xRatio,
             yRatio: e.data.yRatio,
             width: e.data.width,

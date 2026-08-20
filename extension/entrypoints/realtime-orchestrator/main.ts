@@ -92,25 +92,24 @@ async function subscribeTarget(
 function handleEvent(e: RecordSubscription<AnnotationData>) {
   if (e.action === "update") {
     channel?.postMessage({ record: e.record } satisfies RealtimeUpdatePayload);
-    // Pinned position lives on the annotation record itself and is
-    // applied by content.ts (which owns the wrapper element), not by
-    // NoteContent via the BroadcastChannel above -- see
-    // entrypoints/content/mountNote.ts's applyRemotePin. Unpinned
-    // notes don't need this: their position never travels through the
-    // annotation record at all.
-    if (e.record.pin) {
-      window.parent.postMessage(
-        {
-          type: ANNOTATION_POSITION_UPDATED_MESSAGE,
-          annotationId: e.record.id,
-          xRatio: e.record.pinXRatio,
-          yRatio: e.record.pinYRatio,
-          width: e.record.pinWidth,
-          height: e.record.pinHeight,
-        } satisfies AnnotationPositionUpdatedMessage,
-        "*",
-      );
-    }
+    // Relayed on every update (not just when currently pinned), since
+    // content.ts also needs to detect the pin flag itself flipping --
+    // see entrypoints/content/mountNote.ts's applyRemotePin. When
+    // pin is false, xRatio/yRatio/width/height are simply the
+    // annotation's stale pin* fields and are ignored on the receiving
+    // end.
+    window.parent.postMessage(
+      {
+        type: ANNOTATION_POSITION_UPDATED_MESSAGE,
+        annotationId: e.record.id,
+        pin: e.record.pin,
+        xRatio: e.record.pinXRatio,
+        yRatio: e.record.pinYRatio,
+        width: e.record.pinWidth,
+        height: e.record.pinHeight,
+      } satisfies AnnotationPositionUpdatedMessage,
+      "*",
+    );
   } else if (e.action === "create") {
     window.parent.postMessage(
       {
