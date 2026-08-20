@@ -39,6 +39,32 @@ export const IFRAME_PAGE = "/annotation-iframe.html";
 // max, so it can keep counting up as notes are brought to front.
 const Z_BASE = 2147480000;
 
+// CSS transition used only for remote pin/position updates (see
+// animateMove/applyRemotePin below) -- purely decorative, so a note
+// glides to its new spot instead of jumping when another tab/user
+// moves it. Drag and window-resize rescaling never use this: both
+// need instant, 1:1 tracking, and set top/left directly instead of
+// going through animateMove.
+// cubic-bezier(0.65, 0, 0.35, 1) is a symmetric "ease-in-out" curve --
+// slow at both ends, fastest through the middle -- more pronounced
+// than the built-in `ease` keyword, whose deceleration is skewed
+// toward the end rather than symmetric.
+const REMOTE_MOVE_TRANSITION =
+  "top 0.3s cubic-bezier(0.65, 0, 0.35, 1), left 0.3s cubic-bezier(0.65, 0, 0.35, 1)";
+
+// Moves `wrapper` to (top, left) with the transition above, then
+// clears the transition afterward so any later direct write to
+// top/left (drag, resize, window-resize rescaling) goes back to
+// instant positioning instead of inheriting this animation.
+function animateMove(wrapper: HTMLElement, top: number, left: number) {
+  wrapper.style.transition = REMOTE_MOVE_TRANSITION;
+  wrapper.style.top = `${top}px`;
+  wrapper.style.left = `${left}px`;
+  window.setTimeout(() => {
+    wrapper.style.transition = "";
+  }, 300);
+}
+
 // Dependencies mountNote needs from its caller (entrypoints/content/index.ts),
 // so this file doesn't have to own any state shared across notes.
 export interface MountNoteDeps {
@@ -684,8 +710,7 @@ export async function mountNote(
       left = update.xRatio * doc.width;
       contentHeight = Math.max(0, update.height - TITLE_ROW_HEIGHT_PX);
       wrapper.style.position = "absolute";
-      wrapper.style.top = `${top}px`;
-      wrapper.style.left = `${left}px`;
+      animateMove(wrapper, top, left);
       wrapper.style.width = `${update.width}px`;
       applyHeight();
       return;
@@ -722,8 +747,7 @@ export async function mountNote(
       top = 12 + index * 24;
       left = 12 + index * 24;
     }
-    wrapper.style.top = `${top}px`;
-    wrapper.style.left = `${left}px`;
+    animateMove(wrapper, top, left);
     applyHeight();
   }
 
