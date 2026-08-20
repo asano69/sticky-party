@@ -16,8 +16,8 @@ import {
 } from "../../lib/popupColor";
 import { DEFAULT_NOTE_COLOR, type NoteColor } from "../../lib/colors";
 import {
-  CHECK_ANNOTATION_MESSAGE,
-  type CheckAnnotationMessage,
+  RECHECK_ALL_TABS_MESSAGE,
+  type RecheckAllTabsMessage,
 } from "../../lib/messages";
 
 // Three-screen popup, switched via NavBar's mode toggle. Home (create an
@@ -92,6 +92,14 @@ function App() {
       // -- see lib/syncBadge.ts.
       await withSyncErrorBadge(() => syncTargets());
       setSyncError(false);
+      // A target that only just appeared in the cache (e.g. someone
+      // else annotated this page moments ago) might already match a
+      // tab sitting open on it -- ask background.ts to recheck every
+      // open tab so that tab's overlay updates immediately instead of
+      // waiting for its next navigation.
+      browser.runtime.sendMessage({
+        type: RECHECK_ALL_TABS_MESSAGE,
+      } satisfies RecheckAllTabsMessage);
     } catch (err) {
       console.error("[sticky-party] popup sync failed", err);
       setSyncError(true);
@@ -150,33 +158,24 @@ function App() {
     setView(next);
   };
 
-  // Manual full sync
   // Manual full sync (fetch every target from PocketBase, overwrite the
   // local cache) on top of the automatic write-through/periodic sync.
   // Lives here (rather than in Targets.tsx) since it's a global action,
   // not specific to the cached-URLs view.
   //
-  // After refreshing the cache, also re-run the mount process for the
-  // active tab (mirrors Home.tsx's post-save behavior): a stale cache
-  // may have been hiding/showing the wrong notes on the current page,
-  // and without this the fix would only take effect on the next
-  // navigation instead of immediately.
+  // After refreshing the cache, also ask background.ts to recheck
+  // every open tab (RECHECK_ALL_TABS_MESSAGE): a stale cache may have
+  // been hiding/showing the wrong notes on any of them, and without
+  // this the fix would only take effect on the next navigation
+  // instead of immediately.
   const handleSync = async () => {
     setSyncing(true);
     try {
       await withSyncErrorBadge(() => fullSyncTargets());
       setSyncError(false);
-      const [activeTab] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (activeTab?.id != null && activeTab.url) {
-        browser.runtime.sendMessage({
-          type: CHECK_ANNOTATION_MESSAGE,
-          url: activeTab.url,
-          tabId: activeTab.id,
-        } satisfies CheckAnnotationMessage);
-      }
+      browser.runtime.sendMessage({
+        type: RECHECK_ALL_TABS_MESSAGE,
+      } satisfies RecheckAllTabsMessage);
       // Manual sync is also a natural moment to refresh the displayed
       // count (e.g. after annotations were added/removed elsewhere).
       setAnnotationCount(await fetchAnnotationCount(await getAuthedPb()));

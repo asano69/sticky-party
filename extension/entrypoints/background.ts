@@ -14,12 +14,14 @@ import {
   CHECK_ANNOTATION_MESSAGE,
   GET_POSITION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
+  RECHECK_ALL_TABS_MESSAGE,
   SAVE_POSITION_MESSAGE,
   SET_ANNOTATION_PIN_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type AddCachedTargetMessage,
   type CheckAnnotationMessage,
   type PositionMessage,
+  type RecheckAllTabsMessage,
 } from "../lib/messages";
 import { fetchPosition, savePosition } from "../lib/positions";
 import {
@@ -46,7 +48,13 @@ export default defineBackground(() => {
       // the badge is what makes the failure visible. withSyncErrorBadge
       // already retried once before giving up and showing the badge.
       console.error("[sticky-party] target sync failed", err);
+      return;
     }
+    // A target that just appeared in the cache might match a tab
+    // that's already open on that page -- recheckAllTabs (defined
+    // below) is what makes that reach the tab, instead of only ever
+    // being picked up on that tab's next navigation.
+    await recheckAllTabs();
   };
 
   // Runs once whenever the service worker starts (extension install,
@@ -55,7 +63,17 @@ export default defineBackground(() => {
 
   // browser.alarms wakes the service worker on a schedule even after
   // MV3 kills it for inactivity, so this is what makes periodic sync
-  // actually happen in MV3.
+  // actually happen in MV3. periodInMinutes: 5 is the practical floor
+  // for this API (both Chrome and Firefox round anything shorter up to
+  // 1 minute for an installed extension outside of a dev-only relaxed
+  // mode), so this is as tight as this backstop can get without
+  // abandoning browser.alarms altogether -- see docs/architecture.md
+  // for why a persistent timer (setInterval, a kept-alive SSE
+  // connection, etc.) isn't an option in MV3. This now only matters as
+  // a backstop for cases the realtime target-history subscribe doesn't
+  // reach (no page with notes currently open, a fresh browser
+  // session, or a dropped SSE connection) -- see
+  // docs/target-list-sync.md.
   browser.alarms.create("target-sync", { periodInMinutes: 5 });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "target-sync") sync();
@@ -164,6 +182,23 @@ export default defineBackground(() => {
     }
   };
 
+  // Re-runs checkTab for every open tab against the current target
+  // cache. Cheap for tabs whose URL doesn't match any cached target --
+  // isTargetMatch inside checkTab/runCheckTab is a local lookup, not a
+  // network call -- so this is safe to call after any cache update,
+  // not just for the one tab a popup save or manual sync happened to
+  // target. This is what lets a target update reach a tab that's
+  // already sitting open on a page which only just gained an
+  // annotation (see docs/realtime-sync.md's known gap for pages with
+  // zero annotations: they mount no orchestrator of their own, so this
+  // polling/on-demand path is the only way they ever learn about one).
+  const recheckAllTabs = async () => {
+    const tabs = await browser.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id != null && tab.url) checkTab(tab.id, tab.url);
+    }
+  };
+
   // Detects navigation -- including client-side route changes that
   // update the tab's URL -- and checks it against the cached target
   // list. No network call unless it actually matches.
@@ -188,6 +223,16 @@ export default defineBackground(() => {
       if (tabId != null) checkTab(tabId, message.url);
     },
   );
+
+  // Sent by the popup after it refreshes the target cache itself (see
+  // entrypoints/popup/App.tsx's checkConfigured/handleSync). Unlike
+  // CHECK_ANNOTATION_MESSAGE above, this isn't scoped to one tab: the
+  // popup has no way to know which open tabs might match a target it
+  // just learned about, so it asks background.ts to recheck all of
+  // them.
+  browser.runtime.onMessage.addListener((message: RecheckAllTabsMessage) => {
+    if (message?.type === RECHECK_ALL_TABS_MESSAGE) recheckAllTabs();
+  });
 
   // Handles GET_POSITION_MESSAGE/SAVE_POSITION_MESSAGE/
   // SET_ANNOTATION_PIN_MESSAGE from content.ts (see lib/messages.ts for
@@ -223,7 +268,12 @@ export default defineBackground(() => {
   // sync above.
   browser.runtime.onMessage.addListener((message: AddCachedTargetMessage) => {
     if (message?.type === ADD_CACHED_TARGET_MESSAGE) {
-      addCachedTarget(message.target, message.updated);
+      // A brand new target learned this way might already match a tab
+      // that's open on it right now (including one showing zero notes
+      // so far -- see recheckAllTabs above), so recheck once the write
+      // finishes rather than waiting for this tab's own orchestrator,
+      // if it even has one, to notice.
+      addCachedTarget(message.target, message.updated).then(recheckAllTabs);
     }
   });
 });

@@ -10,10 +10,23 @@
 import { getAuthedPb } from "./pb";
 
 const TARGETS_KEY = "cachedTargets";
-// Timestamp (ISO 8601, UTC) of the last successful sync, used by
-// syncTargets to fetch only annotations touched since then instead of
-// the full list every time.
+// Timestamp of the last successful sync, used by syncTargets to fetch
+// only annotations touched since then instead of the full list every
+// time.
 const LAST_SYNC_KEY = "targetsLastSyncedAt";
+
+// PocketBase's filter engine expects datetime literals formatted as
+// "YYYY-MM-DD HH:MM:SS.sssZ" -- a space between date and time, not
+// full ISO 8601's "T" separator. Passing a "T"-separated string into
+// a filter's date comparison (see syncTargets below) doesn't error,
+// but silently falls back to a plain string comparison against the
+// DB's own space-separated representation, which never evaluates
+// true -- so every annotation created after the first sync would be
+// permanently invisible to the "updated > {:since}" filter. Always
+// convert through here before storing or filtering on a timestamp.
+function toPbDateTime(iso: string): string {
+  return iso.replace("T", " ");
+}
 
 async function getLastSyncedAt(): Promise<string | undefined> {
   const result = await browser.storage.local.get(LAST_SYNC_KEY);
@@ -107,8 +120,10 @@ export function isTargetMatch(url: string, targets: CachedTarget[]): boolean {
 export async function fullSyncTargets(): Promise<CachedTarget[]> {
   // Captured before the fetch so a later differential sync (syncTargets)
   // starts from this point, not from whenever the fetch happened to
-  // finish.
-  const startedAt = new Date().toISOString();
+  // finish. Converted to PocketBase's expected datetime format --
+  // see toPbDateTime above -- since this value is later fed straight
+  // into a filter's date comparison.
+  const startedAt = toPbDateTime(new Date().toISOString());
 
   const pb = await getAuthedPb();
   const records = await pb
@@ -152,8 +167,9 @@ export async function syncTargets(): Promise<CachedTarget[]> {
 
   // Captured before the fetch, for the same reason as in
   // fullSyncTargets: the next sync should start from here, not from
-  // whenever this fetch happened to finish.
-  const startedAt = new Date().toISOString();
+  // whenever this fetch happened to finish. Same format conversion as
+  // fullSyncTargets -- see toPbDateTime above.
+  const startedAt = toPbDateTime(new Date().toISOString());
 
   const pb = await getAuthedPb();
   const records = await pb

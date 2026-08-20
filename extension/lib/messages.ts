@@ -124,6 +124,17 @@ export interface CheckAnnotationMessage {
   tabId?: number;
 }
 
+// popup -> background: re-check every open tab against the local
+// target cache. Sent after the popup refreshes that cache itself (see
+// entrypoints/popup/App.tsx's checkConfigured/handleSync), since a
+// target that only just appeared in the cache might already match a
+// tab that's sitting open on it -- without this, that tab would only
+// ever pick up the change on its next navigation.
+export const RECHECK_ALL_TABS_MESSAGE = "sticky-party:recheck-all-tabs";
+export interface RecheckAllTabsMessage {
+  type: typeof RECHECK_ALL_TABS_MESSAGE;
+}
+
 // content -> background: relayed from the realtime-orchestrator (see
 // lib/realtime-messages.ts's TARGET_HISTORY_CREATED_MESSAGE) when a new
 // annotation's target appears anywhere, not just the current page. Only
