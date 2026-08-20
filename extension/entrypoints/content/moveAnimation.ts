@@ -18,7 +18,7 @@
 // 1:1 tracking, so they write top/left directly instead of going
 // through this.
 
-const MOVE_DURATION_MS = 300;
+const MOVE_DURATION_MS = 1000;
 // An "ease-in-out" curve: slow at both ends, fastest through the
 // middle. The first control point (0.4, 0) sits closer to the origin
 // than a more extreme curve like (0.65, 0, 0.35, 1) would use --
