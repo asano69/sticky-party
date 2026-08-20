@@ -22,16 +22,21 @@ export default defineConfig({
   // entrypoints/background.ts).
   // "alarms" wakes the MV3 service worker on a schedule for periodic
   // full sync even after it has been killed for inactivity.
-  // "web_accessible_resources" exposes annotation-iframe.html so content
-  // scripts can load it in an iframe (see entrypoints/content.ts). The
-  // iframe is what actually renders each note's title/body: since it's
+  // "web_accessible_resources" exposes annotation-iframe.html and
+  // realtime-orchestrator.html so content scripts can load them in an
+  // iframe (see entrypoints/content.ts and entrypoints/content/mountOrchestrator.ts).
+  // annotation-iframe.html renders each note's title/body: since it's
   // loaded from the extension's own origin rather than injected into the
   // host page's DOM, the host page cannot read its content.
+  // realtime-orchestrator.html is a headless page that subscribes to
+  // PocketBase realtime for the page's current target (see
+  // docs/realtime-sync.md); without this entry, the browser silently
+  // refuses to load it as an iframe, so it never runs at all.
   manifest: {
     permissions: ["storage", "activeTab", "tabs", "alarms"],
     web_accessible_resources: [
       {
-        resources: ["annotation-iframe.html"],
+        resources: ["annotation-iframe.html", "realtime-orchestrator.html"],
         matches: ["*://*/*"],
       },
     ],
