@@ -983,68 +983,6 @@ func init() {
 						"type": "bool"
 					},
 					{
-						"help": "",
-						"hidden": false,
-						"id": "bool3045404147",
-						"name": "pin",
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "bool"
-					},
-					{
-						"help": "",
-						"hidden": false,
-						"id": "number433697199",
-						"max": null,
-						"min": null,
-						"name": "pinXRatio",
-						"onlyInt": false,
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "number"
-					},
-					{
-						"help": "",
-						"hidden": false,
-						"id": "number3531956746",
-						"max": null,
-						"min": null,
-						"name": "pinYRatio",
-						"onlyInt": false,
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "number"
-					},
-					{
-						"help": "",
-						"hidden": false,
-						"id": "number1851503827",
-						"max": null,
-						"min": null,
-						"name": "pinWidth",
-						"onlyInt": false,
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "number"
-					},
-					{
-						"help": "",
-						"hidden": false,
-						"id": "number1101273801",
-						"max": null,
-						"min": null,
-						"name": "pinHeight",
-						"onlyInt": false,
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "number"
-					},
-					{
 						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
@@ -1102,20 +1040,6 @@ func init() {
 						"maxSelect": 0,
 						"minSelect": 0,
 						"name": "annotation",
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "relation"
-					},
-					{
-						"cascadeDelete": false,
-						"collectionId": "_pb_users_auth_",
-						"help": "",
-						"hidden": false,
-						"id": "relation2375276105",
-						"maxSelect": 0,
-						"minSelect": 0,
-						"name": "user",
 						"presentable": false,
 						"required": false,
 						"system": false,
@@ -1187,6 +1111,26 @@ func init() {
 						"type": "number"
 					},
 					{
+						"help": "",
+						"hidden": false,
+						"id": "bool3045404147",
+						"name": "pin",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"help": "",
+						"hidden": false,
+						"id": "bool3116547842",
+						"name": "heightAuto",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
 						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
@@ -1209,7 +1153,7 @@ func init() {
 				],
 				"id": "pbc_2998141924",
 				"indexes": [
-					"CREATE UNIQUE INDEX ` + "`" + `idx_4ff9gi82nk` + "`" + ` ON ` + "`" + `positions` + "`" + ` (\n  ` + "`" + `annotation` + "`" + `,\n  ` + "`" + `user` + "`" + `\n)"
+					"CREATE UNIQUE INDEX ` + "`" + `idx_2kchbwfnq7` + "`" + ` ON ` + "`" + `positions` + "`" + ` (` + "`" + `annotation` + "`" + `)"
 				],
 				"listRule": "@request.auth.id != ''",
 				"name": "positions",
