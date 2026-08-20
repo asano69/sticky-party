@@ -57,7 +57,16 @@ func Register(app core.App) {
 		}
 		// e.Record is still a valid in-memory struct after deletion --
 		// only the DB row is gone -- so its Id is still readable here.
-		return record(e.App, e.Record, e.Auth, "delete")
+		if err := record(e.App, e.Record, e.Auth, "delete"); err != nil {
+			return err
+		}
+		// Create/update rows are just an edit trail for a note that no
+		// longer exists, so they're pruned once the annotation itself
+		// is deleted. The "delete" row written above is intentionally
+		// left alone -- it's the only record of when/who deleted the
+		// annotation, and purgeCreateUpdateHistory never touches
+		// "delete" rows.
+		return purgeCreateUpdateHistory(e.App, e.Record.Id)
 	})
 }
 
@@ -141,4 +150,28 @@ func record(app core.App, annotation *core.Record, actor *core.Record, action st
 	row.Set("userName", name)
 	row.Set("action", action)
 	return app.Save(row)
+}
+
+// purgeCreateUpdateHistory deletes every "create"/"update" history row
+// for annotationId, leaving any "delete" row untouched. Called once the
+// annotation itself has just been deleted, since a create/update row is
+// only meaningful as an edit trail for a still-existing annotation.
+func purgeCreateUpdateHistory(app core.App, annotationId string) error {
+	rows, err := app.FindRecordsByFilter(
+		historiesCollection,
+		"annotationId = {:annotationId} && (action = 'create' || action = 'update')",
+		"",
+		0,
+		0,
+		map[string]any{"annotationId": annotationId},
+	)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if err := app.Delete(row); err != nil {
+			return err
+		}
+	}
+	return nil
 }
