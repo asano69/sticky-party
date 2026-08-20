@@ -55,6 +55,12 @@ let unsubscribe: (() => void) | undefined;
 // can't be accidentally skipped if the two ever need different timing.
 let historyChannel: BroadcastChannel | undefined;
 let unsubscribeHistory: (() => void) | undefined;
+// Target-scoped `positions` subscribe (see subscribePositions below).
+// Unlike the annotations/history subscribes above, this has no
+// BroadcastChannel of its own: a position/size/pin/z change is only
+// ever acted on by content.ts (which owns the wrapper elements), so it
+// goes straight to window.parent instead.
+let unsubscribePositions: (() => void) | undefined;
 // Bumped on every re-target, so a subscribe() call that resolves after
 // a newer target has already taken over can detect it's stale and
 // unsubscribe itself instead of delivering events for the wrong page.
@@ -75,6 +81,19 @@ interface HistoryRecord {
   userName: string;
 }
 
+// A `positions` row, as delivered by the realtime subscribe below.
+// `annotation` is the relation field's raw id (not expanded).
+interface PositionRecord {
+  id: string;
+  annotation: string;
+  pin: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  z: number;
+}
+
 function teardown() {
   unsubscribe?.();
   unsubscribe = undefined;
@@ -84,6 +103,8 @@ function teardown() {
   unsubscribeHistory = undefined;
   historyChannel?.close();
   historyChannel = undefined;
+  unsubscribePositions?.();
+  unsubscribePositions = undefined;
 }
 
 async function subscribeTarget(
@@ -179,24 +200,6 @@ async function subscribeTargetHistoryScoped(
 function handleEvent(e: RecordSubscription<AnnotationData>) {
   if (e.action === "update") {
     channel?.postMessage({ record: e.record } satisfies RealtimeUpdatePayload);
-    // Relayed on every update (not just when currently pinned), since
-    // content.ts also needs to detect the pin flag itself flipping --
-    // see entrypoints/content/mountNote.ts's applyRemotePin. When
-    // pin is false, xRatio/yRatio/width/height are simply the
-    // annotation's stale pin* fields and are ignored on the receiving
-    // end.
-    window.parent.postMessage(
-      {
-        type: ANNOTATION_POSITION_UPDATED_MESSAGE,
-        annotationId: e.record.id,
-        pin: e.record.pin,
-        xRatio: e.record.pinXRatio,
-        yRatio: e.record.pinYRatio,
-        width: e.record.pinWidth,
-        height: e.record.pinHeight,
-      } satisfies AnnotationPositionUpdatedMessage,
-      "*",
-    );
   } else if (e.action === "create") {
     window.parent.postMessage(
       {
@@ -213,6 +216,67 @@ function handleEvent(e: RecordSubscription<AnnotationData>) {
       } satisfies AnnotationDeletedMessage,
       "*",
     );
+  }
+}
+
+// Target-scoped `positions` subscribe: relays every position/size/pin/
+// z change straight to content.ts. Filtered server-side via the
+// `annotation` relation's own `target` field, so only positions
+// belonging to this page's annotations are delivered. Tied to the same
+// per-target generation as subscribeTarget/subscribeTargetHistoryScoped
+// above, for the same reason: a stale response must not apply to the
+// wrong page.
+async function subscribePositions(
+  target: string,
+  myGeneration: number,
+  attempt = 0,
+) {
+  try {
+    const pb = await getAuthedPb();
+    if (myGeneration !== generation) return;
+
+    const off = await pb.collection("positions").subscribe<PositionRecord>(
+      "*",
+      (e) => {
+        if (myGeneration !== generation) return;
+        if (e.action === "delete") return; // handled via annotation delete
+        window.parent.postMessage(
+          {
+            type: ANNOTATION_POSITION_UPDATED_MESSAGE,
+            annotationId: e.record.annotation,
+            pin: e.record.pin,
+            x: e.record.x,
+            y: e.record.y,
+            width: e.record.width,
+            height: e.record.height,
+            z: e.record.z,
+          } satisfies AnnotationPositionUpdatedMessage,
+          "*",
+        );
+      },
+      // Relies on PocketBase's relation dot-path filter support to
+      // scope this server-side without a `target` field on `positions`
+      // itself.
+      { filter: pb.filter("annotation.target = {:target}", { target }) },
+    );
+    if (myGeneration !== generation) {
+      off();
+      return;
+    }
+    unsubscribePositions = off;
+  } catch (err) {
+    console.error(
+      "[sticky-party] orchestrator positions subscribe failed",
+      err,
+    );
+    if (myGeneration !== generation) return;
+    const delay = INITIAL_RETRY_DELAYS_MS[attempt];
+    if (delay !== undefined) {
+      setTimeout(
+        () => subscribePositions(target, myGeneration, attempt + 1),
+        delay,
+      );
+    }
   }
 }
 
@@ -261,6 +325,7 @@ window.addEventListener(
       generation++;
       subscribeTarget(ev.data.target, generation);
       subscribeTargetHistoryScoped(ev.data.target, generation);
+      subscribePositions(ev.data.target, generation);
     }
   },
 );

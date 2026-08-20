@@ -42,7 +42,6 @@ import {
   TARGET_HISTORY_CREATED_MESSAGE,
   type OrchestratorToParentMessage,
 } from "../../lib/realtime-messages";
-import { createResizeRegistry } from "./viewport";
 import { IFRAME_PAGE, mountNote } from "./mountNote";
 import { mountOrchestrator, ORCHESTRATOR_PAGE } from "./mountOrchestrator";
 
@@ -113,18 +112,8 @@ export default defineContentScript({
       if (z > zCounter) zCounter = z;
     };
 
-    // Notes render at raw pixel offsets, but their saved position is a
-    // ratio of the window's size (see lib/positions.ts's toRatio), so a
-    // manual browser resize should keep each note in the same relative
-    // spot instead of leaving it pinned to its old pixel offset.
-    // createResizeRegistry (see ./viewport) owns the actual resize
-    // listeners and rescale math; mountNote just adds/removes its own
-    // reposition callback from the returned Set.
-    const repositionOnResize = createResizeRegistry();
-
     const mountNoteDeps = {
       iframeOrigin,
-      repositionOnResize,
       nextZ,
       bumpZCounter,
     };
@@ -204,12 +193,13 @@ export default defineContentScript({
           mountedNotes.get(e.data.annotationId)?.removeShredded();
           mountedNotes.delete(e.data.annotationId);
         } else if (e.data?.type === ANNOTATION_POSITION_UPDATED_MESSAGE) {
-          mountedNotes.get(e.data.annotationId)?.applyRemotePin({
+          mountedNotes.get(e.data.annotationId)?.applyRemotePosition({
             pin: e.data.pin,
-            xRatio: e.data.xRatio,
-            yRatio: e.data.yRatio,
+            x: e.data.x,
+            y: e.data.y,
             width: e.data.width,
             height: e.data.height,
+            z: e.data.z,
           });
         } else if (e.data?.type === TARGET_HISTORY_CREATED_MESSAGE) {
           // Not scoped to this page's own target -- just forwarded on

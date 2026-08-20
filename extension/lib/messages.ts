@@ -2,7 +2,7 @@
 // content script (see entrypoints/background.ts and
 // entrypoints/content.ts). Kept in one place so both sides stay in sync.
 
-import type { PositionData, ViewportInfo } from "./positions";
+import type { PositionData } from "./positions";
 
 // background -> content
 export const SHOW_ANNOTATION_MESSAGE = "sticky-party:show-annotation";
@@ -10,56 +10,37 @@ export const HIDE_ANNOTATION_MESSAGE = "sticky-party:hide-annotation";
 // content -> background
 export const CHECK_ANNOTATION_MESSAGE = "sticky-party:check-annotation";
 
-// content -> background: fetch/save a note's position and size.
-// Routed through the background script rather than calling PocketBase
-// directly from content.ts, because a content script's own network
-// requests are treated differently from the extension's (Firefox
-// attributes them to the host page's origin, which broke loading saved
-// positions once the extension was installed as a real add-on instead
-// of run via `wxt dev`).
+// content -> background: fetch/save a note's shared position, size,
+// pin state, and z-index. Routed through the background script rather
+// than calling PocketBase directly from content.ts, because a content
+// script's own network requests are treated differently from the
+// extension's (Firefox attributes them to the host page's origin,
+// which broke loading saved positions once the extension was installed
+// as a real add-on instead of run via `wxt dev`).
 export const GET_POSITION_MESSAGE = "sticky-party:get-position";
 export const SAVE_POSITION_MESSAGE = "sticky-party:save-position";
 
 export interface GetPositionMessage {
   type: typeof GET_POSITION_MESSAGE;
   annotationId: string;
-  // The content page's own viewport/screen -- lib/positions.ts runs in
-  // the background script, which has no access to the content page's
-  // `window`/`screen` (see lib/positions.ts for why that matters).
-  viewport: ViewportInfo;
 }
 
 export interface SavePositionMessage {
   type: typeof SAVE_POSITION_MESSAGE;
   annotationId: string;
   position: PositionData;
-  viewport: ViewportInfo;
   existingId?: string;
 }
 
-// content -> background: pin (or unpin) an annotation to a fixed spot
-// on the page. Unlike GET_POSITION_MESSAGE/SAVE_POSITION_MESSAGE, this
-// writes straight to the annotation record (see lib/annotations.ts's
-// setAnnotationPin), not the positions collection -- pin is shared by
-// every viewer, not a per-user preference. `coords` is only sent when
-// pinning (content.ts's togglePin/persistPosition); unpinning just
-// clears the flag.
-export const SET_ANNOTATION_PIN_MESSAGE = "sticky-party:set-annotation-pin";
-export interface SetAnnotationPinMessage {
-  type: typeof SET_ANNOTATION_PIN_MESSAGE;
-  annotationId: string;
-  pin: boolean;
-  coords?: { xRatio: number; yRatio: number; width: number; height: number };
-}
-
-export type PositionMessage =
-  GetPositionMessage | SavePositionMessage | SetAnnotationPinMessage;
+export type PositionMessage = GetPositionMessage | SavePositionMessage;
 
 // A single annotation's id (needed to save edits back to PocketBase),
-// body text, and last-updated timestamp. `updated` drives the stacking
-// order in AnnotationBoard: notes are sorted oldest-first so the most
-// recently edited one ends up last in the DOM and renders on top (see
-// fetchAnnotations in lib/annotations.ts).
+// content, and last-updated timestamp. Position/size/pin/z now live
+// entirely in the `positions` collection (see lib/positions.ts) --
+// annotations only ever holds the note's content. `updated` drives the
+// stacking order in AnnotationBoard: notes are sorted oldest-first so
+// the most recently edited one ends up last in the DOM and renders on
+// top (see fetchAnnotations in lib/annotations.ts).
 export interface AnnotationData {
   id: string;
   // The normalized target URL this annotation belongs to. Needed to
@@ -75,21 +56,6 @@ export interface AnnotationData {
   // button in NoteContent.tsx's footer. Empty/unrecognized values fall
   // back to DEFAULT_NOTE_COLOR.
   color: string;
-  // Whether this note is pinned to a fixed spot on the page (position:
-  // absolute, so it scrolls with the page) instead of following the
-  // viewport (position: fixed, the default). Shared by every viewer --
-  // unlike ordinary position, which is per-user (see lib/positions.ts)
-  // -- so it lives on the annotation record itself, toggled via the
-  // footer's pin button (see NoteFooter.tsx/lib/annotations.ts's
-  // setAnnotationPin).
-  pin: boolean;
-  // Pinned coordinates, as ratios of the whole document (not the
-  // window) plus a fixed pixel size. Only meaningful when pin is true;
-  // ignored otherwise.
-  pinXRatio: number;
-  pinYRatio: number;
-  pinWidth: number;
-  pinHeight: number;
   updated: string;
 }
 

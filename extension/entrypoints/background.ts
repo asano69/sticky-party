@@ -1,6 +1,6 @@
 // See docs/architecture.md for the full sync design this implements.
 
-import { fetchAnnotations, setAnnotationPin } from "../lib/annotations";
+import { fetchAnnotations } from "../lib/annotations";
 import { getAuthedPb } from "../lib/pb";
 import { formatActionTitle } from "../lib/actionTitle";
 import { getCachedAnnotationCount } from "../lib/annotationCountCache";
@@ -16,7 +16,6 @@ import {
   HIDE_ANNOTATION_MESSAGE,
   RECHECK_ALL_TABS_MESSAGE,
   SAVE_POSITION_MESSAGE,
-  SET_ANNOTATION_PIN_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type AddCachedTargetMessage,
   type CheckAnnotationMessage,
@@ -234,27 +233,20 @@ export default defineBackground(() => {
     if (message?.type === RECHECK_ALL_TABS_MESSAGE) recheckAllTabs();
   });
 
-  // Handles GET_POSITION_MESSAGE/SAVE_POSITION_MESSAGE/
-  // SET_ANNOTATION_PIN_MESSAGE from content.ts (see lib/messages.ts for
-  // why this can't run in the content script itself). Returning a
-  // Promise here makes the polyfilled browser.runtime.onMessage resolve
-  // the sender's sendMessage() call with whatever
-  // fetchPosition/savePosition/setAnnotationPin resolve to.
+  // Handles GET_POSITION_MESSAGE/SAVE_POSITION_MESSAGE from content.ts
+  // (see lib/messages.ts for why this can't run in the content script
+  // itself). Returning a Promise here makes the polyfilled
+  // browser.runtime.onMessage resolve the sender's sendMessage() call
+  // with whatever fetchPosition/savePosition resolves to.
   browser.runtime.onMessage.addListener((message: PositionMessage) => {
     if (message?.type === GET_POSITION_MESSAGE) {
-      return fetchPosition(message.annotationId, message.viewport);
+      return fetchPosition(message.annotationId);
     }
     if (message?.type === SAVE_POSITION_MESSAGE) {
       return savePosition(
         message.annotationId,
         message.position,
-        message.viewport,
         message.existingId,
-      );
-    }
-    if (message?.type === SET_ANNOTATION_PIN_MESSAGE) {
-      return getAuthedPb().then((pb) =>
-        setAnnotationPin(pb, message.annotationId, message.pin, message.coords),
       );
     }
   });

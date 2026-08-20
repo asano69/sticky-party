@@ -5,17 +5,23 @@
 // entrypoints/content/index.ts, which is kept as a thin entry point --
 // see that file's own header comment for why the iframe/parent split
 // exists at all.
+//
+// Position/size/pin/z are all shared across every viewer now (see
+// lib/positions.ts): x/y are stored as a ratio of the whole document,
+// used as-is whether the note is pinned (position: absolute) or not
+// (position: fixed) -- the two modes only differ in how the browser
+// then renders that anchor as the page scrolls, not in how the anchor
+// itself is computed or stored. That's what makes togglePin below a
+// pure metadata flip with no coordinate math.
 
 import X from "lucide-solid/icons/x";
 
 import {
   GET_POSITION_MESSAGE,
   SAVE_POSITION_MESSAGE,
-  SET_ANNOTATION_PIN_MESSAGE,
   type AnnotationData,
   type GetPositionMessage,
   type SavePositionMessage,
-  type SetAnnotationPinMessage,
 } from "../../lib/messages";
 import {
   INIT_NOTE_MESSAGE,
@@ -31,7 +37,7 @@ import {
   type NotePinMessage,
 } from "../../lib/iframe-messages";
 import type { StoredPosition } from "../../lib/positions";
-import { currentViewport, documentSize } from "./viewport";
+import { documentSize, pxToRem, remToPx } from "./viewport";
 import { animateMove } from "./moveAnimation";
 import { removeFaded, removeShredded } from "./removeAnimation";
 
@@ -47,9 +53,6 @@ export interface MountNoteDeps {
   // Origin every postMessage exchange with this note's iframe is
   // validated against (see entrypoints/annotation-iframe.html).
   iframeOrigin: string;
-  // Shared registry of per-note reposition callbacks, invoked on
-  // window/visualViewport resize -- see ./viewport's createResizeRegistry.
-  repositionOnResize: Set<(scaleX: number, scaleY: number) => void>;
   // Returns a fresh, ever-increasing z-index value.
   nextZ: () => number;
   // Advances the shared z counter to at least `z`, so a note restored
@@ -64,100 +67,86 @@ export async function mountNote(
   index: number,
   deps: MountNoteDeps,
 ) {
-  // Cascade defaults, used only if this device has no saved
-  // position yet. Resolved before the iframe UI is created below,
-  // so the note appears directly at its saved spot instead of
-  // flashing at the cascade position and then jumping once
-  // fetchPosition resolves (this mirrors old-arch's
-  // `positionLoaded` gate, adapted for the iframe split).
+  // Cascade defaults, used only if this annotation has no saved
+  // position yet. Resolved before the iframe UI is created below, so
+  // the note appears directly at its saved spot instead of flashing at
+  // the cascade position and then jumping once fetchPosition resolves.
   let top = 12 + index * 24;
   let left = 12 + index * 24;
   let z: number;
   let positionRecordId: string | undefined;
-  let savedWidth: number | undefined;
-  let savedHeight: number | undefined;
+  let savedWidthPx: number | undefined;
   // Whether this note follows the viewport (position: fixed, the
-  // default for every new note) or stays anchored to a fixed spot
-  // on the page itself (position: absolute, so it scrolls with the
-  // page). Sourced from the annotation record itself (pin is
-  // shared by every viewer, unlike ordinary position -- see
-  // lib/messages.ts's AnnotationData), not the positions
-  // collection. Toggled from the footer's pin button -- see
-  // togglePin below.
-  let pinned = annotation.pin;
+  // default) or stays anchored to a fixed spot on the page (position:
+  // absolute). Shared across every viewer via the `positions`
+  // collection (see lib/positions.ts) -- no longer per-user.
+  let pinned = false;
   // This note's anchor, as a ratio of the whole document -- the
-  // source of truth for a pinned note's position. Only meaningful
-  // while pinned; kept up to date by persistPosition/togglePin
-  // below, and read by the document ResizeObserver (see onMount)
-  // to redraw top/left whenever the document's size changes (e.g.
-  // images or fonts finishing loading), not just on window resize.
-  let pinRatioX = 0;
-  let pinRatioY = 0;
+  // source of truth for top/left regardless of pinned (see this
+  // file's header comment). Kept up to date by persistPosition and
+  // the document ResizeObserver below.
+  let xRatio = 0;
+  let yRatio = 0;
 
-  if (pinned) {
-    // Pinned coordinates are ratios of the whole document, not the
-    // window, and live on the annotation record itself (see
-    // lib/annotations.ts's setAnnotationPin) -- every viewer sees
-    // the same anchor point, so there's no positions lookup here.
-    pinRatioX = annotation.pinXRatio;
-    pinRatioY = annotation.pinYRatio;
-    const doc = documentSize();
-    top = pinRatioY * doc.height;
-    left = pinRatioX * doc.width;
-    savedWidth = annotation.pinWidth || undefined;
-    savedHeight = annotation.pinHeight || undefined;
-    z = deps.nextZ();
-  } else {
-    try {
-      // Fetched via the background script, not directly here -- see
-      // lib/messages.ts for why a content script can't safely call
-      // PocketBase itself.
-      const saved: StoredPosition | undefined =
-        await browser.runtime.sendMessage({
-          type: GET_POSITION_MESSAGE,
-          annotationId: annotation.id,
-          viewport: currentViewport(),
-        } satisfies GetPositionMessage);
-      if (saved) {
-        positionRecordId = saved.id;
-        top = saved.top;
-        left = saved.left;
-        z = saved.z;
-        savedWidth = saved.width;
-        savedHeight = saved.height;
-        deps.bumpZCounter(z);
-      } else {
-        z = deps.nextZ();
-      }
-    } catch (err) {
-      console.error("[sticky-party] failed to load position", err);
+  try {
+    // Fetched via the background script, not directly here -- see
+    // lib/messages.ts for why a content script can't safely call
+    // PocketBase itself.
+    const saved: StoredPosition | undefined = await browser.runtime.sendMessage(
+      {
+        type: GET_POSITION_MESSAGE,
+        annotationId: annotation.id,
+      } satisfies GetPositionMessage,
+    );
+    if (saved) {
+      positionRecordId = saved.id;
+      pinned = saved.pin;
+      xRatio = saved.x;
+      yRatio = saved.y;
+      savedWidthPx = remToPx(saved.width);
+      const doc = documentSize();
+      top = saved.y * doc.height;
+      left = saved.x * doc.width;
+      z = saved.z;
+      deps.bumpZCounter(z);
+    } else {
       z = deps.nextZ();
     }
+  } catch (err) {
+    console.error("[sticky-party] failed to load position", err);
+    z = deps.nextZ();
   }
 
-  // Tracks the note's "resting" (non-editing) content height, as
+  if (positionRecordId === undefined) {
+    // No saved position: derive the initial ratio from the cascade
+    // default so the document-resize observer below has a sane anchor
+    // to work from until the first persistPosition() call.
+    const doc = documentSize();
+    xRatio = doc.width ? left / doc.width : 0;
+    yRatio = doc.height ? top / doc.height : 0;
+  }
+
+  // Tracks the note's "resting" (non-editing) content height in px, as
   // last reported by the iframe via NOTE_CONTENT_RESIZE_MESSAGE (or
   // recovered from a manual drag-resize -- see the ResizeObserver
   // below). This, not the wrapper's current on-screen size, is what
-  // gets persisted, so temporarily growing the wrapper for the
-  // edit-mode footer (see applyWrapperHeight below) never changes
-  // the note's saved size.
-  let contentHeight = savedHeight ? savedHeight - TITLE_ROW_HEIGHT_PX : 0;
+  // gets persisted (converted to rem), so temporarily growing the
+  // wrapper for the edit-mode footer (see applyWrapperHeight below)
+  // never changes the note's saved size.
+  let contentHeight = savedWidthPx !== undefined ? 0 : 0;
   let isEditingNote = false;
 
   let resizeObserver: ResizeObserver | undefined;
   let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
-  // Watches the whole document (not just this note's own wrapper --
-  // see resizeObserver above) so a pinned note's on-screen position
-  // can be redrawn from pinRatioX/pinRatioY whenever the document's
-  // size changes, for any reason (window resize, images/fonts
-  // finishing loading, lazily-mounted content). Only ever created
-  // and observed for pinned notes -- see onMount below.
+  // Watches the whole document so this note's on-screen position can
+  // be redrawn from xRatio/yRatio whenever the document's size changes,
+  // for any reason (window resize, images/fonts finishing loading,
+  // lazily-mounted content). Applies to every note now, pinned or
+  // not -- see this file's header comment.
   let docResizeObserver: ResizeObserver | undefined;
   let docResizeTimer: ReturnType<typeof setTimeout> | undefined;
   let onMessage: ((e: MessageEvent) => void) | undefined;
-  let reposition: ((scaleX: number, scaleY: number) => void) | undefined;
-  // Hoisted out of onMount so applyRemotePin (defined below, and
+  // Hoisted out of onMount so applyRemotePosition (defined below, and
   // exposed on the returned handle) can reach the wrapper element and
   // its height-recalculation logic from outside the onMount closure.
   let wrapperEl: HTMLElement | undefined;
@@ -196,7 +185,7 @@ export async function mountNote(
         position: pinned ? "absolute" : "fixed",
         top: `${top}px`,
         left: `${left}px`,
-        width: savedWidth ? `${savedWidth}px` : "260px",
+        width: savedWidthPx ? `${savedWidthPx}px` : "260px",
         minWidth: "160px",
         minHeight: `${TITLE_ROW_HEIGHT_PX + MIN_CONTENT_HEIGHT_PX}px`,
         resize: "both",
@@ -217,97 +206,41 @@ export async function mountNote(
       };
       applyWrapperHeight();
 
-      // Keeps this note's screen position proportional to the
-      // window when the browser window is resized (registered
-      // into deps.repositionOnResize above).
-      reposition = (scaleX, scaleY) => {
-        // Pinned notes ignore viewport resizes entirely: their
-        // top/left are document-relative, so the browser's own
-        // scrolling and reflow already keep them in the right spot
-        // without any rescaling here.
-        if (pinned) return;
-        // top/left themselves stay pure ratio-scaled values, never
-        // clamped -- clamping the state itself (not just the
-        // rendered position) would permanently lose the note's true
-        // position once the window shrinks far enough, so growing
-        // the window back afterward could no longer restore it
-        // exactly. Only the on-screen rendering is clamped here, so
-        // top/left always scale back to their original values once
-        // the window returns to its original size.
-        top *= scaleY;
-        left *= scaleX;
-        const clampedTop = Math.min(
-          Math.max(top, 0),
-          Math.max(window.innerHeight - wrapper.offsetHeight, 0),
-        );
-        const clampedLeft = Math.min(
-          Math.max(left, 0),
-          Math.max(window.innerWidth - wrapper.offsetWidth, 0),
-        );
-        wrapper.style.top = `${clampedTop}px`;
-        wrapper.style.left = `${clampedLeft}px`;
-      };
-      deps.repositionOnResize.add(reposition);
-
       const bringToFront = () => {
         z = deps.nextZ();
         wrapper.style.zIndex = `${Z_BASE + z}`;
+        // z is shared now, so a "bring to front" needs to reach every
+        // viewer promptly, not just wait for the next drag/resize.
+        persistPosition();
       };
 
       // Saved via the background script, not directly here -- see
       // lib/messages.ts for why a content script can't safely call
-      // PocketBase itself. Pinned notes persist to the annotation
-      // record (SET_ANNOTATION_PIN_MESSAGE); ordinary notes persist
-      // to the positions collection (SAVE_POSITION_MESSAGE) as
-      // before.
+      // PocketBase itself. Always recomputes xRatio/yRatio from the
+      // current top/left before sending: this is the one place a
+      // note's anchor is actually redefined (e.g. after a drag), so
+      // the values the document ResizeObserver below relies on must
+      // be refreshed here too.
       const persistPosition = () => {
-        if (pinned) {
-          const doc = documentSize();
-          // Recompute the ratio from the current pixel position
-          // (not the other way around): this is the one place a
-          // pinned note's anchor is actually redefined -- e.g.
-          // after a drag -- so pinRatioX/pinRatioY (read by the
-          // document ResizeObserver above to redraw the note on
-          // later layout shifts) must be refreshed here too.
-          pinRatioX = left / doc.width;
-          pinRatioY = top / doc.height;
-          browser.runtime
-            .sendMessage({
-              type: SET_ANNOTATION_PIN_MESSAGE,
-              annotationId: annotation.id,
-              pin: true,
-              coords: {
-                xRatio: pinRatioX,
-                yRatio: pinRatioY,
-                width: wrapper.offsetWidth,
-                // Use contentHeight (the resting/non-editing size),
-                // not wrapper.offsetHeight -- the wrapper is
-                // temporarily taller than that while editing (see
-                // applyWrapperHeight above).
-                height: TITLE_ROW_HEIGHT_PX + contentHeight,
-              },
-            } satisfies SetAnnotationPinMessage)
-            .catch((err: unknown) =>
-              console.error("[sticky-party] failed to save pin position", err),
-            );
-          return;
-        }
+        const doc = documentSize();
+        xRatio = doc.width ? left / doc.width : xRatio;
+        yRatio = doc.height ? top / doc.height : yRatio;
         browser.runtime
           .sendMessage({
             type: SAVE_POSITION_MESSAGE,
             annotationId: annotation.id,
-            // Use contentHeight (the resting/non-editing size), not
-            // wrapper.offsetHeight -- the wrapper is temporarily
-            // taller than that while editing (see applyWrapperHeight
-            // above).
             position: {
-              top,
-              left,
-              width: wrapper.offsetWidth,
-              height: TITLE_ROW_HEIGHT_PX + contentHeight,
+              pin: pinned,
+              x: xRatio,
+              y: yRatio,
+              width: pxToRem(wrapper.offsetWidth),
+              // Use contentHeight (the resting/non-editing size), not
+              // wrapper.offsetHeight -- the wrapper is temporarily
+              // taller than that while editing (see applyWrapperHeight
+              // above).
+              height: pxToRem(TITLE_ROW_HEIGHT_PX + contentHeight),
               z,
             },
-            viewport: currentViewport(),
             existingId: positionRecordId,
           } satisfies SavePositionMessage)
           .then((id: string) => (positionRecordId = id))
@@ -317,42 +250,14 @@ export async function mountNote(
       };
 
       // Flips this note between following the viewport (fixed) and
-      // staying anchored to a fixed spot on the page (absolute, so
-      // it scrolls with the page) -- triggered by the footer's pin
-      // button (see NoteFooter.tsx/TOGGLE_PIN_MESSAGE). Converts
-      // top/left into the new mode's coordinate space first, so the
-      // note doesn't visually jump: fixed (viewport) and absolute
-      // (page) coordinates differ by exactly the current scroll
-      // offset.
+      // staying anchored to a fixed spot on the page (absolute) --
+      // triggered by the footer's pin button (see
+      // NoteFooter.tsx/TOGGLE_PIN_MESSAGE). Both modes now share the
+      // same document-relative x/y (see this file's header comment),
+      // so this is purely a metadata flip -- no coordinate conversion.
       const togglePin = () => {
-        const nowPinned = !pinned;
-        if (nowPinned) {
-          top += window.scrollY;
-          left += window.scrollX;
-        } else {
-          top -= window.scrollY;
-          left -= window.scrollX;
-        }
-        pinned = nowPinned;
+        pinned = !pinned;
         wrapper.style.position = pinned ? "absolute" : "fixed";
-        wrapper.style.top = `${top}px`;
-        wrapper.style.left = `${left}px`;
-        if (!pinned) {
-          // Clear the pin flag on the annotation before switching
-          // this note over to the positions collection below --
-          // otherwise the annotation would keep pin: true (with
-          // now-stale coordinates) even though this note is back to
-          // following the viewport.
-          browser.runtime
-            .sendMessage({
-              type: SET_ANNOTATION_PIN_MESSAGE,
-              annotationId: annotation.id,
-              pin: false,
-            } satisfies SetAnnotationPinMessage)
-            .catch((err: unknown) =>
-              console.error("[sticky-party] failed to unpin", err),
-            );
-        }
         persistPosition();
         iframe.contentWindow?.postMessage(
           { type: NOTE_PIN_MESSAGE, pin: pinned } satisfies NotePinMessage,
@@ -562,19 +467,21 @@ export async function mountNote(
       // "correct" moment to measure once. Debounced like
       // resizeObserver above, since a page still loading can
       // resize many times in quick succession.
-      if (pinned) {
-        docResizeObserver = new ResizeObserver(() => {
-          clearTimeout(docResizeTimer);
-          docResizeTimer = setTimeout(() => {
-            const doc = documentSize();
-            top = pinRatioY * doc.height;
-            left = pinRatioX * doc.width;
-            wrapper.style.top = `${top}px`;
-            wrapper.style.left = `${left}px`;
-          }, 300);
-        });
-        docResizeObserver.observe(document.documentElement);
-      }
+
+      // Redraws top/left from xRatio/yRatio whenever the document's
+      // size changes, for every note (see this file's header
+      // comment) -- not just pinned ones as before.
+      docResizeObserver = new ResizeObserver(() => {
+        clearTimeout(docResizeTimer);
+        docResizeTimer = setTimeout(() => {
+          const doc = documentSize();
+          top = yRatio * doc.height;
+          left = xRatio * doc.width;
+          wrapper.style.top = `${top}px`;
+          wrapper.style.left = `${left}px`;
+        }, 300);
+      });
+      docResizeObserver.observe(document.documentElement);
 
       // Hand the annotation to the iframe once it reports itself
       // ready, rather than on the iframe's 'load' event -- 'load'
@@ -585,6 +492,14 @@ export async function mountNote(
         if (e.data?.type === NOTE_READY_MESSAGE) {
           iframe.contentWindow?.postMessage(
             { type: INIT_NOTE_MESSAGE, annotation },
+            deps.iframeOrigin,
+          );
+          // pin isn't part of AnnotationData (it lives in the
+          // `positions` collection now, not `annotations` -- see
+          // lib/positions.ts), so it's reported to the iframe
+          // separately, right after init.
+          iframe.contentWindow?.postMessage(
+            { type: NOTE_PIN_MESSAGE, pin: pinned } satisfies NotePinMessage,
             deps.iframeOrigin,
           );
         } else if (e.data?.type === NOTE_DELETED_MESSAGE) {
@@ -628,7 +543,6 @@ export async function mountNote(
     },
     onRemove: () => {
       if (onMessage) window.removeEventListener("message", onMessage);
-      if (reposition) deps.repositionOnResize.delete(reposition);
       if (darkModeQuery && applyThemeColors) {
         darkModeQuery.removeEventListener("change", applyThemeColors);
       }
@@ -641,83 +555,39 @@ export async function mountNote(
     },
   });
 
-  // Applies a remote pin-state/position change relayed by the realtime
-  // orchestrator (see entrypoints/content/index.ts's handling of
-  // ANNOTATION_POSITION_UPDATED_MESSAGE). Compares the incoming pin
-  // flag against this note's own local `pinned` to cover three cases:
-  //   - pin turned on (locally still unpinned): switch this wrapper to
-  //     document-anchored (absolute) mode using the given coords, same
-  //     as if this viewer had pinned it themselves.
-  //   - pin stays on: just refresh the coords (another tab/user moved
-  //     or resized it further).
-  //   - pin turned off (locally still pinned): switch back to
-  //     viewport-following (fixed) mode using this viewer's own saved
-  //     position, the same source read on initial mount (see the
-  //     GET_POSITION_MESSAGE call above this function) -- pin is
-  //     shared by every viewer, but ordinary position is per-user, so
-  //     there's no "correct" unpinned position in the incoming event
-  //     itself to derive from.
-  // A no-op once this note's wrapper no longer exists (removed while
-  // this was in flight -- checked both up front and again after the
-  // GET_POSITION_MESSAGE round trip below). Never calls
-  // persistPosition(): both the pinned coords and (when unpinning) the
-  // fetched saved position already came from the DB, so writing either
-  // straight back would just be a redundant round trip.
-  async function applyRemotePin(update: {
+  // Applies a remote position/size/pin/z change relayed by the
+  // realtime orchestrator (see entrypoints/content/index.ts's handling
+  // of ANNOTATION_POSITION_UPDATED_MESSAGE) -- fired for every note
+  // now that position is shared, not just pinned ones. Both pin modes
+  // share the same document-relative x/y (see this file's header
+  // comment), so unlike the old per-user version, there's no separate
+  // "fetch my own saved position back" fallback needed on unpin: there
+  // is only one shared position now, and it's already in `update`.
+  function applyRemotePosition(update: {
     pin: boolean;
-    xRatio: number;
-    yRatio: number;
-    width: number;
-    height: number;
+    x: number;
+    y: number;
+    width: number; // rem
+    height: number; // rem
+    z: number;
   }) {
     const wrapper = wrapperEl;
     const applyHeight = applyWrapperHeight;
     if (!wrapper || !applyHeight) return;
 
-    if (update.pin) {
-      pinned = true;
-      pinRatioX = update.xRatio;
-      pinRatioY = update.yRatio;
-      const doc = documentSize();
-      top = update.yRatio * doc.height;
-      left = update.xRatio * doc.width;
-      contentHeight = Math.max(0, update.height - TITLE_ROW_HEIGHT_PX);
-      wrapper.style.position = "absolute";
-      animateMove(wrapper, top, left);
-      wrapper.style.width = `${update.width}px`;
-      applyHeight();
-      return;
-    }
+    pinned = update.pin;
+    xRatio = update.x;
+    yRatio = update.y;
+    const doc = documentSize();
+    top = update.y * doc.height;
+    left = update.x * doc.width;
+    contentHeight = Math.max(0, remToPx(update.height) - TITLE_ROW_HEIGHT_PX);
+    z = Math.max(z, update.z);
 
-    if (!pinned) return; // already unpinned locally, nothing to do
-    pinned = false;
-    wrapper.style.position = "fixed";
-
-    try {
-      const saved: StoredPosition | undefined =
-        await browser.runtime.sendMessage({
-          type: GET_POSITION_MESSAGE,
-          annotationId: annotation.id,
-          viewport: currentViewport(),
-        } satisfies GetPositionMessage);
-      if (wrapperEl !== wrapper) return; // removed while awaiting
-      if (saved) {
-        positionRecordId = saved.id;
-        top = saved.top;
-        left = saved.left;
-        contentHeight = Math.max(0, saved.height - TITLE_ROW_HEIGHT_PX);
-        wrapper.style.width = `${saved.width}px`;
-      } else {
-        top = 12 + index * 24;
-        left = 12 + index * 24;
-      }
-    } catch (err) {
-      console.error("[sticky-party] failed to load position after unpin", err);
-      if (wrapperEl !== wrapper) return;
-      top = 12 + index * 24;
-      left = 12 + index * 24;
-    }
+    wrapper.style.position = pinned ? "absolute" : "fixed";
+    wrapper.style.zIndex = `${Z_BASE + z}`;
     animateMove(wrapper, top, left);
+    wrapper.style.width = `${remToPx(update.width)}px`;
     applyHeight();
   }
 
@@ -746,7 +616,7 @@ export async function mountNote(
   ui.mount();
   return {
     ...ui,
-    applyRemotePin,
+    applyRemotePosition,
     removeFaded: playRemoveFaded,
     removeShredded: playRemoveShredded,
   };

@@ -91,6 +91,14 @@ export default function NoteContent() {
   const [shaking, setShaking] = createSignal(false);
   let shakeTimer: ReturnType<typeof setTimeout> | undefined;
 
+  // Whether this note is pinned to a fixed spot on the page. No longer
+  // part of AnnotationData -- pin now lives in the shared `positions`
+  // collection, not `annotations` (see lib/positions.ts) -- so
+  // content.ts reports it separately via NOTE_PIN_MESSAGE, both right
+  // after init and on every later toggle (see useParentMessaging.ts's
+  // onPinChange below).
+  const [pinned, setPinned] = createSignal(false);
+
   // Edit-history panel (see NoteMain.tsx), toggled by the footer's
   // info button. Its contents live in state.historyEntries, seeded once
   // on init and kept live by realtime updates (see onInit and
@@ -170,9 +178,7 @@ export default function NoteContent() {
     onStartEditTitle: () => startEdit("title"),
     editing,
     onBlurWhileEditing: () => saveEdit(),
-    onPinChange: (pin) => {
-      if (state.annotation) setState("annotation", "pin", pin);
-    },
+    onPinChange: setPinned,
   });
 
   // Applies another tab/user's edits onto this note's store as soon as
@@ -388,7 +394,7 @@ export default function NoteContent() {
             saving={saving()}
             onKeyDown={onEditorKeyDown}
             titleInputRef={(el) => (titleInputRef = el)}
-            pinned={note().pin}
+            pinned={pinned()}
             onTogglePin={parentMessaging.sendTogglePin}
           />
 

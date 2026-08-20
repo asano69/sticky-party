@@ -90,25 +90,23 @@ export interface RealtimeHistoryPayload {
   record: HistoryEntry;
 }
 
-// orchestrator -> content.ts: an annotation's pin state and/or pinned
-// position/size changed. Carries the raw `pin` flag (not just
-// coordinates) so content.ts can detect the pin flag itself flipping
-// -- another tab/user pinning or unpinning the note -- not only a
-// position/size change on an already-pinned one. Only content.ts can
-// act on this: it owns the wrapper element and is the sole place a
-// note's fixed/absolute positioning mode is applied (see
-// entrypoints/content/mountNote.ts's applyRemotePin). Unpinned
-// position (per-viewer, stored in the positions collection) never
-// travels through this message -- see applyRemotePin for how the
-// unpin case is handled instead.
+// orchestrator -> content.ts: a note's shared position, size, pin
+// state, or stacking order changed (see lib/positions.ts -- position
+// is no longer per-user, so this now applies to every note, not just
+// pinned ones). x/y are document-size ratios; width/height are in rem
+// -- see lib/positions.ts for why. Only content.ts can act on this: it
+// owns the wrapper element and is the sole place a note's on-page
+// position is applied (see entrypoints/content/mountNote.ts's
+// applyRemotePosition).
 export const ANNOTATION_POSITION_UPDATED_MESSAGE =
   "sticky-party:annotation-position-updated";
 export interface AnnotationPositionUpdatedMessage {
   type: typeof ANNOTATION_POSITION_UPDATED_MESSAGE;
   annotationId: string;
   pin: boolean;
-  xRatio: number;
-  yRatio: number;
+  x: number;
+  y: number;
   width: number;
   height: number;
+  z: number;
 }
