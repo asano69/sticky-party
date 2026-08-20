@@ -110,6 +110,7 @@ export default function NoteMain(props: {
           <div class="min-h-full">
             <AnnotationBody
               body={props.note.body}
+              annotationId={props.note.id}
               onToggleTask={props.onToggleTask}
             />
           </div>

@@ -16,18 +16,40 @@ import { fetchAttachmentBlobUrl } from "../../lib/attachments";
 // auth headers and would be rejected by the attachments collection's
 // auth-gated viewRule. The Blob URL is revoked on cleanup so repeated
 // mounts (e.g. toggling blur) don't leak memory.
-function AttachmentImage(props: { attachmentId: string }) {
+//
+// annotationId scopes the fetch to the annotation this token was
+// rendered from: fetchAttachmentBlobUrl returns undefined (rendered as
+// plain text below) if the attachment actually belongs to a different
+// annotation -- e.g. someone copy-pasted a ![[id]] embed from one
+// note's body into another's.
+//
+// blobUrl.state is checked instead of calling the blobUrl() accessor
+// directly, since calling a createResource accessor while it's in its
+// "errored" state re-throws that error into the render tree -- which
+// would take down this whole note (including its edit/delete
+// controls) rather than just this one broken image. Any failure --
+// mismatched annotation, a deleted file, a network error -- is shown
+// as plain fallback text instead, so a single unreadable image can
+// never make the annotation impossible to edit or delete.
+function AttachmentImage(props: { attachmentId: string; annotationId: string }) {
   const [blobUrl] = createResource(
-    () => props.attachmentId,
-    fetchAttachmentBlobUrl,
+    () => [props.attachmentId, props.annotationId] as const,
+    ([attachmentId, annotationId]) =>
+      fetchAttachmentBlobUrl(attachmentId, annotationId),
   );
   onCleanup(() => {
-    const url = blobUrl();
-    if (url) URL.revokeObjectURL(url);
+    if (blobUrl.state === "ready" && blobUrl.latest) {
+      URL.revokeObjectURL(blobUrl.latest);
+    }
   });
 
   return (
-    <Show when={blobUrl()}>
+    <Show
+      when={blobUrl.state === "ready" && blobUrl.latest}
+      fallback={
+        <span class="opacity-60">[image unavailable]</span>
+      }
+    >
       {(url) => (
         <img src={url()} loading="lazy" class="my-1 block max-w-full rounded" />
       )}
@@ -37,6 +59,10 @@ function AttachmentImage(props: { attachmentId: string }) {
 
 export default function AnnotationBody(props: {
   body: string;
+  // The annotation this body belongs to -- passed through to
+  // AttachmentImage so it can refuse to render an embed that was
+  // pasted in from a different annotation's body.
+  annotationId: string;
   // Called with a task line's index (matching parseLines's array
   // order, which is also the line index toggleTaskLine expects) when
   // its checkbox is toggled. Only fires for task lines -- see
@@ -84,7 +110,10 @@ export default function AnnotationBody(props: {
             <For each={line.tokens}>
               {(token) =>
                 token.type === "attachment" ? (
-                  <AttachmentImage attachmentId={token.value} />
+                  <AttachmentImage
+                    attachmentId={token.value}
+                    annotationId={props.annotationId}
+                  />
                 ) : token.type === "image" ? (
                   <img
                     src={token.value}

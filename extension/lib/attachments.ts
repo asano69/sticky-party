@@ -60,33 +60,59 @@ export async function linkAttachment(
   });
 }
 
-// Fetches an attachment's image and returns a Blob URL for it. Callers
-// must revoke the returned URL (URL.revokeObjectURL) once done with it
-// to avoid leaking memory -- see AnnotationBody.tsx's AttachmentImage,
-// which does this in onCleanup.
+// Fetches an attachment's image and returns a Blob URL for it, or
+// undefined if it cannot be shown for a known/expected reason (see
+// below). Callers must revoke a returned URL (URL.revokeObjectURL)
+// once done with it to avoid leaking memory -- see
+// AnnotationBody.tsx's AttachmentImage, which does this in onCleanup.
+//
+// annotationId is the id of the annotation whose body contains this
+// ![[id]] embed. An attachment belongs to exactly one annotation (they
+// are not shared across annotations -- see docs/attachment-embeds.md),
+// so if the fetched record's own `annotation` relation doesn't match,
+// the embed was copy-pasted into a different note's body and must not
+// render -- the attachment stays private to the annotation it was
+// actually uploaded for. This is treated as an expected outcome (return
+// undefined), not an error, since the annotation itself is otherwise
+// perfectly valid and its edit/delete controls must keep working.
+//
+// Any other failure (network error, deleted attachment, 404, etc.) is
+// also caught and reported as undefined rather than thrown: a single
+// unreadable image must never break the rest of the note's rendering
+// (see AttachmentImage, which shows a plain-text fallback instead).
 export async function fetchAttachmentBlobUrl(
   attachmentId: string,
-): Promise<string> {
-  const pb = await getAuthedPb();
-  // A normal SDK call, so the Authorization header is attached
-  // automatically -- this is what actually enforces the attachments
-  // collection's viewRule for the record lookup itself.
-  const record = await pb.collection("attachments").getOne(attachmentId);
+  annotationId: string,
+): Promise<string | undefined> {
+  try {
+    const pb = await getAuthedPb();
+    // A normal SDK call, so the Authorization header is attached
+    // automatically -- this is what actually enforces the attachments
+    // collection's viewRule for the record lookup itself.
+    const record = await pb.collection("attachments").getOne(attachmentId);
 
-  // File downloads are a separate, unauthenticated-by-default route:
-  // unlike ordinary API calls, PocketBase's file endpoint does NOT
-  // check the Authorization header. A protected file (viewRule set)
-  // instead requires a short-lived file token as a `?token=` query
-  // param, obtained via a dedicated auth'd endpoint. Without it, the
-  // download 404s (PocketBase returns 404 rather than 403 for a
-  // protected file, so as not to reveal whether it exists).
-  const token = await pb.files.getToken();
-  const fileUrl = pb.files.getURL(record, record.image as string, { token });
+    if (record.annotation !== annotationId) {
+      return undefined;
+    }
 
-  const res = await fetch(fileUrl);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch attachment: ${res.status}`);
+    // File downloads are a separate, unauthenticated-by-default route:
+    // unlike ordinary API calls, PocketBase's file endpoint does NOT
+    // check the Authorization header. A protected file (viewRule set)
+    // instead requires a short-lived file token as a `?token=` query
+    // param, obtained via a dedicated auth'd endpoint. Without it, the
+    // download 404s (PocketBase returns 404 rather than 403 for a
+    // protected file, so as not to reveal whether it exists).
+    const token = await pb.files.getToken();
+    const fileUrl = pb.files.getURL(record, record.image as string, { token });
+
+    const res = await fetch(fileUrl);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch attachment: ${res.status}`);
+    }
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  } catch (err) {
+    console.error("[sticky-party] failed to load attachment", err);
+    return undefined;
   }
-  const blob = await res.blob();
-  return URL.createObjectURL(blob);
 }

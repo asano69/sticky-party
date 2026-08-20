@@ -9,6 +9,7 @@ import (
 	_ "github.com/asano69/sticky-party/migrations"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 
+	"github.com/asano69/sticky-party/internal/gc"
 	"github.com/asano69/sticky-party/internal/history"
 )
 
@@ -26,6 +27,10 @@ func main() {
 	// Writes an audit trail into "histories" for every annotation
 	// create/update/delete -- see internal/history for the merge rule.
 	history.Register(app)
+
+	// Daily sweep that deletes attachments no longer referenced by their
+	// annotation's body -- see internal/gc.
+	gc.Register(app)
 
 	root := app.RootCmd
 	root.Use = "sticky-party"
