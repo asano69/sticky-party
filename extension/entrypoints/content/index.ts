@@ -127,14 +127,30 @@ export default defineContentScript({
     // page.
     let showGeneration = 0;
 
+    // Reconciles the mounted note set against `annotations` instead of
+    // blindly tearing everything down and remounting: notes whose id is
+    // no longer present get removed, notes whose id is still present are
+    // left mounted untouched, and only genuinely new ids get mounted.
+    // This is what lets a popup save that adds a second (or later) note
+    // to an already-matching page mount just that one note, instead of
+    // destroying and recreating every note already on screen (losing
+    // drag position mid-interaction, restarting each note's iframe,
+    // etc.). It also still handles a target change correctly, since
+    // removal is based on annotation id membership, not on `target`
+    // itself.
     function showAnnotations(annotations: AnnotationData[], target: string) {
-      // Only the note set is torn down here -- the orchestrator iframe
-      // is kept and just re-targeted below (see ensureOrchestrator),
-      // since it's the same target's notes being redrawn.
-      hideOverlay({ keepOrchestrator: true });
       ensureOrchestrator(target);
       const generation = ++showGeneration;
+      const incomingIds = new Set(annotations.map((a) => a.id));
+
+      for (const [id, ui] of mountedNotes) {
+        if (incomingIds.has(id)) continue;
+        ui.remove();
+        mountedNotes.delete(id);
+      }
+
       for (const [index, annotation] of annotations.entries()) {
+        if (mountedNotes.has(annotation.id)) continue;
         mountNote(ctx, annotation, index, mountNoteDeps).then((ui) => {
           if (generation !== showGeneration) {
             ui.remove();
@@ -145,14 +161,11 @@ export default defineContentScript({
       }
     }
 
-    // keepOrchestrator: true when called from showAnnotations, about
-    // to mount/re-target the orchestrator right after -- only a
-    // genuine "no match" (HIDE_ANNOTATION_MESSAGE below) tears it down.
-    function hideOverlay(opts: { keepOrchestrator?: boolean } = {}) {
+    function hideOverlay() {
       showGeneration++;
       for (const ui of mountedNotes.values()) ui.remove();
       mountedNotes = new Map();
-      if (!opts.keepOrchestrator) teardownOrchestrator();
+      teardownOrchestrator();
     }
 
     browser.runtime.onMessage.addListener((message: AnnotationMessage) => {
