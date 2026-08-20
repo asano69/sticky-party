@@ -46,7 +46,8 @@ export interface AnnotationDeletedMessage {
 export type OrchestratorToParentMessage =
   | OrchestratorReadyMessage
   | AnnotationCreatedMessage
-  | AnnotationDeletedMessage;
+  | AnnotationDeletedMessage
+  | AnnotationPositionUpdatedMessage;
 export type ParentToOrchestratorMessage = InitOrchestratorMessage;
 
 // The payload broadcast on a target-scoped BroadcastChannel for
@@ -55,4 +56,22 @@ export type ParentToOrchestratorMessage = InitOrchestratorMessage;
 // matches its own annotation id.
 export interface RealtimeUpdatePayload {
   record: AnnotationData;
+}
+
+// orchestrator -> content.ts: a pinned annotation's position/size
+// changed (another tab/user dragged or resized it). Only pinned notes
+// need this: an unpinned note's position is per-viewer and lives in
+// the positions collection, which this event never touches. Only
+// content.ts can act on it, since it owns the wrapper element and is
+// the sole place a pinned note's on-screen position is applied (see
+// entrypoints/content/mountNote.ts's applyRemotePin).
+export const ANNOTATION_POSITION_UPDATED_MESSAGE =
+  "sticky-party:annotation-position-updated";
+export interface AnnotationPositionUpdatedMessage {
+  type: typeof ANNOTATION_POSITION_UPDATED_MESSAGE;
+  annotationId: string;
+  xRatio: number;
+  yRatio: number;
+  width: number;
+  height: number;
 }

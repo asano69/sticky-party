@@ -11,10 +11,12 @@
 import {
   ANNOTATION_CREATED_MESSAGE,
   ANNOTATION_DELETED_MESSAGE,
+  ANNOTATION_POSITION_UPDATED_MESSAGE,
   INIT_ORCHESTRATOR_MESSAGE,
   ORCHESTRATOR_READY_MESSAGE,
   type AnnotationCreatedMessage,
   type AnnotationDeletedMessage,
+  type AnnotationPositionUpdatedMessage,
   type ParentToOrchestratorMessage,
   type RealtimeUpdatePayload,
 } from "../../lib/realtime-messages";
@@ -90,6 +92,25 @@ async function subscribeTarget(
 function handleEvent(e: RecordSubscription<AnnotationData>) {
   if (e.action === "update") {
     channel?.postMessage({ record: e.record } satisfies RealtimeUpdatePayload);
+    // Pinned position lives on the annotation record itself and is
+    // applied by content.ts (which owns the wrapper element), not by
+    // NoteContent via the BroadcastChannel above -- see
+    // entrypoints/content/mountNote.ts's applyRemotePin. Unpinned
+    // notes don't need this: their position never travels through the
+    // annotation record at all.
+    if (e.record.pin) {
+      window.parent.postMessage(
+        {
+          type: ANNOTATION_POSITION_UPDATED_MESSAGE,
+          annotationId: e.record.id,
+          xRatio: e.record.pinXRatio,
+          yRatio: e.record.pinYRatio,
+          width: e.record.pinWidth,
+          height: e.record.pinHeight,
+        } satisfies AnnotationPositionUpdatedMessage,
+        "*",
+      );
+    }
   } else if (e.action === "create") {
     window.parent.postMessage(
       {

@@ -36,6 +36,7 @@ import {
 import {
   ANNOTATION_CREATED_MESSAGE,
   ANNOTATION_DELETED_MESSAGE,
+  ANNOTATION_POSITION_UPDATED_MESSAGE,
   type OrchestratorToParentMessage,
 } from "../../lib/realtime-messages";
 import { createResizeRegistry } from "./viewport";
@@ -194,6 +195,13 @@ export default defineContentScript({
         } else if (e.data?.type === ANNOTATION_DELETED_MESSAGE) {
           mountedNotes.get(e.data.annotationId)?.remove();
           mountedNotes.delete(e.data.annotationId);
+        } else if (e.data?.type === ANNOTATION_POSITION_UPDATED_MESSAGE) {
+          mountedNotes.get(e.data.annotationId)?.applyRemotePin({
+            xRatio: e.data.xRatio,
+            yRatio: e.data.yRatio,
+            width: e.data.width,
+            height: e.data.height,
+          });
         }
       },
     );

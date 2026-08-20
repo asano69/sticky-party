@@ -155,6 +155,11 @@ export async function mountNote(
   let docResizeTimer: ReturnType<typeof setTimeout> | undefined;
   let onMessage: ((e: MessageEvent) => void) | undefined;
   let reposition: ((scaleX: number, scaleY: number) => void) | undefined;
+  // Hoisted out of onMount so applyRemotePin (defined below, and
+  // exposed on the returned handle) can reach the wrapper element and
+  // its height-recalculation logic from outside the onMount closure.
+  let wrapperEl: HTMLElement | undefined;
+  let applyWrapperHeight: (() => void) | undefined;
   // Tracks the media query used below to keep the Dismiss icon and
   // loading spinner colors in sync with the system color scheme,
   // and the listener function so it can be removed again in
@@ -173,6 +178,7 @@ export async function mountNote(
     position: "inline",
     anchor: "html",
     onMount: (wrapper, iframe) => {
+      wrapperEl = wrapper;
       // Floor height for a single-line note: TITLE_ROW_HEIGHT_PX
       // (header) plus one line of body text with its vertical
       // padding (main's py-1.5 = 12px + one 14px/1.4 line ~= 20px).
@@ -203,7 +209,7 @@ export async function mountNote(
       // footer's extra space is purely visual -- persistPosition
       // never includes it (see below) -- so entering/leaving edit
       // mode never changes the note's saved size.
-      const applyWrapperHeight = () => {
+      applyWrapperHeight = () => {
         const footer = isEditingNote ? TITLE_ROW_HEIGHT_PX : 0;
         wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + contentHeight + footer}px`;
       };
@@ -631,9 +637,41 @@ export async function mountNote(
       clearTimeout(resizeSaveTimer);
       docResizeObserver?.disconnect();
       clearTimeout(docResizeTimer);
+      wrapperEl = undefined;
+      applyWrapperHeight = undefined;
     },
   });
 
+  // Applies a pinned note's position/size after another tab/user moved
+  // it, relayed by the realtime orchestrator (see
+  // entrypoints/content/index.ts's handling of
+  // ANNOTATION_POSITION_UPDATED_MESSAGE). A no-op for an unpinned note
+  // or before/after this note's wrapper exists -- unpinned position is
+  // per-viewer and never travels through this path at all (see
+  // lib/realtime-messages.ts's ANNOTATION_POSITION_UPDATED_MESSAGE).
+  //
+  // Doesn't call persistPosition(): this data came from the DB in the
+  // first place, so writing it straight back would be a redundant
+  // round trip.
+  function applyRemotePin(coords: {
+    xRatio: number;
+    yRatio: number;
+    width: number;
+    height: number;
+  }) {
+    if (!pinned || !wrapperEl || !applyWrapperHeight) return;
+    pinRatioX = coords.xRatio;
+    pinRatioY = coords.yRatio;
+    const doc = documentSize();
+    top = coords.yRatio * doc.height;
+    left = coords.xRatio * doc.width;
+    contentHeight = Math.max(0, coords.height - TITLE_ROW_HEIGHT_PX);
+    wrapperEl.style.top = `${top}px`;
+    wrapperEl.style.left = `${left}px`;
+    wrapperEl.style.width = `${coords.width}px`;
+    applyWrapperHeight();
+  }
+
   ui.mount();
-  return ui;
+  return { ...ui, applyRemotePin };
 }
