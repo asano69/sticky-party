@@ -9,6 +9,7 @@
 // an in-place content update.
 
 import type { AnnotationData } from "./messages";
+import type { HistoryEntry } from "./history";
 
 // content.ts -> orchestrator, sent once on mount and again whenever
 // the page's matched target changes (e.g. a client-side route change),
@@ -75,6 +76,18 @@ export type ParentToOrchestratorMessage = InitOrchestratorMessage;
 // matches its own annotation id.
 export interface RealtimeUpdatePayload {
   record: AnnotationData;
+}
+
+// The payload broadcast on the target-scoped history BroadcastChannel
+// (see lib/realtime-channel.ts's realtimeHistoryChannelName) for every
+// "histories" row -- create, a fresh update row, or a merged update
+// overwriting a previous one (see internal/history's merge rule).
+// Reuses HistoryEntry as-is since the shape needed here (id,
+// annotationId, action, updated, userName) is identical to what
+// lib/history.ts's fetchHistory already returns -- each NoteContent
+// iframe matches record.annotationId against its own annotation id.
+export interface RealtimeHistoryPayload {
+  record: HistoryEntry;
 }
 
 // orchestrator -> content.ts: an annotation's pin state and/or pinned

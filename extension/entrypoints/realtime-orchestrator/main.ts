@@ -19,10 +19,14 @@ import {
   type AnnotationDeletedMessage,
   type AnnotationPositionUpdatedMessage,
   type ParentToOrchestratorMessage,
+  type RealtimeHistoryPayload,
   type RealtimeUpdatePayload,
   type TargetHistoryCreatedMessage,
 } from "../../lib/realtime-messages";
-import { realtimeChannelName } from "../../lib/realtime-channel";
+import {
+  realtimeChannelName,
+  realtimeHistoryChannelName,
+} from "../../lib/realtime-channel";
 import { getAuthedPb } from "../../lib/pb";
 import type { AnnotationData } from "../../lib/messages";
 import type { RecordSubscription } from "pocketbase";
@@ -41,20 +45,34 @@ const INITIAL_RETRY_DELAYS_MS = [1000, 5000, 15000];
 
 let channel: BroadcastChannel | undefined;
 let unsubscribe: (() => void) | undefined;
+// Target-scoped "histories" subscribe backing each note's edit-history
+// panel (see subscribeTargetHistoryScoped below). Shares
+// subscribeTarget's per-target lifecycle -- torn down and re-subscribed
+// together on every INIT_ORCHESTRATOR_MESSAGE -- since, like the
+// annotations subscribe above, it only matters for the page currently
+// being viewed. Kept as separate channel/unsubscribe vars (not folded
+// into channel/unsubscribe above) so this subscribe's own teardown
+// can't be accidentally skipped if the two ever need different timing.
+let historyChannel: BroadcastChannel | undefined;
+let unsubscribeHistory: (() => void) | undefined;
 // Bumped on every re-target, so a subscribe() call that resolves after
 // a newer target has already taken over can detect it's stale and
 // unsubscribe itself instead of delivering events for the wrong page.
 let generation = 0;
 
-// A "histories" row, as needed by the target-list subscribe below --
-// see docs/target-list-sync.md. `action` here is the row's own field
-// recording what happened to the annotation (create/update/delete),
-// not the realtime event's action.
+// A "histories" row, as needed by both subscribes below -- the
+// target-list subscribe (action="create" only, target-agnostic) reads
+// only target/updated; the history-panel subscribe
+// (target-scoped) needs the rest to build a HistoryEntry. `action` here
+// is the row's own field recording what happened to the annotation
+// (create/update/delete), not the realtime event's action.
 interface HistoryRecord {
   id: string;
+  annotationId: string;
   target: string;
   action: "create" | "update" | "delete";
   updated: string;
+  userName: string;
 }
 
 function teardown() {
@@ -62,6 +80,10 @@ function teardown() {
   unsubscribe = undefined;
   channel?.close();
   channel = undefined;
+  unsubscribeHistory?.();
+  unsubscribeHistory = undefined;
+  historyChannel?.close();
+  historyChannel = undefined;
 }
 
 async function subscribeTarget(
@@ -96,6 +118,58 @@ async function subscribeTarget(
     if (delay !== undefined) {
       setTimeout(
         () => subscribeTarget(target, myGeneration, attempt + 1),
+        delay,
+      );
+    }
+  }
+}
+
+// Target-scoped "histories" subscribe for the edit-history panel (see
+// NoteFooter.tsx / entrypoints/annotation-iframe/useHistoryUpdates.ts).
+// Separate subscribe() call from subscribeTarget's annotations one --
+// two independent filters/callbacks are simpler than merging both
+// collections' events through one handler -- but tied to the same
+// per-target generation, so a stale response here is detected the same
+// way.
+async function subscribeTargetHistoryScoped(
+  target: string,
+  myGeneration: number,
+  attempt = 0,
+) {
+  historyChannel = new BroadcastChannel(realtimeHistoryChannelName(target));
+
+  try {
+    const pb = await getAuthedPb();
+    if (myGeneration !== generation) return;
+
+    const off = await pb.collection("histories").subscribe<HistoryRecord>(
+      "*",
+      (e) => {
+        if (myGeneration !== generation) return;
+        historyChannel?.postMessage({
+          record: {
+            id: e.record.id,
+            annotationId: e.record.annotationId,
+            action: e.record.action,
+            updated: e.record.updated,
+            userName: e.record.userName || "unknown",
+          },
+        } satisfies RealtimeHistoryPayload);
+      },
+      { filter: pb.filter("target = {:target}", { target }) },
+    );
+    if (myGeneration !== generation) {
+      off();
+      return;
+    }
+    unsubscribeHistory = off;
+  } catch (err) {
+    console.error("[sticky-party] orchestrator history subscribe failed", err);
+    if (myGeneration !== generation) return;
+    const delay = INITIAL_RETRY_DELAYS_MS[attempt];
+    if (delay !== undefined) {
+      setTimeout(
+        () => subscribeTargetHistoryScoped(target, myGeneration, attempt + 1),
         delay,
       );
     }
@@ -191,6 +265,7 @@ window.addEventListener(
       teardown();
       generation++;
       subscribeTarget(ev.data.target, generation);
+      subscribeTargetHistoryScoped(ev.data.target, generation);
     }
   },
 );

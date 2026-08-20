@@ -11,3 +11,14 @@
 export function realtimeChannelName(target: string): string {
   return `sticky-party:realtime:${target}`;
 }
+
+// Target-scoped BroadcastChannel name for realtime "histories" rows,
+// used by each note's edit-history panel (see
+// entrypoints/annotation-iframe/useHistoryUpdates.ts). Kept separate
+// from realtimeChannelName above rather than shared: sharing one
+// channel for both annotation and history rows would need a
+// discriminated union to tell them apart on every message, whereas two
+// channels let each side just assume its own payload shape.
+export function realtimeHistoryChannelName(target: string): string {
+  return `sticky-party:realtime-history:${target}`;
+}

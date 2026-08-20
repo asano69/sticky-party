@@ -1,4 +1,4 @@
-import { createResource, createSignal, onCleanup, Show } from "solid-js";
+import { createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 
 import {
@@ -8,7 +8,7 @@ import {
   updateAnnotation,
 } from "../../lib/annotations";
 import { uploadAttachment } from "../../lib/attachments";
-import { fetchHistory } from "../../lib/history";
+import { fetchHistory, type HistoryEntry } from "../../lib/history";
 import { toggleTaskLine } from "../../lib/markup";
 import { continueListOnEnter } from "../../lib/listContinuation";
 import type { AnnotationData } from "../../lib/messages";
@@ -19,6 +19,7 @@ import {
 } from "../../lib/colors";
 import { useAuthedPb } from "./useAuthedPb";
 import { useContentHeight } from "./useContentHeight";
+import { useHistoryUpdates } from "./useHistoryUpdates";
 import { useParentMessaging } from "./useParentMessaging";
 import { useRealtimeUpdates } from "./useRealtimeUpdates";
 import NoteHeader from "./NoteHeader";
@@ -53,7 +54,14 @@ export default function NoteContent() {
   // single-key object (`annotation`) rather than storing AnnotationData
   // directly, since createStore needs a defined initial value and this
   // note has none until INIT_NOTE_MESSAGE arrives.
-  const [state, setState] = createStore<{ annotation?: AnnotationData }>({});
+  const [state, setState] = createStore<{
+    annotation?: AnnotationData;
+    // Seeded once via fetchHistory when the annotation first arrives
+    // (see onInit below), then kept live by useHistoryUpdates -- no
+    // more refetching on every panel open (see NoteFooter.tsx's
+    // onShowHistory).
+    historyEntries: HistoryEntry[];
+  }>({ historyEntries: [] });
   const [editing, setEditing] = createSignal(false);
   const [draftTitle, setDraftTitle] = createSignal("");
   const [draft, setDraft] = createSignal("");
@@ -84,14 +92,39 @@ export default function NoteContent() {
   let shakeTimer: ReturnType<typeof setTimeout> | undefined;
 
   // Edit-history panel (see NoteMain.tsx), toggled by the footer's
-  // info button. The resource only fetches while historyOpen() is
-  // true, and re-fetches on every reopen, so the list stays current
-  // without polling while closed.
+  // info button. Its contents live in state.historyEntries, seeded once
+  // on init and kept live by realtime updates (see onInit and
+  // useHistoryUpdates below), so opening the panel is now just a plain
+  // UI toggle, not a fetch trigger.
   const [historyOpen, setHistoryOpen] = createSignal(false);
-  const [history, { refetch: refetchHistory }] = createResource(
-    () => (historyOpen() ? state.annotation?.id : undefined),
-    (id) => fetchHistory(id),
+  // Whether the initial fetchHistory (see onInit below) has resolved
+  // yet, so NoteMain.tsx can tell "still loading" apart from "loaded,
+  // and genuinely empty" -- both would otherwise look like the same
+  // empty array.
+  const [historyLoaded, setHistoryLoaded] = createSignal(false);
+  // Newest first, re-derived on every read rather than baked into
+  // insertion order: a merged row (see internal/history's merge rule)
+  // updates an existing entry's `updated` in place without moving it,
+  // so the list must be re-sorted after every realtime update.
+  const sortedHistoryEntries = createMemo(() =>
+    [...state.historyEntries].sort((a, b) =>
+      b.updated.localeCompare(a.updated),
+    ),
   );
+
+  // Applies one history row (from the initial fetch, or a realtime
+  // update -- see useHistoryUpdates.ts) onto state.historyEntries,
+  // upserting by id: a merged "update" row (internal/history's merge
+  // rule) overwrites the existing entry in place; anything else is
+  // prepended as a new row.
+  const applyHistoryEntry = (entry: HistoryEntry) => {
+    const exists = state.historyEntries.some((e) => e.id === entry.id);
+    if (exists) {
+      setState("historyEntries", (e) => e.id === entry.id, entry);
+    } else {
+      setState("historyEntries", (entries) => [entry, ...entries]);
+    }
+  };
 
   let titleInputRef: HTMLInputElement | undefined;
 
@@ -119,7 +152,21 @@ export default function NoteContent() {
   // re-measuring from the read-mode display here would shrink the note
   // back down below that floor.
   const parentMessaging = useParentMessaging({
-    onInit: (annotation) => setState("annotation", annotation),
+    onInit: (annotation) => {
+      setState("annotation", annotation);
+      // One-time seed of the history panel's data -- everything after
+      // this comes from useHistoryUpdates' realtime subscription
+      // below, not further calls to fetchHistory.
+      fetchHistory(annotation.id)
+        .then((entries) => {
+          setState("historyEntries", entries);
+          setHistoryLoaded(true);
+        })
+        .catch((err) => {
+          console.error("[sticky-party] failed to load history", err);
+          setHistoryLoaded(true);
+        });
+    },
     onStartEditTitle: () => startEdit("title"),
     editing,
     onBlurWhileEditing: () => saveEdit(),
@@ -135,6 +182,14 @@ export default function NoteContent() {
   useRealtimeUpdates({
     annotation: () => state.annotation,
     setAnnotation: setState,
+  });
+
+  // Applies another tab/user's history rows (edits, creates, deletes)
+  // onto this note's history list as they arrive -- see
+  // docs/target-list-sync.md's "編集履歴パネルのリアルタイム更新".
+  useHistoryUpdates({
+    annotation: () => state.annotation,
+    onEntry: applyHistoryEntry,
   });
 
   const cancelEdit = () => {
@@ -352,7 +407,7 @@ export default function NoteContent() {
             onLockDblClick={() => setRevealed(true)}
             onToggleTask={handleToggleTask}
             historyOpen={historyOpen()}
-            historyEntries={history()}
+            historyEntries={historyLoaded() ? sortedHistoryEntries() : undefined}
           />
 
           {/* Footer only appears while editing, so a casual click can
@@ -374,16 +429,9 @@ export default function NoteContent() {
               togglingColor={togglingColor()}
               onColorChange={handleColorChange}
               historyOpen={historyOpen()}
-              // Every open of the history panel explicitly refetches,
-              // so the info button always shows up-to-date history --
-              // not just the last-cached fetch from when the panel was
-              // previously opened. No refetch on close: there's
-              // nothing to refresh once the panel is hidden.
-              onShowHistory={() => {
-                const opening = !historyOpen();
-                setHistoryOpen(opening);
-                if (opening) refetchHistory();
-              }}
+              // Just a UI toggle now -- the list itself is realtime,
+              // not refetched on open (see useHistoryUpdates.ts).
+              onShowHistory={() => setHistoryOpen((open) => !open)}
             />
           </Show>
         </div>

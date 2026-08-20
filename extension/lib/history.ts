@@ -7,6 +7,12 @@ import { getAuthedPb } from "./pb";
 
 export interface HistoryEntry {
   id: string;
+  // Which annotation this row belongs to. Not needed by the initial
+  // fetchHistory call below (it's already filtered to one annotation),
+  // but required when a row instead arrives over the target-scoped
+  // realtime channel (see useHistoryUpdates.ts), which can carry rows
+  // for any annotation sharing that target.
+  annotationId: string;
   action: "create" | "update" | "delete";
   // The timestamp shown in the UI. This is deliberately `updated`, not
   // `created`: consecutive same-user edits within the merge window
@@ -37,6 +43,7 @@ export async function fetchHistory(
   // field existed.
   return records.map((record) => ({
     id: record.id,
+    annotationId: record.annotationId,
     action: record.action,
     updated: record.updated,
     userName: record.userName || "unknown",
