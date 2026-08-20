@@ -157,12 +157,74 @@ const res = await fetch(fileUrl); // Authorizationヘッダーは不要
 - `createRule` / `listRule` / `viewRule`: いずれも `@request.auth.id != ''`
   のまま（`viewRule` を緩める必要はない）
 
-## 既知のトレードオフ
+## スコープ: 添付は貼り付けたannotation専用
 
-- 編集中に貼った画像は即座にアップロードされるため、Escでキャンセルしたり
-  保存せず閉じたりすると、本文には現れないのに `attachments` レコードだけ
-  残る（孤立ファイル）。定期クリーンアップは未実装で、現状は許容している。
-- `AttachmentImage` は `createResource` でマウントのたびに毎回fetchし直す
-  （キャッシュ層は無い）。付箋は表示のたびにiframeごと再マウントされる
-  既存構造と一貫しているが、頻繁な再表示でネットワーク負荷が気になる場合は
-  別途検討が必要。
+`attachments` は `annotation`（relation, 単数）を持つ設計であり、1つの
+attachmentは常にちょうど1つのannotationに属する（複数のannotationで
+共有される多対多の設計ではない）。
+
+この前提を守るため、`![[id]]` を**別のannotationの本文にコピペしても、
+そちらでは画像としてレンダリングされない**。表示時（`AttachmentImage`
+→ `fetchAttachmentBlobUrl`）に、取得した `attachments` レコード自身が
+持つ `annotation` フィールドと、いま描画しているannotation自身のIDを
+突き合わせ、一致する場合のみ画像を表示する。
+
+```
+本文中の ![[attachmentId]] を検出
+        │
+        ▼
+attachments.getOne(attachmentId) で record 取得
+        │
+        ▼
+record.annotation === 表示中のannotationId ?
+        │
+    ┌───┴───┐
+   Yes      No
+    │        │
+  画像表示   画像として表示しない（別annotationの本文に
+              貼られた ![[id]] は無効化される）
+```
+
+これにより、`![[id]]` はいわば「そのannotation内でしか意味を持たない
+ローカルな参照」として振る舞う。同じidをコピーして別の付箋に貼っても、
+参照先のattachmentは元のannotationのものであり続けるため、意図せず
+他人の付箋の画像が漏れて表示されることもない。
+
+## ガベージコレクション（未参照attachmentの削除）
+
+添付は上記の通り1つのannotationにのみ紐づくため、「そのannotationの
+本文中に `![[id]]` として実際に含まれているかどうか」だけを見れば、
+そのattachmentが今も使われているかを判定できる。
+
+`internal/gc` パッケージが、1日1回（cron: 毎日0時）以下のスイープを
+実行する。
+
+```
+毎日0時（cron）
+    │
+    ▼
+全 attachments レコードを走査
+    │
+    ▼
+各 attachment について:
+  - annotation リレーションが空
+  - もしくはリレーション先の annotation が既に存在しない
+  - もしくは annotation.body 内に ![[このattachmentのid]] が無い
+    │
+   Yes（いずれか true）
+    │
+    ▼
+  そのattachmentレコードを削除
+```
+
+削除対象になる典型的なケース:
+
+- 編集中に画像を貼り付けたが、保存せずに（Escでキャンセル、閉じる等）
+  終了した場合 -- 本文には現れないのに `attachments` レコードだけが
+  残ってしまう（孤立ファイル）。
+- 本文編集で `![[id]]` の行自体を削除した場合。
+
+annotation自体が削除された場合は、PocketBase側の `annotation` relation
+の `cascadeDelete: true` によって基本的にはこの時点で一緒に削除される。
+上記スイープの「リレーション先が存在しない」の判定は、その後始末として
+念のため残してあるフォールバックという位置づけ。
