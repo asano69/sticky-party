@@ -1363,7 +1363,7 @@ func init() {
 						"type": "text"
 					},
 					{
-						"cascadeDelete": false,
+						"cascadeDelete": true,
 						"collectionId": "pbc_2353526682",
 						"help": "",
 						"hidden": false,
