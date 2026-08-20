@@ -138,9 +138,10 @@ target単位で分ける。固定の1チャンネルにすると、拡張機能�
 
 Orchestratorは受信したレコードをそのままチャンネルにpostMessageし、
 各NoteContentは自分の`annotation().id`と一致するものだけを拾って
-signalを更新する（idでの絞り込みはNoteContent側の責務。target側の
+状態を更新する（idでの絞り込みはNoteContent側の責務。target側の
 絞り込みで既に対象は十分小さいので、Orchestrator側でid別に振り分ける
-仕組みは設けない）。
+仕組みは設けない）。実際の受信・適用ロジックは後述の
+「update イベントの適用」を参照。
 
 ### create / delete: content.tsへのrelay
 
@@ -149,23 +150,126 @@ content.tsへ送る。content.tsはcreateなら`mountNote()`を呼んで新規
 iframeを追加し、deleteなら該当iframeを`ui.remove()`する。
 
 deleteの実現には、`content.ts`の`mountedNotes`をannotation idから
-引けるマッピング（現状は配列のみ）に変更する必要がある。
+引けるマッピング（`Map<annotationId, ui>`）にする必要があった。実装済み
+（`entrypoints/content/index.ts`）。
 
-## 編集中への配慮（衝突解決ではなく最低限のガードとして）
+## update イベントの適用（実装済み: `NoteContent.tsx`側）
 
-同時編集の競合解決自体は本ドキュメントのスコープ外だが、
-NoteContentが`editing()`中にupdateイベントを受けてsignalを無条件に
-上書きすると、保存時に他人の変更を問答無用で消してしまう。これは
-「リアルタイム反映機能を入れたことでデータ消失リスクが増える」
-という本末転倒な結果になるため、最低限のガードとして
-**編集中はupdateイベントを無視し、保存完了後の次の反映で追いつく**
-方針とする。
+### `AnnotationData`に`target`を持たせる
+
+BroadcastChannelのチャンネル名は`target`から一意に決まる
+（`realtimeChannelName(target)`）。NoteContentは自分がどのtargetの
+付箋なのかを知る必要があるため、`lib/messages.ts`の`AnnotationData`に
+`target`フィールドを追加した。`fetchAnnotations`（`lib/annotations.ts`）
+はフィールドを絞らず全件取得しているので、バックエンド側の変更は不要
+（`INIT_NOTE_MESSAGE`で渡ってくる`annotation`にそのまま`target`が
+乗っている）。
+
+`content.ts`からわざわざ`target`を別メッセージとして渡す案もあったが、
+「このNoteContentがどのtargetに属するか」は本来annotationレコード自身が
+持つべき情報であり、既存の型に素直に足すほうが影響範囲も小さいと判断した。
+
+### 付箋の状態をSolid Storeにする
+
+NoteContentの付箋状態は、`createSignal<AnnotationData>()` +
+`setAnnotation({ ...current, ...patch })`から、`createStore`ベースに
+変更した（`const [state, setState] = createStore<{ annotation?:
+AnnotationData }>({})`）。
+
+動機はfine-grainedな再レンダー。update受信は「他ユーザーがtitleだけ
+変えた」のようにフィールド単位で届くことが多く、signal + spreadの
+実装だと毎回オブジェクト全体を差し替えるため、そのフィールドに
+依存しないDOMまで含めて再レンダーの対象になってしまう。Storeであれば
+`setState("annotation", "title", value)`のようにフィールド単位で
+更新でき、実際に変化したプロパティを参照している箇所だけが
+再レンダーされる。
+
+signal自体を捨てる必要のない`editing`/`saving`等のUIローカル状態は
+従来通り`createSignal`のまま残し、realtimeの適用対象になる
+`annotation`本体だけをStore化した。
+
+### `useRealtimeUpdates.ts`: 受信・適用ロジック
+
+`useContentHeight.ts`と同様の粒度で、専用のhookに切り出した。
+
+```ts
+export function useRealtimeUpdates(params: {
+  annotation: () => AnnotationData | undefined;
+  setAnnotation: SetStoreFunction<{ annotation?: AnnotationData }>;
+}) {
+  let channel: BroadcastChannel | undefined;
+
+  createEffect(() => {
+    const note = params.annotation();
+    if (!note || channel) return;
+    channel = new BroadcastChannel(realtimeChannelName(note.target));
+    channel.onmessage = (e: MessageEvent<RealtimeUpdatePayload>) => {
+      if (e.data.record.id !== note.id) return;
+      params.setAnnotation("annotation", e.data.record);
+    };
+  });
+
+  onCleanup(() => channel?.close());
+}
+```
+
+- 購読は`annotation()`が最初にセットされた時点（`INIT_NOTE_MESSAGE`到着後）
+  の一度きり。target/idはそれ以降変わらないので再購読は不要。
+- 1つのtargetチャンネルには、同じtargetを持つ他のannotationのupdateも
+  流れてくる（1ページに複数付箋があり得るため）。`e.data.record.id`で
+  このNoteContent自身の付箋かどうかを判定してから適用する。
+- `setAnnotation("annotation", e.data.record)`はレコード全体を
+  1回のsetStore呼び出しで渡しているが、Storeの差分検知により実際に
+  値が変わったフィールドのみが再レンダーされる（title/body/hide/color/pin
+  等をそれぞれ個別にsetStoreする必要はない）。
+
+### 自分自身の変更のエコーバック
+
+PocketBase realtimeは書き込んだ本人にもイベントを送り返す。つまり
+`saveEdit`/`handleToggleHide`/`handleColorChange`等でローカルの
+Storeを更新した直後、Orchestrator経由で同じ内容のupdateイベントが
+BroadcastChannel経由で戻ってくる。これは無条件にそのまま適用して
+問題ない: 値が既にローカルと一致しているため、Storeの差分検知により
+実質的な再レンダーは発生せず、実害がない。エコーバックだけを検知して
+スキップするような特別なロジックは設けていない。
+
+## 編集中への配慮（衝突解決ではなく、無条件上書きが安全という判断）
+
+同時編集の競合解決自体は本ドキュメントのスコープ外。当初案では
+「編集中はupdateイベントを無視し、保存完了後の次の反映で追いつく」
+としていたが、実装時に方針を変更した。
+
+**`editing() === true`中でもupdateイベントは無条件に適用する**
+（`useRealtimeUpdates`は`editing`の状態を一切見ない）。理由:
+
+- 編集中だけイベントを無視する実装は、「他ユーザーが加えた変更が、
+  この編集者が保存ボタンを押した瞬間に問答無用で消える」という
+  サイレントな上書きを防げていない。編集者はその間ずっと、他ユーザーの
+  最新の変更に気づかないまま古い内容を編集し続けることになる。
+- 逆に無条件に上書きするほうが、「今まさに他の人がこの付箋を書き換えて
+  いる」ことが編集中の画面にすぐ反映されるため、編集者は状況に気づいた
+  上で保存するかどうかを判断できる。データが本人の知らないところで
+  消えるより、編集中の下書きが不意に置き換わる方が安全側に倒れている
+  と判断した。
+- 本格的な同時編集の競合解決（例: 編集中は他ユーザーの変更をマージ待ち
+  キューに入れる等）は、依然として本ドキュメントのスコープ外のまま。
+
+## 編集履歴パネル(`historyOpen`)は今回のスコープ外
+
+`NoteFooter.tsx`の履歴パネルは、開くたびに`fetchHistory()`する現状の
+挙動のまま変更していない。理由:
+
+- 今回のBroadcastChannelは`annotations`コレクションの更新のみを流しており、
+  `histories`コレクションの変更は含まれていない。付箋本体をStore化しても、
+  履歴パネルの内容（誰がいつ編集したか）は別途`histories`への専用の
+  realtime購読を追加しない限りライブ更新にはならない。
+- `histories`をライブ反映する価値自体は認めつつ、これは「編集操作の
+  反映」という今回のタスクとはスコープが別であり、別タスクとして
+  切り出すほうがシンプルさを保てると判断した。
 
 ## 未確定事項（次に詰めるべきこと）
 
-- `content.ts`の`mountedNotes`を`Map<annotationId, ui>`へ変更する
-  具体的な設計
-- `background.ts`の`SHOW_ANNOTATION_MESSAGE`送信箇所に、Orchestratorへ
-  渡すための`target`（normalize済み）を含める
+- `histories`コレクションへのrealtime購読を追加し、開いている履歴
+  パネルをライブ更新するかどうか（上記の通り今回は見送り）
 - 複数タブでの重複購読を将来一本化する場合の具体的な方式
   （現時点では実害が小さいとして許容し、対応しない）
