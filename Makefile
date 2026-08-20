@@ -1,4 +1,6 @@
-.PHONY: lint
+.PHONY: all init build extension-deps build-extension zip-extension \
+        zip-extension-firefox icons kill-ports server dev-back dev-ext \
+        clean test lint format migrate-collections
 
 include sticky-party.env
 export
@@ -8,11 +10,9 @@ BINARY := sticky-party
 # Port used by the backend dev server
 PORTS := 3000
 
-.PHONY: all
-all: 
-	go run ./cmd/$(BINARY) superuser upsert admin@mail.internal password --dir=pb_data
-	go run ./cmd/$(BINARY) serve
-
+# ============================================================
+# Project setup
+# ============================================================
 
 init:
 	fastmod --hidden sticky-party $(notdir $(CURDIR)) --glob '!Makefile'
@@ -22,33 +22,37 @@ init:
 	done
 	fastmod sticky-party $(notdir $(CURDIR))
 
+# ============================================================
+# Build
+# ============================================================
 
-.PHONY: build
 build:
 	go build -o $(BINARY) ./cmd/$(BINARY)
 
-.PHONY: extension-deps
 extension-deps:
 	cd extension && pnpm install
 
 # MV3 build, unpacked (for loading via chrome://extensions "Load unpacked").
-.PHONY: build-extension
 build-extension: extension-deps
 	cd extension && pnpm run build
 
 # MV3 build packaged as a distributable .zip (dist-zip: extension/.output).
-.PHONY: zip-extension
 zip-extension: extension-deps
 	cd extension && pnpm run zip
 
 # Firefox defaults to MV2 (see extension/README.md); this project's
 # background.ts relies on MV3 service-worker semantics (browser.alarms
 # waking it after inactivity kill), so build Firefox as MV3 too to match.
-.PHONY: zip-extension-firefox
 zip-extension-firefox: extension-deps
 	cd extension && pnpm exec wxt zip -b firefox --mv3
 
-.PHONY: kill-ports
+icons:
+	cd extension && pnpm run icons
+
+# ============================================================
+# Run / dev servers
+# ============================================================
+
 kill-ports:
 	@for port in $(PORTS); do \
 		pid=$$(lsof -ti tcp:$$port); \
@@ -58,19 +62,20 @@ kill-ports:
 		fi \
 	done
 
+# Runs the built binary directly, without the live-reload dev server.
+all:
+	go run ./cmd/$(BINARY) superuser upsert admin@mail.internal password --dir=pb_data
+	go run ./cmd/$(BINARY) serve
 
-.PHONY: server
 server:
 	#./sticky-party migrate up --dir=pb_data
 	./$(BINARY) superuser upsert admin@mail.internal password --dir=pb_data
 	./$(BINARY) serve --dev
 
-# --------------
-.PHONY: clean
+clean:
 	rm -fr ./tmp/ # air
 
 # port: 3000
-.PHONY: dev-back
 dev-back: clean
 	air
 
@@ -83,24 +88,27 @@ dev-back: clean
 dev-ext:
 	cd extension && pnpm exec wxt -b firefox --mv3
 
-icons:
-	cd extension && pnpm run icons
+# ============================================================
+# Test / lint / format
+# ============================================================
 
-.PHONY: test
 test:
 	#cd frontend && pnpm test
 	go test ./...
 
 lint:
 	golangci-lint run; cd extension && pnpm run lint
+	cd extension && pnpm run compile
 
-# 本番では、後方互換性のために残しておいたほうが良いかも。
+format:
+	cd extension && pnpm exec prettier --write .
+
+# ============================================================
+# Database
+# ============================================================
+
+# May be worth keeping in production, for backward compatibility.
 migrate-collections:
 	ls -1 migrations/*.go | sort | head -n -1 | xargs rm -f
 	yes | go run ./cmd/sticky-party migrate collections
 	ls -1 migrations/*.go | sort | head -n -1 | xargs rm -f
-
-
-
-format:
-	cd extension && pnpm exec prettier --write .

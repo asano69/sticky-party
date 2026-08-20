@@ -61,7 +61,10 @@ export function mountOrchestrator(
     pendingTarget = target;
     if (!ready) return;
     contentWindow?.postMessage(
-      { type: INIT_ORCHESTRATOR_MESSAGE, target } satisfies InitOrchestratorMessage,
+      {
+        type: INIT_ORCHESTRATOR_MESSAGE,
+        target,
+      } satisfies InitOrchestratorMessage,
       deps.orchestratorOrigin,
     );
   }

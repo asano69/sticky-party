@@ -312,7 +312,10 @@ export default function NoteContent() {
     if (!current || !client) return;
     const body = toggleTaskLine(current.body, lineIndex);
     try {
-      await updateAnnotation(client, current.id, { title: current.title, body });
+      await updateAnnotation(client, current.id, {
+        title: current.title,
+        body,
+      });
       setState("annotation", "body", body);
     } catch (err) {
       console.error("[sticky-party] failed to toggle task", err);
@@ -407,7 +410,9 @@ export default function NoteContent() {
             onLockDblClick={() => setRevealed(true)}
             onToggleTask={handleToggleTask}
             historyOpen={historyOpen()}
-            historyEntries={historyLoaded() ? sortedHistoryEntries() : undefined}
+            historyEntries={
+              historyLoaded() ? sortedHistoryEntries() : undefined
+            }
           />
 
           {/* Footer only appears while editing, so a casual click can

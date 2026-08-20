@@ -288,10 +288,7 @@ export async function mountNote(
               },
             } satisfies SetAnnotationPinMessage)
             .catch((err: unknown) =>
-              console.error(
-                "[sticky-party] failed to save pin position",
-                err,
-              ),
+              console.error("[sticky-party] failed to save pin position", err),
             );
           return;
         }
@@ -715,10 +712,7 @@ export async function mountNote(
         left = 12 + index * 24;
       }
     } catch (err) {
-      console.error(
-        "[sticky-party] failed to load position after unpin",
-        err,
-      );
+      console.error("[sticky-party] failed to load position after unpin", err);
       if (wrapperEl !== wrapper) return;
       top = 12 + index * 24;
       left = 12 + index * 24;
@@ -750,5 +744,10 @@ export async function mountNote(
   }
 
   ui.mount();
-  return { ...ui, applyRemotePin, removeFaded: playRemoveFaded, removeShredded: playRemoveShredded };
+  return {
+    ...ui,
+    applyRemotePin,
+    removeFaded: playRemoveFaded,
+    removeShredded: playRemoveShredded,
+  };
 }

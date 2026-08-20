@@ -228,28 +228,23 @@ function handleEvent(e: RecordSubscription<AnnotationData>) {
 async function subscribeTargetHistory(attempt = 0) {
   try {
     const pb = await getAuthedPb();
-    await pb
-      .collection("histories")
-      .subscribe<HistoryRecord>(
-        "*",
-        (e) => {
-          if (!e.record.target) return;
-          window.parent.postMessage(
-            {
-              type: TARGET_HISTORY_CREATED_MESSAGE,
-              target: e.record.target,
-              updated: e.record.updated,
-            } satisfies TargetHistoryCreatedMessage,
-            "*",
-          );
-        },
-        { filter: "action = 'create'" },
-      );
-  } catch (err) {
-    console.error(
-      "[sticky-party] target-history subscribe failed",
-      err,
+    await pb.collection("histories").subscribe<HistoryRecord>(
+      "*",
+      (e) => {
+        if (!e.record.target) return;
+        window.parent.postMessage(
+          {
+            type: TARGET_HISTORY_CREATED_MESSAGE,
+            target: e.record.target,
+            updated: e.record.updated,
+          } satisfies TargetHistoryCreatedMessage,
+          "*",
+        );
+      },
+      { filter: "action = 'create'" },
     );
+  } catch (err) {
+    console.error("[sticky-party] target-history subscribe failed", err);
     const delay = INITIAL_RETRY_DELAYS_MS[attempt];
     if (delay !== undefined) {
       setTimeout(() => subscribeTargetHistory(attempt + 1), delay);

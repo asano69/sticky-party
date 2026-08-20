@@ -71,9 +71,7 @@ export async function setAnnotationHide(
   id: string,
   hide: boolean,
 ): Promise<void> {
-  await withReauth(pb, () =>
-    pb.collection("annotations").update(id, { hide }),
-  );
+  await withReauth(pb, () => pb.collection("annotations").update(id, { hide }));
 }
 
 // Sets an annotation's background color. Kept separate from

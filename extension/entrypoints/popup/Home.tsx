@@ -45,8 +45,9 @@ export default function Home(props: {
   // annotation itself exists yet (see lib/attachments.ts). Linked to
   // the real annotation once handleSave actually creates it; cleared
   // after saving, same as the note body itself.
- const [pendingAttachmentIds, setPendingAttachmentIds] =
-  createSignal<string[]>([]);
+  const [pendingAttachmentIds, setPendingAttachmentIds] = createSignal<
+    string[]
+  >([]);
   // Needed after save to ask the background script to re-check this tab
   // (see handleSave below); captured once here since the popup has no
   // sender.tab context of its own to fall back on.

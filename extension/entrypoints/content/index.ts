@@ -122,7 +122,12 @@ export default defineContentScript({
     // reposition callback from the returned Set.
     const repositionOnResize = createResizeRegistry();
 
-    const mountNoteDeps = { iframeOrigin, repositionOnResize, nextZ, bumpZCounter };
+    const mountNoteDeps = {
+      iframeOrigin,
+      repositionOnResize,
+      nextZ,
+      bumpZCounter,
+    };
 
     // Bumped on every showAnnotations/hideOverlay call so a mountNote()
     // that resolves after a newer call has already run (e.g. the user

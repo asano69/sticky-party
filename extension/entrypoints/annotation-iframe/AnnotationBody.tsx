@@ -31,7 +31,10 @@ import { fetchAttachmentBlobUrl } from "../../lib/attachments";
 // mismatched annotation, a deleted file, a network error -- is shown
 // as plain fallback text instead, so a single unreadable image can
 // never make the annotation impossible to edit or delete.
-function AttachmentImage(props: { attachmentId: string; annotationId: string }) {
+function AttachmentImage(props: {
+  attachmentId: string;
+  annotationId: string;
+}) {
   const [blobUrl] = createResource(
     () => [props.attachmentId, props.annotationId] as const,
     ([attachmentId, annotationId]) =>
@@ -46,9 +49,7 @@ function AttachmentImage(props: { attachmentId: string; annotationId: string }) 
   return (
     <Show
       when={blobUrl.state === "ready" && blobUrl.latest}
-      fallback={
-        <span class="opacity-60">[image unavailable]</span>
-      }
+      fallback={<span class="opacity-60">[image unavailable]</span>}
     >
       {(url) => (
         <img src={url()} loading="lazy" class="my-1 block max-w-full rounded" />
