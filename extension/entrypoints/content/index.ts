@@ -196,7 +196,7 @@ export default defineContentScript({
             (ui) => mountedNotes.set(annotation.id, ui),
           );
         } else if (e.data?.type === ANNOTATION_DELETED_MESSAGE) {
-          mountedNotes.get(e.data.annotationId)?.removeAnimated();
+          mountedNotes.get(e.data.annotationId)?.removeShredded();
           mountedNotes.delete(e.data.annotationId);
         } else if (e.data?.type === ANNOTATION_POSITION_UPDATED_MESSAGE) {
           mountedNotes.get(e.data.annotationId)?.applyRemotePin({

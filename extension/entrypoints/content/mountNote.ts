@@ -33,15 +33,13 @@ import {
 import type { StoredPosition } from "../../lib/positions";
 import { currentViewport, documentSize } from "./viewport";
 import { animateMove } from "./moveAnimation";
+import { removeFaded, removeShredded } from "./removeAnimation";
 
 export const IFRAME_PAGE = "/annotation-iframe.html";
 
 // z-index base kept well above host-page content but below the int32
 // max, so it can keep counting up as notes are brought to front.
 const Z_BASE = 2147480000;
-
-// Duration of the fade-out/shrink played by removeAnimated below.
-const REMOVE_DURATION_MS = 200;
 
 // Dependencies mountNote needs from its caller (entrypoints/content/index.ts),
 // so this file doesn't have to own any state shared across notes.
@@ -469,7 +467,7 @@ export async function mountNote(
       dismissBtn.addEventListener("mouseleave", () => {
         dismissBtn.style.background = "transparent";
       });
-      dismissBtn.addEventListener("click", () => ui.remove());
+      dismissBtn.addEventListener("click", () => playRemoveFaded());
       header.append(dismissBtn);
       wrapper.append(header);
 
@@ -593,7 +591,7 @@ export async function mountNote(
             deps.iframeOrigin,
           );
         } else if (e.data?.type === NOTE_DELETED_MESSAGE) {
-          removeAnimated();
+          playRemoveShredded();
         } else if (e.data?.type === NOTE_FOCUS_MESSAGE) {
           bringToFront();
         } else if (e.data?.type === NOTE_CONTENT_RESIZE_MESSAGE) {
@@ -729,31 +727,28 @@ export async function mountNote(
     applyHeight();
   }
 
-  // Plays a low-cost, GPU-composited fade + shrink before actually
-  // unmounting the note, so a genuine delete (this viewer's own trash
-  // button via NOTE_DELETED_MESSAGE below, or another viewer deleting
-  // it -- see index.ts's ANNOTATION_DELETED_MESSAGE relay) reads as
-  // the note disappearing rather than vanishing instantly. Both
-  // opacity and transform are compositor-only properties (same
-  // reasoning as animateMove in moveAnimation.ts), so this costs no
-  // extra Layout/Paint work per frame -- no canvas/WebGL involved.
-  // Dismiss (the header's X button, still using the plain ui.remove()
-  // above) and page-navigation teardown (hideOverlay in index.ts)
-  // intentionally skip this: neither is an actual delete, so
-  // animating them would be misleading.
-  function removeAnimated() {
+  // Wrappers around removeAnimation.ts's pure animation functions,
+  // adding this note's own fallback (no wrapper mounted yet -> just
+  // remove immediately) and the actual unmount call once the
+  // animation finishes.
+  function playRemoveFaded() {
     const wrapper = wrapperEl;
     if (!wrapper) {
       ui.remove();
       return;
     }
-    wrapper.style.willChange = "opacity, transform";
-    wrapper.style.transition = `opacity ${REMOVE_DURATION_MS}ms ease, transform ${REMOVE_DURATION_MS}ms ease`;
-    wrapper.style.opacity = "0";
-    wrapper.style.transform = "scale(0.85)";
-    window.setTimeout(() => ui.remove(), REMOVE_DURATION_MS);
+    removeFaded(wrapper, () => ui.remove());
+  }
+
+  function playRemoveShredded() {
+    const wrapper = wrapperEl;
+    if (!wrapper) {
+      ui.remove();
+      return;
+    }
+    removeShredded(wrapper, () => ui.remove());
   }
 
   ui.mount();
-  return { ...ui, applyRemotePin, removeAnimated };
+  return { ...ui, applyRemotePin, removeFaded: playRemoveFaded, removeShredded: playRemoveShredded };
 }
