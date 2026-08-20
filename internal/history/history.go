@@ -62,11 +62,14 @@ func Register(app core.App) {
 		}
 		// Create/update rows are just an edit trail for a note that no
 		// longer exists, so they're pruned once the annotation itself
-		// is deleted. The "delete" row written above is intentionally
-		// left alone -- it's the only record of when/who deleted the
-		// annotation, and purgeCreateUpdateHistory never touches
-		// "delete" rows.
-		return purgeCreateUpdateHistory(e.App, e.Record.Id)
+		// is deleted. The "delete" row written above is normally left
+		// alone -- it's the only record of when/who deleted the
+		// annotation -- unless every row (create, every merged update,
+		// and this delete) was authored by the same person, in which
+		// case purgeHistory removes it too, out of respect for that
+		// person's privacy: deleting your own solo annotation should
+		// leave no trace behind.
+		return purgeHistory(e.App, e.Record.Id)
 	})
 }
 
@@ -152,14 +155,20 @@ func record(app core.App, annotation *core.Record, actor *core.Record, action st
 	return app.Save(row)
 }
 
-// purgeCreateUpdateHistory deletes every "create"/"update" history row
-// for annotationId, leaving any "delete" row untouched. Called once the
-// annotation itself has just been deleted, since a create/update row is
-// only meaningful as an edit trail for a still-existing annotation.
-func purgeCreateUpdateHistory(app core.App, annotationId string) error {
+// purgeHistory decides how much history to keep once an annotation has
+// just been deleted. If every row for this annotation -- the create
+// row, every merged update, and the delete row just written -- was
+// authored by the same person, that person never shared this
+// annotation's edit trail with anyone else, so every row (including
+// the delete row) is removed to respect their privacy. Otherwise, only
+// the create/update rows are purged (they're just an edit trail for a
+// note that no longer exists), and the delete row stays as the sole
+// record of who deleted an annotation other people also touched, and
+// when.
+func purgeHistory(app core.App, annotationId string) error {
 	rows, err := app.FindRecordsByFilter(
 		historiesCollection,
-		"annotationId = {:annotationId} && (action = 'create' || action = 'update')",
+		"annotationId = {:annotationId}",
 		"",
 		0,
 		0,
@@ -168,7 +177,22 @@ func purgeCreateUpdateHistory(app core.App, annotationId string) error {
 	if err != nil {
 		return err
 	}
+	if len(rows) == 0 {
+		return nil
+	}
+
+	sameUser := true
+	for _, row := range rows[1:] {
+		if row.GetString("user") != rows[0].GetString("user") {
+			sameUser = false
+			break
+		}
+	}
+
 	for _, row := range rows {
+		if !sameUser && row.GetString("action") == "delete" {
+			continue // kept as the sole record of who deleted a shared annotation
+		}
 		if err := app.Delete(row); err != nil {
 			return err
 		}
