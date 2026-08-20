@@ -95,6 +95,11 @@ export interface ShowAnnotationMessage {
   // (not merged into one string) so the content script can show them as
   // separate sticky notes instead of concatenating unrelated notes.
   annotations: AnnotationData[];
+  // The normalized target these annotations were fetched for (see
+  // lib/targets.ts's normalizeTarget). Passed through explicitly so the
+  // realtime-orchestrator iframe can subscribe to the right filter
+  // without re-deriving it -- see lib/realtime-messages.ts.
+  target: string;
 }
 
 export interface HideAnnotationMessage {

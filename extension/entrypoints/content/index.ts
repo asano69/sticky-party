@@ -33,8 +33,14 @@ import {
   type AnnotationMessage,
   type CheckAnnotationMessage,
 } from "../../lib/messages";
+import {
+  ANNOTATION_CREATED_MESSAGE,
+  ANNOTATION_DELETED_MESSAGE,
+  type OrchestratorToParentMessage,
+} from "../../lib/realtime-messages";
 import { createResizeRegistry } from "./viewport";
 import { IFRAME_PAGE, mountNote } from "./mountNote";
+import { mountOrchestrator, ORCHESTRATOR_PAGE } from "./mountOrchestrator";
 
 export default defineContentScript({
   matches: ["*://*/*"],
@@ -54,9 +60,41 @@ export default defineContentScript({
     // matches their own origin; every note's iframe shares this origin.
     const iframeOrigin = new URL(browser.runtime.getURL(IFRAME_PAGE)).origin;
 
-    // The notes currently on screen. Replaced wholesale on every
-    // SHOW_ANNOTATION_MESSAGE, mirroring the old AnnotationBoard.
-    let mountedNotes: Awaited<ReturnType<typeof mountNote>>[] = [];
+    // The notes currently on screen, keyed by annotation id -- a Map
+    // (not a plain array) so a realtime delete relay from the
+    // orchestrator (see below) can remove exactly the right note.
+    let mountedNotes = new Map<string, Awaited<ReturnType<typeof mountNote>>>();
+
+    // Realtime: one orchestrator iframe per page-with-notes, kept alive
+    // across repeated showAnnotations() calls for the *same* target
+    // (SSE reconnects are expensive -- see docs/realtime-sync.md). The
+    // orchestrator's own iframe is separate from every note's
+    // annotation-iframe, so it isn't touched by hideOverlay()'s note
+    // teardown unless the target itself stops matching.
+    const orchestratorOrigin = new URL(
+      browser.runtime.getURL(ORCHESTRATOR_PAGE),
+    ).origin;
+    let orchestrator: ReturnType<typeof mountOrchestrator> | undefined;
+    let orchestratorTarget: string | undefined;
+
+    // Mounts the orchestrator iframe if needed and (re-)subscribes it
+    // to `target`. Reuses the existing iframe when the target hasn't
+    // changed, instead of tearing it down and reconnecting.
+    function ensureOrchestrator(target: string) {
+      if (orchestrator && orchestratorTarget === target) return;
+      orchestratorTarget = target;
+      if (!orchestrator) {
+        orchestrator = mountOrchestrator(ctx, { orchestratorOrigin });
+        orchestrator.ui.mount();
+      }
+      orchestrator.sendInit(target);
+    }
+
+    function teardownOrchestrator() {
+      orchestrator?.ui.remove();
+      orchestrator = undefined;
+      orchestratorTarget = undefined;
+    }
 
     // Shared stacking counter: each note starts at mount order, but any
     // note the user interacts with (drag, or a click inside its iframe)
@@ -89,8 +127,12 @@ export default defineContentScript({
     // page.
     let showGeneration = 0;
 
-    function showAnnotations(annotations: AnnotationData[]) {
-      hideOverlay();
+    function showAnnotations(annotations: AnnotationData[], target: string) {
+      // Only the note set is torn down here -- the orchestrator iframe
+      // is kept and just re-targeted below (see ensureOrchestrator),
+      // since it's the same target's notes being redrawn.
+      hideOverlay({ keepOrchestrator: true });
+      ensureOrchestrator(target);
       const generation = ++showGeneration;
       for (const [index, annotation] of annotations.entries()) {
         mountNote(ctx, annotation, index, mountNoteDeps).then((ui) => {
@@ -98,24 +140,50 @@ export default defineContentScript({
             ui.remove();
             return;
           }
-          mountedNotes.push(ui);
+          mountedNotes.set(annotation.id, ui);
         });
       }
     }
 
-    function hideOverlay() {
+    // keepOrchestrator: true when called from showAnnotations, about
+    // to mount/re-target the orchestrator right after -- only a
+    // genuine "no match" (HIDE_ANNOTATION_MESSAGE below) tears it down.
+    function hideOverlay(opts: { keepOrchestrator?: boolean } = {}) {
       showGeneration++;
-      for (const ui of mountedNotes) ui.remove();
-      mountedNotes = [];
+      for (const ui of mountedNotes.values()) ui.remove();
+      mountedNotes = new Map();
+      if (!opts.keepOrchestrator) teardownOrchestrator();
     }
 
     browser.runtime.onMessage.addListener((message: AnnotationMessage) => {
       if (message?.type === SHOW_ANNOTATION_MESSAGE) {
-        showAnnotations(message.annotations);
+        showAnnotations(message.annotations, message.target);
       } else if (message?.type === HIDE_ANNOTATION_MESSAGE) {
         hideOverlay();
       }
     });
+
+    // Relays from the orchestrator iframe: another user created or
+    // deleted an annotation for this page's target. Only this document
+    // can act on these since it owns the note wrapper elements --
+    // "update" events skip this entirely and go straight to the
+    // matching note's own iframe via BroadcastChannel (see
+    // lib/realtime-channel.ts and NoteContent.tsx).
+    window.addEventListener(
+      "message",
+      (e: MessageEvent<OrchestratorToParentMessage>) => {
+        if (e.source !== orchestrator?.getWindow()) return;
+        if (e.data?.type === ANNOTATION_CREATED_MESSAGE) {
+          const annotation = e.data.annotation;
+          mountNote(ctx, annotation, mountedNotes.size, mountNoteDeps).then(
+            (ui) => mountedNotes.set(annotation.id, ui),
+          );
+        } else if (e.data?.type === ANNOTATION_DELETED_MESSAGE) {
+          mountedNotes.get(e.data.annotationId)?.remove();
+          mountedNotes.delete(e.data.annotationId);
+        }
+      },
+    );
 
     // Ask the background script to check this page as soon as this
     // script starts. tabs.onUpdated in entrypoints/background.ts already

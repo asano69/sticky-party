@@ -143,6 +143,7 @@ export default defineBackground(() => {
       await browser.tabs.sendMessage(tabId, {
         type: SHOW_ANNOTATION_MESSAGE,
         annotations,
+        target: url,
       });
       // Shows how many notes are on screen for this tab, in a neutral
       // dark gray -- distinct from the red sync-error badge, which
