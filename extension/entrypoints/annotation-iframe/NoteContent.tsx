@@ -1,4 +1,5 @@
 import { createResource, createSignal, onCleanup, Show } from "solid-js";
+import { createStore } from "solid-js/store";
 
 import {
   deleteAnnotation,
@@ -19,6 +20,7 @@ import {
 import { useAuthedPb } from "./useAuthedPb";
 import { useContentHeight } from "./useContentHeight";
 import { useParentMessaging } from "./useParentMessaging";
+import { useRealtimeUpdates } from "./useRealtimeUpdates";
 import NoteHeader from "./NoteHeader";
 import NoteMain from "./NoteMain";
 import NoteFooter from "./NoteFooter";
@@ -44,7 +46,14 @@ function resolveNoteColor(color: string): NoteColor {
 
 export default function NoteContent() {
   const pb = useAuthedPb();
-  const [annotation, setAnnotation] = createSignal<AnnotationData>();
+  // Store, not a signal: realtime updates (see useRealtimeUpdates
+  // below) patch individual fields (title/body/hide/color/pin), and a
+  // store only re-renders the DOM for the fields that actually
+  // changed rather than the whole note on every patch. Wrapped in a
+  // single-key object (`annotation`) rather than storing AnnotationData
+  // directly, since createStore needs a defined initial value and this
+  // note has none until INIT_NOTE_MESSAGE arrives.
+  const [state, setState] = createStore<{ annotation?: AnnotationData }>({});
   const [editing, setEditing] = createSignal(false);
   const [draftTitle, setDraftTitle] = createSignal("");
   const [draft, setDraft] = createSignal("");
@@ -80,7 +89,7 @@ export default function NoteContent() {
   // without polling while closed.
   const [historyOpen, setHistoryOpen] = createSignal(false);
   const [history, { refetch: refetchHistory }] = createResource(
-    () => (historyOpen() ? annotation()?.id : undefined),
+    () => (historyOpen() ? state.annotation?.id : undefined),
     (id) => fetchHistory(id),
   );
 
@@ -91,7 +100,7 @@ export default function NoteContent() {
   const contentHeight = useContentHeight({ editing, draft, draftTitle });
 
   const startEdit = (field: "title" | "body" = "body") => {
-    const current = annotation();
+    const current = state.annotation;
     if (!current) return;
     setDraftTitle(current.title);
     setDraft(current.body);
@@ -110,14 +119,22 @@ export default function NoteContent() {
   // re-measuring from the read-mode display here would shrink the note
   // back down below that floor.
   const parentMessaging = useParentMessaging({
-    onInit: setAnnotation,
+    onInit: (annotation) => setState("annotation", annotation),
     onStartEditTitle: () => startEdit("title"),
     editing,
     onBlurWhileEditing: () => saveEdit(),
     onPinChange: (pin) => {
-      const current = annotation();
-      if (current) setAnnotation({ ...current, pin });
+      if (state.annotation) setState("annotation", "pin", pin);
     },
+  });
+
+  // Applies another tab/user's edits onto this note's store as soon as
+  // they arrive (see docs/realtime-sync.md). Create/delete are handled
+  // separately by content.ts -- this hook only ever touches this
+  // already-mounted note's own fields.
+  useRealtimeUpdates({
+    annotation: () => state.annotation,
+    setAnnotation: setState,
   });
 
   const cancelEdit = () => {
@@ -139,7 +156,7 @@ export default function NoteContent() {
   onCleanup(() => clearTimeout(shakeTimer));
 
   const saveEdit = async () => {
-    const current = annotation();
+    const current = state.annotation;
     const client = pb();
     if (!current || !client) return;
     setSaving(true);
@@ -148,7 +165,7 @@ export default function NoteContent() {
         title: draftTitle(),
         body: draft(),
       });
-      setAnnotation({ ...current, title: draftTitle(), body: draft() });
+      setState("annotation", { title: draftTitle(), body: draft() });
       setEditing(false);
     } catch (err) {
       console.error("[sticky-party] failed to save annotation", err);
@@ -177,7 +194,7 @@ export default function NoteContent() {
       setConfirmDelete(true);
       return;
     }
-    const current = annotation();
+    const current = state.annotation;
     const client = pb();
     if (!current || !client) return;
     setDeleting(true);
@@ -196,13 +213,13 @@ export default function NoteContent() {
   // persisting it immediately -- unlike title/body, there's no separate
   // save step for this control.
   const handleToggleHide = async (next: boolean) => {
-    const current = annotation();
+    const current = state.annotation;
     const client = pb();
     if (!current || !client) return;
     setTogglingHide(true);
     try {
       await setAnnotationHide(client, current.id, next);
-      setAnnotation({ ...current, hide: next });
+      setState("annotation", "hide", next);
       if (next) setRevealed(false);
     } catch (err) {
       console.error("[sticky-party] failed to toggle hide", err);
@@ -215,13 +232,13 @@ export default function NoteContent() {
   // same pattern as handleToggleHide, since there's no separate save
   // step for footer controls.
   const handleColorChange = async (color: NoteColor) => {
-    const current = annotation();
+    const current = state.annotation;
     const client = pb();
     if (!current || !client) return;
     setTogglingColor(true);
     try {
       await setAnnotationColor(client, current.id, color);
-      setAnnotation({ ...current, color });
+      setState("annotation", "color", color);
     } catch (err) {
       console.error("[sticky-party] failed to change color", err);
     } finally {
@@ -235,13 +252,13 @@ export default function NoteContent() {
   // toggleTaskLine rather than any parsed representation, so every
   // other line is left untouched.
   const handleToggleTask = async (lineIndex: number) => {
-    const current = annotation();
+    const current = state.annotation;
     const client = pb();
     if (!current || !client) return;
     const body = toggleTaskLine(current.body, lineIndex);
     try {
       await updateAnnotation(client, current.id, { title: current.title, body });
-      setAnnotation({ ...current, body });
+      setState("annotation", "body", body);
     } catch (err) {
       console.error("[sticky-party] failed to toggle task", err);
     }
@@ -258,7 +275,7 @@ export default function NoteContent() {
     );
     if (!item) return; // No image on the clipboard -- let normal text paste proceed.
     const blob = item.getAsFile();
-    const current = annotation();
+    const current = state.annotation;
     if (!blob || !current || !(e.target instanceof HTMLTextAreaElement)) return;
 
     e.preventDefault();
@@ -287,7 +304,7 @@ export default function NoteContent() {
     // The loading state is now shown by content.ts (which owns the
     // wrapper on the host page), so this Show has no fallback -- while
     // annotation() is unset, this iframe simply renders nothing.
-    <Show when={annotation()}>
+    <Show when={state.annotation}>
       {(note) => (
         <div
           // Clicks inside this iframe don't bubble out to the wrapper's

@@ -62,6 +62,10 @@ export type PositionMessage =
 // fetchAnnotations in lib/annotations.ts).
 export interface AnnotationData {
   id: string;
+  // The normalized target URL this annotation belongs to. Needed to
+  // subscribe to the right target-scoped BroadcastChannel for realtime
+  // updates (see lib/realtime-channel.ts and useRealtimeUpdates.ts).
+  target: string;
   title: string;
   body: string;
   // Whether this note's body is blurred (shoulder-surfing protection),
