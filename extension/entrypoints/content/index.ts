@@ -46,7 +46,15 @@ import { IFRAME_PAGE, mountNote } from "./mountNote";
 import { mountOrchestrator, ORCHESTRATOR_PAGE } from "./mountOrchestrator";
 
 export default defineContentScript({
+  // "*://*/*" is kept here so WXT declares it as a host permission
+  // (unchanged from before -- see wxt.config.ts's manifest comment),
+  // but registration: "runtime" keeps it out of the manifest's static
+  // content_scripts, so the browser no longer auto-injects this on
+  // every page. Injection is instead driven entirely by
+  // lib/dynamicContentScript.ts's registerContentScripts/
+  // updateContentScripts calls, scoped to the local target cache.
   matches: ["*://*/*"],
+  registration: "runtime",
   async main(ctx) {
     // Guard against double-mounting: dev-mode HMR can re-run this script
     // in the same page without a full reload, which would otherwise

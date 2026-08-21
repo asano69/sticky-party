@@ -6,8 +6,14 @@
 // full sync (fullSyncTargets, e.g. the popup's refresh button), and the
 // background script's periodic full sync. Both full syncs overwrite this
 // key wholesale via setCachedTargets, not addCachedTarget.
+//
+// Every writer below (addCachedTarget/removeCachedTarget/setCachedTargets)
+// also calls syncContentScriptMatches, so the dynamically-registered
+// content script (see lib/dynamicContentScript.ts) never drifts out of
+// sync with this cache.
 
 import { getAuthedPb } from "./pb";
+import { syncContentScriptMatches } from "./dynamicContentScript";
 
 const TARGETS_KEY = "cachedTargets";
 // Timestamp of the last successful sync, used by syncTargets to fetch
@@ -83,6 +89,7 @@ export async function addCachedTarget(
   const next = targets.filter((t) => normalizeTarget(t.target) !== normalized);
   next.push({ target: normalized, updated });
   await browser.storage.local.set({ [TARGETS_KEY]: next });
+  await syncContentScriptMatches(next);
 }
 
 // Removes a single target from the cache. Used when a page matches the
@@ -96,11 +103,13 @@ export async function removeCachedTarget(target: string): Promise<void> {
   const next = targets.filter((t) => normalizeTarget(t.target) !== normalized);
   if (next.length !== targets.length) {
     await browser.storage.local.set({ [TARGETS_KEY]: next });
+    await syncContentScriptMatches(next);
   }
 }
 
 export async function setCachedTargets(targets: CachedTarget[]): Promise<void> {
   await browser.storage.local.set({ [TARGETS_KEY]: targets });
+  await syncContentScriptMatches(targets);
 }
 
 // Whether `url` matches any cached target, ignoring a trailing-slash

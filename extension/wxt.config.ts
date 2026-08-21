@@ -33,7 +33,11 @@ export default defineConfig({
   // docs/realtime-sync.md); without this entry, the browser silently
   // refuses to load it as an iframe, so it never runs at all.
   manifest: {
-    permissions: ["storage", "activeTab", "tabs", "alarms"],
+    // "scripting" is required for lib/dynamicContentScript.ts's
+    // registerContentScripts/updateContentScripts/
+    // unregisterContentScripts calls (see entrypoints/content/index.ts's
+    // registration: "runtime").
+    permissions: ["storage", "activeTab", "tabs", "alarms", "scripting"],
     web_accessible_resources: [
       {
         resources: ["annotation-iframe.html", "realtime-orchestrator.html"],
