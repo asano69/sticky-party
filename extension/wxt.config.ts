@@ -37,7 +37,6 @@ export default defineConfig({
     // browser.scripting.executeScript call, which injects the main
     // content script (entrypoints/content/index.ts, registration:
     // "runtime") only into tabs whose page matches a cached target --
-    // triggered by entrypoints/bootstrap.ts's always-on ping.
     permissions: ["storage", "activeTab", "tabs", "alarms", "scripting"],
     web_accessible_resources: [
       {

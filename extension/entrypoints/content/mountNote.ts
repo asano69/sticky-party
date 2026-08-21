@@ -92,6 +92,13 @@ export async function mountNote(
   let initialZ: number;
   let positionRecordId: string | undefined;
   let savedWidthPx: number | undefined;
+  // Restored from the last-saved position, in px (converted from rem).
+  // Used both as contentHeightPx's initial value and as a one-time
+  // floor for the iframe's first real content-height report below, so
+  // reloading a note that was manually resized taller than its text
+  // doesn't immediately shrink back down to whatever height the text
+  // alone needs.
+  let savedHeightPx: number | undefined;
   let initialPinned = false;
   // This note's anchor, as a ratio of the whole document -- the
   // source of truth for top/left regardless of pin mode (see this
@@ -119,6 +126,7 @@ export async function mountNote(
       xRatio = saved.x;
       yRatio = saved.y;
       savedWidthPx = remToPx(saved.width);
+      savedHeightPx = remToPx(saved.height);
       // Basis matches this note's pin mode -- see header comment.
       const basis = initialPinned ? documentSize() : viewportSize();
       initialTop = saved.y * basis.height;
@@ -150,6 +158,17 @@ export async function mountNote(
   // from it, so every writer in this file just patches the store
   // instead of touching wrapper.style directly -- see this file's
   // header comment and docs/note-sizing.md for the height formula.
+  // One-time floor for the iframe's first NOTE_CONTENT_RESIZE_MESSAGE
+  // report after mount (see that handler below), so a manually
+  // widened/heightened note doesn't snap back down to the text's own
+  // height the instant the page reloads. Cleared right after that
+  // first report is applied -- later reports (the body actually
+  // growing or shrinking) are meant to resize the note, so only the
+  // very first one after mount needs this protection.
+  let restoredFloorPx = savedHeightPx
+    ? Math.max(0, savedHeightPx - TITLE_ROW_HEIGHT_PX)
+    : undefined;
+
   const [note, setNote] = createStore({
     pinned: initialPinned,
     top: initialTop,
@@ -160,7 +179,7 @@ export async function mountNote(
     // the wrapper's current on-screen size, is what gets persisted
     // (converted to rem), so temporarily growing the wrapper for the
     // edit-mode footer never changes the note's saved size.
-    contentHeightPx: 0,
+    contentHeightPx: restoredFloorPx ?? 0,
     editing: false,
     z: initialZ,
   });
@@ -679,12 +698,20 @@ export async function mountNote(
           // what the note store's effect and persistPosition build on.
           // While editing, never go below editingFloorPx (see its
           // declaration above) -- this is what stops an existing note
-          // from shrinking the instant editing starts.
+          // from shrinking the instant editing starts. On the first
+          // report after a reload, never go below restoredFloorPx
+          // either, so a note that was manually resized taller than
+          // its text doesn't immediately snap back down to the text's
+          // own height.
+          const floor = editingFloorPx ?? restoredFloorPx;
           const height =
-            editingFloorPx !== undefined
-              ? Math.max(e.data.height, editingFloorPx)
-              : e.data.height;
+            floor !== undefined ? Math.max(e.data.height, floor) : e.data.height;
           setNote("contentHeightPx", height);
+          // Only the very first report after mount should be floored
+          // by the restored size -- later reports reflect the body
+          // actually growing or shrinking, and must be free to shrink
+          // the note below that original restored size.
+          restoredFloorPx = undefined;
           // The iframe has now measured and reported real content,
           // so the note is actually showing something -- remove the
           // loading spinner. loadingOverlay is cleared right after,
