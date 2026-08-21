@@ -94,7 +94,40 @@ export async function syncContentScriptMatches(
         { id: CONTENT_SCRIPT_ID, matches },
       ]);
     }
+
+    // registerContentScripts/updateContentScripts only take effect on
+    // future navigations -- a tab already sitting open on a URL that
+    // just started matching (e.g. the very first annotation saved for
+    // it) never gets the content script injected on its own. Without
+    // this, background.ts's CHECK_ANNOTATION_MESSAGE handling has no
+    // listener in that tab and browser.tabs.sendMessage fails silently,
+    // so the freshly-saved annotation never appears. Injecting into
+    // every open tab here is safe even where the script is already
+    // running: its own top-level guard (see
+    // entrypoints/content/index.ts's __stickyPartyContentLoaded) makes
+    // a repeat injection a no-op.
+    await injectIntoOpenTabs();
   } catch (err) {
     console.error("[sticky-party] failed to sync content script matches", err);
   }
+}
+
+// Executes the content script directly into every currently open tab.
+// Restricted pages (chrome://, the extension store, etc.) reject the
+// injection -- each attempt is caught individually so one such tab
+// can't stop the rest from being covered.
+async function injectIntoOpenTabs(): Promise<void> {
+  const tabs = await browser.tabs.query({});
+  await Promise.all(
+    tabs
+      .filter((tab): tab is typeof tab & { id: number } => tab.id != null)
+      .map((tab) =>
+        browser.scripting
+          .executeScript({
+            target: { tabId: tab.id },
+            files: CONTENT_SCRIPT_JS,
+          })
+          .catch(() => {}),
+      ),
+  );
 }
