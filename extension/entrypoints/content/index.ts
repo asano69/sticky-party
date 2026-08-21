@@ -133,12 +133,22 @@ export default defineContentScript({
       bumpZCounter,
     };
 
-    // Bumped on every showAnnotations/hideOverlay call so a mountNote()
-    // that resolves after a newer call has already run (e.g. the user
-    // navigated away while its position fetch was in flight) can detect
-    // it's stale and remove itself instead of appearing for the wrong
-    // page.
-    let showGeneration = 0;
+    // The annotation ids the most recent showAnnotations() call actually
+    // wants mounted, and the ids currently being mounted (mountNote()
+    // called but not yet resolved). Two overlapping showAnnotations()
+    // calls are common -- e.g. opening the popup sends
+    // RECHECK_ALL_TABS_MESSAGE, which can arrive while the page's own
+    // initial mount is still awaiting its GET_POSITION_MESSAGE round
+    // trip. Without pendingIds, the second call would start a duplicate
+    // mountNote() for the same id; without checking wantedIds (rather
+    // than a per-call generation number) on resolve, the first call's
+    // mountNote() -- which already called ui.mount(), making the note
+    // visible -- would be torn down again just because a later call had
+    // since been issued, even though that later call wants the exact
+    // same note. That combination is what made an already-visible note
+    // flicker or vanish whenever the popup was opened.
+    let wantedIds = new Set<string>();
+    let pendingIds = new Set<string>();
 
     // Reconciles the mounted note set against `annotations` instead of
     // blindly tearing everything down and remounting: notes whose id is
@@ -153,19 +163,22 @@ export default defineContentScript({
     // itself.
     function showAnnotations(annotations: AnnotationData[], target: string) {
       ensureOrchestrator(target);
-      const generation = ++showGeneration;
-      const incomingIds = new Set(annotations.map((a) => a.id));
+      wantedIds = new Set(annotations.map((a) => a.id));
 
       for (const [id, ui] of mountedNotes) {
-        if (incomingIds.has(id)) continue;
+        if (wantedIds.has(id)) continue;
         ui.remove();
         mountedNotes.delete(id);
       }
 
       for (const [index, annotation] of annotations.entries()) {
-        if (mountedNotes.has(annotation.id)) continue;
+        if (mountedNotes.has(annotation.id) || pendingIds.has(annotation.id)) {
+          continue;
+        }
+        pendingIds.add(annotation.id);
         mountNote(ctx, annotation, index, mountNoteDeps).then((ui) => {
-          if (generation !== showGeneration) {
+          pendingIds.delete(annotation.id);
+          if (!wantedIds.has(annotation.id)) {
             ui.remove();
             return;
           }
@@ -175,7 +188,8 @@ export default defineContentScript({
     }
 
     function hideOverlay() {
-      showGeneration++;
+      wantedIds = new Set();
+      pendingIds = new Set();
       for (const ui of mountedNotes.values()) ui.remove();
       mountedNotes = new Map();
       teardownOrchestrator();
