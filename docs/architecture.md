@@ -13,11 +13,11 @@
   採用しない。
 - `content script`（`entrypoints/content/index.ts`、note のマウント処理本体）は
   「ほぼ全ページで動作する」設計ではない。`registration: "runtime"` で宣言され、
-  マニフェストの静的 `content_scripts` には載らない。全ページに静的登録される
-  軽量な `entrypoints/bootstrap.ts` が起動のたびに `background.ts` へ問い合わせ、
-  キャッシュ済み `target` 一覧とのローカル一致判定（`isTargetMatch`）で実際に
-  マッチしたページに対してだけ、`background.ts` が `browser.scripting.executeScript`
-  でこの本体スクリプトを注入する（詳細は後述の「content script の動的注入」節を参照）。
+  マニフェストの静的 `content_scripts` には載らない。`background.ts` が
+  `browser.tabs.onUpdated` でナビゲーションを直接検知し、キャッシュ済み `target`
+  一覧とのローカル一致判定（`isTargetMatch`）で実際にマッチしたページに対して
+  だけ `browser.scripting.executeScript` でこの本体スクリプトを注入する
+  （詳細は後述の「content script の動的注入」節を参照）。
 
 ## 原則: DB is source of truth / local storage は「target 一覧」のみの読み取り専用ミラー
 
@@ -138,12 +138,10 @@ pattern を動的に登録・更新する方式を取っていたが、これは
   `injectIntoOpenTabs()`（開いている全タブへ `browser.scripting.executeScript`
   で直接実行する別経路）を持つ必要があり、仕組みが二重になっていた。
 
-### 現在の方式: 常時起動する軽量bootstrap + マッチ時のみ本体を注入
+### 現在の方式: `tabs.onUpdated` を起点にマッチ時のみ本体を注入
 
 ```
-entrypoints/bootstrap.ts（全ページに静的登録、matches: ["*://*/*"]）
-        │ ページ読み込みのたびに実行。やることは1行の
-        │ CHECK_ANNOTATION_MESSAGE(url) 送信のみ。
+browser.tabs.onUpdated（実際のナビゲーション、SPA遷移含む）
         ▼
 background.ts の checkTab/runCheckTab
         │ isTargetMatch(url, cachedTargets) でローカル判定（通信なし）
@@ -159,9 +157,12 @@ background.ts の checkTab/runCheckTab
             以降は従来通り fetchAnnotations → SHOW_ANNOTATION_MESSAGE
 ```
 
-`bootstrap.ts` は note のマウント処理を一切持たないため、実行コストは
-「1回のメッセージ送信」のみで、`registerContentScripts` 相当の絞り込みを
-一切行わなくても、非対象ページでの実行コストはほぼ無視できる。
+`content script`（`entrypoints/content/index.ts`）を全ページに静的登録する
+代わりに、`browser.tabs.onUpdated` だけを起点にすることで、非対象ページでの
+実行コストは一切発生しない（メッセージ送信すら不要）。かつてはこの起点として
+全ページに静的登録した軽量な `entrypoints/bootstrap.ts` を挟んでいたが、
+`tabs.onUpdated` 自体が content script の実行に依存しないブラウザ組み込みの
+イベントであり、単独でナビゲーション検知に十分だったため撤去した。
 
 `ensureContentScriptInjected` は `checkTab` を経由するすべての呼び出し元
 （`tabs.onUpdated`、popup からの `CHECK_ANNOTATION_MESSAGE`、

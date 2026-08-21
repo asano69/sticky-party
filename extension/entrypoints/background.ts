@@ -130,19 +130,15 @@ export default defineBackground(() => {
   });
 
   // Checks `url` against the cached target list and tells tab `tabId`
-  // to show or hide its annotation overlay accordingly. Shared by the
-  // navigation listener and the content script's own startup ping
-  // below, since a content script can finish injecting after
-  // tabs.onUpdated already fired and missed it -- otherwise a matching
-  // page's annotation only ever appeared after a second navigation
-  // (e.g. a full reload).
+  // to show or hide its annotation overlay accordingly.
   //
-  // On a normal navigation, both callers fire within milliseconds of
-  // each other for the same tab+URL. Without dedupe, that meant two
-  // separate authenticate-and-fetch round trips to the backend right
-  // as the page itself was still loading; if either one happened to
-  // be slow enough to fail under that contention, the sync error
-  // badge would flash on for no real reason. inFlightChecks makes the
+  // Multiple callers can target the same tab+URL close together (e.g.
+  // recheckAllTabs sweeping every open tab while one of them is also
+  // mid-navigation and triggers its own tabs.onUpdated call). Without
+  // dedupe, that meant two separate authenticate-and-fetch round trips
+  // to the backend for the same page; if either one happened to be
+  // slow enough to fail under that contention, the sync error badge
+  // would flash on for no real reason. inFlightChecks makes the
   // second caller just await the first call's result instead of
   // starting a redundant request.
   const inFlightChecks = new Map<string, Promise<void>>();
@@ -281,22 +277,16 @@ export default defineBackground(() => {
   // exist.
   browser.tabs.onRemoved.addListener((tabId) => injectedTabs.delete(tabId));
 
-  // Two senders share this listener:
-  // - The content script, as soon as it starts running. This fixes the
-  //   race above: even if tabs.onUpdated already fired before the
-  //   content script was ready to receive its message, this ping
-  //   re-checks the same URL once the content script exists.
-  // - The popup, right after saving a new annotation, so the sticky
-  //   note appears immediately instead of waiting for the next
-  //   navigation or periodic full sync. The popup has no sender.tab of
-  //   its own, so it passes tabId explicitly.
-  browser.runtime.onMessage.addListener(
-    (message: CheckAnnotationMessage, sender) => {
-      if (message?.type !== CHECK_ANNOTATION_MESSAGE) return;
-      const tabId = message.tabId ?? sender.tab?.id;
-      if (tabId != null) checkTab(tabId, message.url);
-    },
-  );
+  // Sent only by the popup, right after saving a new annotation, so
+  // the sticky note appears immediately instead of waiting for the
+  // next navigation or periodic full sync. Navigation itself is
+  // already detected directly via tabs.onUpdated above, so no content
+  // script needs to send this on page load.
+  browser.runtime.onMessage.addListener((message: CheckAnnotationMessage) => {
+    if (message?.type === CHECK_ANNOTATION_MESSAGE) {
+      checkTab(message.tabId, message.url);
+    }
+  });
 
   // Sent by the popup after it refreshes the target cache itself (see
   // entrypoints/popup/App.tsx's checkConfigured/handleSync). Unlike

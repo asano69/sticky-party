@@ -78,16 +78,17 @@ export interface HideAnnotationMessage {
 
 export type AnnotationMessage = ShowAnnotationMessage | HideAnnotationMessage;
 
-// Sent by the content script as soon as it starts, so the background
-// script can check the page even if the script finished injecting after
-// tabs.onUpdated already fired and missed it (see entrypoints/content.ts).
+// Sent by the popup right after creating a new annotation, so the
+// sticky note appears immediately instead of waiting for the next
+// navigation or periodic full sync. Navigation itself is detected by
+// background.ts directly via browser.tabs.onUpdated, so no content
+// script needs to send this on page load.
 export interface CheckAnnotationMessage {
   type: typeof CHECK_ANNOTATION_MESSAGE;
   url: string;
-  // Set explicitly when sent from the popup, which has no sender.tab
-  // context of its own. Content scripts omit this and rely on
-  // sender.tab.id instead (see background.ts's listener).
-  tabId?: number;
+  // The popup has no sender.tab context of its own, so it must pass
+  // this explicitly.
+  tabId: number;
 }
 
 // popup -> background: re-check every open tab against the local

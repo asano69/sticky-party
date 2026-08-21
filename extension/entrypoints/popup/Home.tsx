@@ -182,11 +182,12 @@ export default function Home(props: {
       // Re-run content.ts's mount process for the current tab so the
       // annotation just saved shows up immediately, instead of waiting
       // for the next navigation or periodic full sync.
-      if (tabId() != null) {
+      const currentTabId = tabId();
+      if (currentTabId != null) {
         browser.runtime.sendMessage({
           type: CHECK_ANNOTATION_MESSAGE,
           url: target,
-          tabId: tabId(),
+          tabId: currentTabId,
         } satisfies CheckAnnotationMessage);
       }
       // Lets App.tsx refresh the displayed annotation count (see

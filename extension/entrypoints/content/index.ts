@@ -245,8 +245,7 @@ export default defineContentScript({
     // background.ts's runCheckTab (see entrypoints/background.ts) after
     // it has already confirmed this page matches a cached target, and
     // only once the resulting SHOW_ANNOTATION_MESSAGE send is guaranteed
-    // to reach the listener registered above. Every page, matching or
-    // not, still runs entrypoints/bootstrap.ts's tiny ping that starts
-    // that check off in the first place.
+    // to reach the listener registered above. background.ts triggers
+    // that check itself, directly off browser.tabs.onUpdated.
   },
 });

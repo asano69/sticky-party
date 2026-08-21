@@ -3,11 +3,9 @@
 ## 現状の設計（docs/architecture.md 見直し後）
 
 ### 2種類のcontent script
-
 | スクリプト | 登録方式 | 役割 |
 |---|---|---|
-| `entrypoints/bootstrap.ts` | 静的（`matches: ["*://*/*"]`、マニフェストに載る） | 全ページで実行。やることは `CHECK_ANNOTATION_MESSAGE` を1回送るだけ |
-| `entrypoints/content/index.ts` | 動的（`registration: "runtime"`、マニフェストに載らない） | 付箋のマウント処理本体。ローカルのtarget一覧にマッチしたタブにのみ、`background.ts` が `browser.scripting.executeScript` で注入する |
+| `entrypoints/content/index.ts` | 動的（`registration: "runtime"`） | 付箋のマウント処理本体。ローカルのtarget一覧にマッチしたタブにのみ、`background.ts` が `browser.scripting.executeScript` で注入する |
 
 ### 注入の呼び出し経路
 
@@ -16,7 +14,7 @@
 `runCheckTab` 自体は複数の経路から呼ばれる（`checkTab` 経由）。
 
 - `browser.tabs.onUpdated`（実際のナビゲーション、SPA遷移含む）
-- `CHECK_ANNOTATION_MESSAGE`（bootstrap.tsからの起動時ping、popupの保存後ping）
+- `CHECK_ANNOTATION_MESSAGE`（popupの保存後ping）
 - `RECHECK_ALL_TABS_MESSAGE` → `recheckAllTabs()` → 開いている**全タブ**に対して `checkTab`
   - popupの `App.tsx` の `checkConfigured`（popup起動のたび）
   - popupの `handleSync`（手動フルシンク）

@@ -6,10 +6,10 @@ talk to each other: the **content script** (`entrypoints/content/index.ts`,
 imperatively injected via `browser.scripting.executeScript` only into tabs
 whose page matches a cached annotation target -- see `docs/architecture.md`'s
 "content script の動的注入" section -- not statically injected on every
-page; a separate, always-on `entrypoints/bootstrap.ts` is what pings
-background.ts to trigger that check), the **background script** (the MV3
-service worker), the **popup** (the extension's own privileged page), and
-the **backend** (the Go server, exposing PocketBase's REST API).
+page; `background.ts` itself triggers that check directly off
+`browser.tabs.onUpdated`), the **background script** (the MV3 service
+worker), the **popup** (the extension's own privileged page), and the
+**backend** (the Go server, exposing PocketBase's REST API).
 
 For *why* the system is split this way, see `docs/architecture.md` (sync
 design) and `docs/note-sizing.md` (note sizing). This document focuses on
@@ -45,7 +45,6 @@ PocketBase itself; it always asks the background script to do it, via
 ```mermaid
 sequenceDiagram
     participant Page as Host page
-    participant Boot as bootstrap.ts
     participant Content as content.ts
     participant BG as background.ts
     participant Popup as popup (Home.tsx)
@@ -56,9 +55,8 @@ sequenceDiagram
     PB-->>BG: target list
     BG->>BG: overwrite cachedTargets (full sync)
 
-    Note over Boot: Statically injected on every page
-    Page->>Boot: script runs
-    Boot->>BG: CHECK_ANNOTATION_MESSAGE(url)
+    Note over Page: Navigation, including SPA route changes
+    Page->>BG: browser.tabs.onUpdated fires
     BG->>BG: isTargetMatch(url, cachedTargets)
 
     alt no match
