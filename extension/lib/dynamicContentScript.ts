@@ -52,6 +52,16 @@ function toMatchPattern(target: string): string | undefined {
 // caching a "registered" flag in module memory -- this runs from
 // multiple independent JS contexts (popup, background), so an
 // in-memory flag in one would never reflect what another already did.
+// Whether two match-pattern lists contain the same set of patterns,
+// ignoring order. Used to skip re-registering the content script
+// entirely when nothing has actually changed -- see the comment in
+// syncContentScriptMatches below for why that matters.
+function sameMatches(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const setA = new Set(a);
+  return b.every((pattern) => setA.has(pattern));
+}
+
 export async function syncContentScriptMatches(
   targets: { target: string }[],
 ): Promise<void> {
@@ -67,6 +77,22 @@ export async function syncContentScriptMatches(
     const existing = await browser.scripting.getRegisteredContentScripts({
       ids: [CONTENT_SCRIPT_ID],
     });
+
+    // Every writer of the target cache (popup write-through, full/diff
+    // sync, deletion) calls this on every change -- including changes
+    // that don't actually touch any target's match pattern (e.g. a
+    // popup open re-running a differential sync that finds nothing
+    // new). Calling registerContentScripts/updateContentScripts
+    // unconditionally in that case re-registers a script that's
+    // already registered with the exact same patterns, which both
+    // re-injects it into every open tab below (injectIntoOpenTabs) and
+    // -- in dev mode -- makes WXT's own tooling reload it, tearing down
+    // whatever that tab's content script had already mounted (see the
+    // notes/ doc on the disappearing-note bug). Skipping the update
+    // entirely when the pattern set is unchanged avoids both.
+    if (existing.length > 0 && sameMatches(existing[0].matches ?? [], matches)) {
+      return;
+    }
 
     if (matches.length === 0) {
       // registerContentScripts/updateContentScripts both reject an
