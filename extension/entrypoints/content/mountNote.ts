@@ -18,8 +18,18 @@
 // the two modes use different bases, togglePin below has to actually
 // convert top/left between them (accounting for scroll), not just
 // flip a flag.
+//
+// The wrapper's on-screen appearance (position, size, pin mode,
+// stacking order) is driven entirely by a single reactive `note`
+// store below, applied to wrapper.style by one createEffect -- see
+// docs/note-sizing.md for the height formula it implements. Every
+// writer (drag, native resize, pin toggle, a remote position update)
+// just patches the store; nothing outside that one effect touches
+// wrapper.style.position/top/left/height/zIndex directly, so those
+// five properties can never drift out of sync with each other.
 
-import { createEffect, createRoot, createSignal } from "solid-js";
+import { createEffect, createRoot } from "solid-js";
+import { createStore } from "solid-js/store";
 import X from "lucide-solid/icons/x";
 
 import {
@@ -74,23 +84,22 @@ export async function mountNote(
   deps: MountNoteDeps,
 ) {
   // Cascade defaults, used only if this annotation has no saved
-  // position yet. Resolved before the iframe UI is created below, so
+  // position yet. Resolved before the note store below is created, so
   // the note appears directly at its saved spot instead of flashing at
   // the cascade position and then jumping once fetchPosition resolves.
-  let top = 12 + index * 24;
-  let left = 12 + index * 24;
-  let z: number;
+  let initialTop = 12 + index * 24;
+  let initialLeft = 12 + index * 24;
+  let initialZ: number;
   let positionRecordId: string | undefined;
   let savedWidthPx: number | undefined;
-  // Whether this note follows the viewport (position: fixed, the
-  // default) or stays anchored to a fixed spot on the page (position:
-  // absolute). Shared across every viewer via the `positions`
-  // collection (see lib/positions.ts) -- no longer per-user.
-  let pinned = false;
+  let initialPinned = false;
   // This note's anchor, as a ratio of the whole document -- the
-  // source of truth for top/left regardless of pinned (see this
+  // source of truth for top/left regardless of pin mode (see this
   // file's header comment). Kept up to date by persistPosition and
-  // the document ResizeObserver below.
+  // the document ResizeObserver below. Deliberately plain variables,
+  // not part of the `note` store below: they're the persisted-ratio
+  // side of this note's position, a separate concern from what the
+  // store renders (the current pixel position for the current basis).
   let xRatio = 0;
   let yRatio = 0;
 
@@ -106,22 +115,22 @@ export async function mountNote(
     );
     if (saved) {
       positionRecordId = saved.id;
-      pinned = saved.pin;
+      initialPinned = saved.pin;
       xRatio = saved.x;
       yRatio = saved.y;
       savedWidthPx = remToPx(saved.width);
       // Basis matches this note's pin mode -- see header comment.
-      const basis = pinned ? documentSize() : viewportSize();
-      top = saved.y * basis.height;
-      left = saved.x * basis.width;
-      z = saved.z;
-      deps.bumpZCounter(z);
+      const basis = initialPinned ? documentSize() : viewportSize();
+      initialTop = saved.y * basis.height;
+      initialLeft = saved.x * basis.width;
+      initialZ = saved.z;
+      deps.bumpZCounter(initialZ);
     } else {
-      z = deps.nextZ();
+      initialZ = deps.nextZ();
     }
   } catch (err) {
     console.error("[sticky-party] failed to load position", err);
-    z = deps.nextZ();
+    initialZ = deps.nextZ();
   }
 
   if (positionRecordId === undefined) {
@@ -130,26 +139,31 @@ export async function mountNote(
     // from until the first persistPosition() call. A brand-new note
     // is never pinned yet, so this always uses the viewport basis.
     const basis = viewportSize();
-    xRatio = basis.width ? left / basis.width : 0;
-    yRatio = basis.height ? top / basis.height : 0;
+    xRatio = basis.width ? initialLeft / basis.width : 0;
+    yRatio = basis.height ? initialTop / basis.height : 0;
   }
 
-  // Tracks the note's "resting" (non-editing) content height in px, as
-  // last reported by the iframe via NOTE_CONTENT_RESIZE_MESSAGE (or
-  // recovered from a manual drag-resize -- see the ResizeObserver
-  // below). This, not the wrapper's current on-screen size, is what
-  // gets persisted (converted to rem), so temporarily growing the
-  // wrapper for the edit-mode footer (see the height effect in onMount
-  // below) never changes the note's saved size.
-  //
-  // Signals (not plain `let`s): the wrapper's height is a pure
-  // derivation of these two values (see the createEffect in onMount
-  // below), so every writer just updates the signal and the DOM always
-  // stays in sync -- no call site can forget to also apply the height.
-  const [contentHeight, setContentHeight] = createSignal(
-    savedWidthPx !== undefined ? 0 : 0,
-  );
-  const [isEditingNote, setIsEditingNote] = createSignal(false);
+  // Everything the wrapper's on-screen appearance depends on --
+  // position, pin mode, resting content height, whether the edit-mode
+  // footer is showing, and stacking order -- lives in this one store.
+  // A single createEffect below (see onMount) derives wrapper.style
+  // from it, so every writer in this file just patches the store
+  // instead of touching wrapper.style directly -- see this file's
+  // header comment and docs/note-sizing.md for the height formula.
+  const [note, setNote] = createStore({
+    pinned: initialPinned,
+    top: initialTop,
+    left: initialLeft,
+    // Resting (non-editing) content height in px, as last reported by
+    // the iframe via NOTE_CONTENT_RESIZE_MESSAGE (or recovered from a
+    // manual drag-resize -- see the ResizeObserver below). This, not
+    // the wrapper's current on-screen size, is what gets persisted
+    // (converted to rem), so temporarily growing the wrapper for the
+    // edit-mode footer never changes the note's saved size.
+    contentHeightPx: 0,
+    editing: false,
+    z: initialZ,
+  });
 
   let resizeObserver: ResizeObserver | undefined;
   // Set only while a native drag-resize gesture is in progress (see
@@ -177,16 +191,16 @@ export async function mountNote(
   let onWindowResize: (() => void) | undefined;
   let onMessage: ((e: MessageEvent) => void) | undefined;
   // Hoisted out of onMount so applyRemotePosition (defined below, and
-  // exposed on the returned handle) can reach the wrapper element and
-  // its height-recalculation logic from outside the onMount closure.
+  // exposed on the returned handle) can reach the wrapper element from
+  // outside the onMount closure.
   let wrapperEl: HTMLElement | undefined;
-  // Disposes the createEffect (created in onMount below) that keeps
-  // the wrapper's height derived from contentHeight/isEditingNote.
-  // Solid effects created outside a component tree need an explicit
-  // owner (createRoot) and an explicit dispose call once the note is
-  // unmounted (see onRemove) -- otherwise the effect (and its
-  // subscription to the signals above) would leak.
-  let disposeHeightEffect: (() => void) | undefined;
+  // Disposes the createEffect (created in onMount below) that derives
+  // wrapper.style from the `note` store. Solid effects created outside
+  // a component tree need an explicit owner (createRoot) and an
+  // explicit dispose call once the note is unmounted (see onRemove) --
+  // otherwise the effect (and its subscription to the store) would
+  // leak.
+  let disposeNoteStyleEffect: (() => void) | undefined;
   // Whether this note is currently mid-drag or mid-resize. While
   // either is true, applyRemotePosition ignores incoming updates --
   // including this client's own self-echoed save from persistPosition
@@ -223,42 +237,40 @@ export async function mountNote(
       // extra space a larger min-height forces, showing up as a
       // blank second line under single-line notes.
       const MIN_CONTENT_HEIGHT_PX = 32;
+      // Static properties only -- never changed again after mount, so
+      // they're set once here rather than through the note store's
+      // effect below. Width in particular is also changed directly by
+      // the browser's own native `resize: both` handle (see
+      // resizeObserver below), which the store never learns about, so
+      // it must stay outside the store-driven effect entirely.
       Object.assign(wrapper.style, {
-        // A pinned note uses absolute positioning so it stays put
-        // in the document flow and scrolls with the page; an
-        // ordinary note (default) uses fixed so it stays put on
-        // screen instead.
-        position: pinned ? "absolute" : "fixed",
-        top: `${top}px`,
-        left: `${left}px`,
         width: savedWidthPx ? `${savedWidthPx}px` : "260px",
         minWidth: "160px",
         minHeight: `${TITLE_ROW_HEIGHT_PX + MIN_CONTENT_HEIGHT_PX}px`,
         resize: "both",
         overflow: "hidden",
         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
-        zIndex: `${Z_BASE + z}`,
       });
 
-      // Derives the wrapper's total height from contentHeight, plus
-      // TITLE_ROW_HEIGHT_PX for the edit-mode footer whenever the
-      // note is being edited (see NOTE_EDITING_MESSAGE below). The
-      // footer's extra space is purely visual -- persistPosition
-      // never includes it (see below) -- so entering/leaving edit
-      // mode never changes the note's saved size. This runs once
-      // immediately (Solid effects run on creation) and again
-      // automatically whenever contentHeight/isEditingNote change.
-      disposeHeightEffect = createRoot((dispose) => {
+      // Derives the wrapper's position, size, pin mode, and stacking
+      // order from the `note` store -- see this file's header comment.
+      // This runs once immediately (Solid effects run on creation,
+      // applying the initial state above) and again automatically
+      // whenever any of the store's fields change.
+      disposeNoteStyleEffect = createRoot((dispose) => {
         createEffect(() => {
-          const footer = isEditingNote() ? TITLE_ROW_HEIGHT_PX : 0;
-          wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + contentHeight() + footer}px`;
+          wrapper.style.position = note.pinned ? "absolute" : "fixed";
+          wrapper.style.top = `${note.top}px`;
+          wrapper.style.left = `${note.left}px`;
+          const footer = note.editing ? TITLE_ROW_HEIGHT_PX : 0;
+          wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + note.contentHeightPx + footer}px`;
+          wrapper.style.zIndex = `${Z_BASE + note.z}`;
         });
         return dispose;
       });
 
       const bringToFront = () => {
-        z = deps.nextZ();
-        wrapper.style.zIndex = `${Z_BASE + z}`;
+        setNote("z", deps.nextZ());
         // z is shared now, so a "bring to front" needs to reach every
         // viewer promptly, not just wait for the next drag/resize.
         persistPosition();
@@ -267,31 +279,31 @@ export async function mountNote(
       // Saved via the background script, not directly here -- see
       // lib/messages.ts for why a content script can't safely call
       // PocketBase itself. Always recomputes xRatio/yRatio from the
-      // current top/left before sending: this is the one place a
-      // note's anchor is actually redefined (e.g. after a drag), so
+      // note's current top/left before sending: this is the one place
+      // a note's anchor is actually redefined (e.g. after a drag), so
       // the values the document ResizeObserver below relies on must
       // be refreshed here too.
       const persistPosition = () => {
         // Basis matches this note's current pin mode -- see header
         // comment.
-        const basis = pinned ? documentSize() : viewportSize();
-        xRatio = basis.width ? left / basis.width : xRatio;
-        yRatio = basis.height ? top / basis.height : yRatio;
+        const basis = note.pinned ? documentSize() : viewportSize();
+        xRatio = basis.width ? note.left / basis.width : xRatio;
+        yRatio = basis.height ? note.top / basis.height : yRatio;
         browser.runtime
           .sendMessage({
             type: SAVE_POSITION_MESSAGE,
             annotationId: annotation.id,
             position: {
-              pin: pinned,
+              pin: note.pinned,
               x: xRatio,
               y: yRatio,
               width: pxToRem(wrapper.offsetWidth),
-              // Use contentHeight (the resting/non-editing size), not
-              // wrapper.offsetHeight -- the wrapper is temporarily
-              // taller than that while editing (see applyWrapperHeight
+              // Use contentHeightPx (the resting/non-editing size),
+              // not wrapper.offsetHeight -- the wrapper is temporarily
+              // taller than that while editing (see the store effect
               // above).
-              height: pxToRem(TITLE_ROW_HEIGHT_PX + contentHeight()),
-              z,
+              height: pxToRem(TITLE_ROW_HEIGHT_PX + note.contentHeightPx),
+              z: note.z,
             },
             existingId: positionRecordId,
           } satisfies SavePositionMessage)
@@ -308,26 +320,22 @@ export async function mountNote(
       // same document-relative x/y (see this file's header comment),
       // so this is purely a metadata flip -- no coordinate conversion.
       const togglePin = () => {
-        // top/left are pixel values in the *old* mode's coordinate
-        // system (document-relative while absolute, viewport-relative
-        // while fixed) -- switching position modes without adjusting
-        // them would visually jump the note by the current scroll
-        // offset. Converting here keeps the note exactly where it
-        // was on screen at the moment of the toggle.
-        if (pinned) {
-          top -= window.scrollY;
-          left -= window.scrollX;
-        } else {
-          top += window.scrollY;
-          left += window.scrollX;
-        }
-        pinned = !pinned;
-        wrapper.style.top = `${top}px`;
-        wrapper.style.left = `${left}px`;
-        wrapper.style.position = pinned ? "absolute" : "fixed";
+        // note.top/note.left are pixel values in the *old* mode's
+        // coordinate system (document-relative while absolute,
+        // viewport-relative while fixed) -- switching position modes
+        // without adjusting them would visually jump the note by the
+        // current scroll offset. Converting here keeps the note
+        // exactly where it was on screen at the moment of the toggle.
+        const nextTop = note.pinned
+          ? note.top - window.scrollY
+          : note.top + window.scrollY;
+        const nextLeft = note.pinned
+          ? note.left - window.scrollX
+          : note.left + window.scrollX;
+        setNote({ pinned: !note.pinned, top: nextTop, left: nextLeft });
         persistPosition();
         iframe.contentWindow?.postMessage(
-          { type: NOTE_PIN_MESSAGE, pin: pinned } satisfies NotePinMessage,
+          { type: NOTE_PIN_MESSAGE, pin: note.pinned } satisfies NotePinMessage,
           deps.iframeOrigin,
         );
       };
@@ -468,7 +476,12 @@ export async function mountNote(
         if ((e.target as HTMLElement).closest("button")) return;
         dragging = true;
         bringToFront();
-        dragStart = { x: e.clientX, y: e.clientY, top, left };
+        dragStart = {
+          x: e.clientX,
+          y: e.clientY,
+          top: note.top,
+          left: note.left,
+        };
         header.setPointerCapture(e.pointerId);
       });
       // Keeps the header row draggable within the currently visible
@@ -490,8 +503,8 @@ export async function mountNote(
       // that's fixed at TITLE_ROW_HEIGHT_PX regardless of note width.
       const MIN_VISIBLE_PX = 40;
       const clampDragPosition = (nextTop: number, nextLeft: number) => {
-        const offsetX = pinned ? window.scrollX : 0;
-        const offsetY = pinned ? window.scrollY : 0;
+        const offsetX = note.pinned ? window.scrollX : 0;
+        const offsetY = note.pinned ? window.scrollY : 0;
         const maxTop = offsetY + window.innerHeight - TITLE_ROW_HEIGHT_PX;
         const minLeft = offsetX - (wrapper.offsetWidth - MIN_VISIBLE_PX);
         const maxLeft = offsetX + window.innerWidth - MIN_VISIBLE_PX;
@@ -506,10 +519,7 @@ export async function mountNote(
           dragStart.top + (e.clientY - dragStart.y),
           dragStart.left + (e.clientX - dragStart.x),
         );
-        top = next.top;
-        left = next.left;
-        wrapper.style.top = `${top}px`;
-        wrapper.style.left = `${left}px`;
+        setNote({ top: next.top, left: next.left });
       });
       const endDrag = () => {
         if (!dragStart) return;
@@ -544,13 +554,15 @@ export async function mountNote(
           skipNextResizeSave = false;
           return;
         }
-        // Re-derive contentHeight from the wrapper's actual size, so
+        // Re-derive contentHeightPx from the wrapper's actual size, so
         // a manual drag-resize (which sets the wrapper's height
-        // directly, bypassing the height effect above) updates what
-        // gets persisted -- minus the edit-mode footer, if currently
-        // editing, so the resting size stays footer-free either way.
-        const footer = isEditingNote() ? TITLE_ROW_HEIGHT_PX : 0;
-        setContentHeight(
+        // directly, bypassing the note store's effect above) updates
+        // what gets persisted -- minus the edit-mode footer, if
+        // currently editing, so the resting size stays footer-free
+        // either way.
+        const footer = note.editing ? TITLE_ROW_HEIGHT_PX : 0;
+        setNote(
+          "contentHeightPx",
           Math.max(0, wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX - footer),
         );
 
@@ -609,11 +621,8 @@ export async function mountNote(
       // loading (or a window being dragged to resize) can fire many
       // times in quick succession.
       const recomputePosition = () => {
-        const basis = pinned ? documentSize() : viewportSize();
-        top = yRatio * basis.height;
-        left = xRatio * basis.width;
-        wrapper.style.top = `${top}px`;
-        wrapper.style.left = `${left}px`;
+        const basis = note.pinned ? documentSize() : viewportSize();
+        setNote({ top: yRatio * basis.height, left: xRatio * basis.width });
       };
       docResizeObserver = new ResizeObserver(() => {
         clearTimeout(docResizeTimer);
@@ -642,7 +651,10 @@ export async function mountNote(
           // lib/positions.ts), so it's reported to the iframe
           // separately, right after init.
           iframe.contentWindow?.postMessage(
-            { type: NOTE_PIN_MESSAGE, pin: pinned } satisfies NotePinMessage,
+            {
+              type: NOTE_PIN_MESSAGE,
+              pin: note.pinned,
+            } satisfies NotePinMessage,
             deps.iframeOrigin,
           );
         } else if (e.data?.type === NOTE_DELETED_MESSAGE) {
@@ -652,9 +664,9 @@ export async function mountNote(
         } else if (e.data?.type === NOTE_CONTENT_RESIZE_MESSAGE) {
           // Grow (or shrink back) the wrapper to fit the iframe's
           // main content, restoring the old Shadow DOM version's
-          // auto-growing textarea. contentHeight (not the footer) is
-          // what the height effect above and persistPosition build on.
-          setContentHeight(e.data.height);
+          // auto-growing textarea. contentHeightPx (not the footer) is
+          // what the note store's effect and persistPosition build on.
+          setNote("contentHeightPx", e.data.height);
           // The iframe has now measured and reported real content,
           // so the note is actually showing something -- remove the
           // loading spinner. loadingOverlay is cleared right after,
@@ -662,11 +674,11 @@ export async function mountNote(
           loadingOverlay?.remove();
           loadingOverlay = undefined;
         } else if (e.data?.type === NOTE_EDITING_MESSAGE) {
-          setIsEditingNote(e.data.editing);
+          setNote("editing", e.data.editing);
           // Grows the wrapper by the footer's height while editing
-          // (see the height effect above), without touching
-          // contentHeight -- so the note's saved size stays the same
-          // whether or not the footer is currently showing.
+          // (see the note store's effect above), without touching
+          // contentHeightPx -- so the note's saved size stays the
+          // same whether or not the footer is currently showing.
           // Stop the header from intercepting pointer events while
           // editing, so clicks reach the title input inside the
           // iframe (see the header comment above).
@@ -698,8 +710,8 @@ export async function mountNote(
       clearTimeout(docResizeTimer);
       if (onWindowResize) window.removeEventListener("resize", onWindowResize);
       wrapperEl = undefined;
-      disposeHeightEffect?.();
-      disposeHeightEffect = undefined;
+      disposeNoteStyleEffect?.();
+      disposeNoteStyleEffect = undefined;
     },
   });
 
@@ -726,23 +738,32 @@ export async function mountNote(
     // declaration above for why.
     if (dragging || resizing) return;
 
-    pinned = update.pin;
     xRatio = update.x;
     yRatio = update.y;
     // Basis matches the pin mode this update carries -- see header
     // comment.
-    const basis = pinned ? documentSize() : viewportSize();
-    top = update.y * basis.height;
-    left = update.x * basis.width;
-    // Setting the signal alone re-triggers the height effect (created
-    // in onMount above), so no separate "apply" call is needed here.
-    setContentHeight(Math.max(0, remToPx(update.height) - TITLE_ROW_HEIGHT_PX));
-    z = Math.max(z, update.z);
+    const basis = update.pin ? documentSize() : viewportSize();
+    const nextTop = update.y * basis.height;
+    const nextLeft = update.x * basis.width;
 
-    wrapper.style.position = pinned ? "absolute" : "fixed";
-    wrapper.style.zIndex = `${Z_BASE + z}`;
-    animateMove(wrapper, top, left);
+    // Animates the visual move (and applies the new width) before
+    // patching the note store: animateMove's FLIP technique needs to
+    // read the wrapper's *current* on-screen position first, which the
+    // note store's effect would otherwise instantly overwrite before
+    // animateMove got a chance to measure it.
+    animateMove(wrapper, nextTop, nextLeft);
     wrapper.style.width = `${remToPx(update.width)}px`;
+
+    setNote({
+      pinned: update.pin,
+      top: nextTop,
+      left: nextLeft,
+      contentHeightPx: Math.max(
+        0,
+        remToPx(update.height) - TITLE_ROW_HEIGHT_PX,
+      ),
+      z: Math.max(note.z, update.z),
+    });
   }
 
   // Wrappers around removeAnimation.ts's pure animation functions,
