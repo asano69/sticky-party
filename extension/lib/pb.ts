@@ -29,6 +29,13 @@ async function createAuthStore(): Promise<AsyncAuthStore> {
   });
 }
 
+// Clears the stored auth token, logging out of whichever profile is
+// currently active. Used by lib/session.ts's logout() when Settings
+// switches to a different backend/account.
+export async function clearAuthStore(): Promise<void> {
+  await browser.storage.local.remove(AUTH_STORAGE_KEY);
+}
+
 // Returns a PocketBase client authenticated as a regular `users` record
 // (not a superuser). Annotations are shared across all users, so this
 // login only gates write access to the backend; it does not scope which

@@ -112,6 +112,17 @@ export async function setCachedTargets(targets: CachedTarget[]): Promise<void> {
   await syncContentScriptMatches(targets);
 }
 
+// Wipes the cached target list entirely, including the last-sync
+// timestamp used to diff against it, and unregisters the dynamically-
+// registered content script's match patterns to match (see
+// lib/dynamicContentScript.ts). Used by lib/session.ts's logout() when
+// switching backends/accounts -- the new profile's targets are pulled
+// fresh on its own next sync, so nothing here needs to survive.
+export async function clearTargets(): Promise<void> {
+  await browser.storage.local.remove([TARGETS_KEY, LAST_SYNC_KEY]);
+  await syncContentScriptMatches([]);
+}
+
 // Whether `url` matches any cached target, ignoring a trailing-slash
 // difference (see normalizeTarget). Otherwise matching is exact-equality;
 // see docs/architecture.md's "未確定事項" for future match strategies

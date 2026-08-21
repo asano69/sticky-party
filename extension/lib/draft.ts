@@ -15,3 +15,10 @@ export async function getDraftNote(): Promise<string> {
 export async function saveDraftNote(note: string): Promise<void> {
   await browser.storage.local.set({ [DRAFT_KEY]: note });
 }
+
+// Clears any in-progress draft. Used by lib/session.ts's logout(): a
+// draft written under the old profile has no meaning once its backend/
+// account changes.
+export async function clearDraftNote(): Promise<void> {
+  await browser.storage.local.remove(DRAFT_KEY);
+}

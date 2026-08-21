@@ -17,6 +17,13 @@ export async function savePopupColor(color: NoteColor): Promise<void> {
   await browser.storage.local.set({ [POPUP_COLOR_KEY]: color });
 }
 
+// Clears the persisted popup color. Used by lib/session.ts's logout():
+// the color is per-profile appearance state, not worth carrying across
+// a backend/account switch.
+export async function clearPopupColor(): Promise<void> {
+  await browser.storage.local.remove(POPUP_COLOR_KEY);
+}
+
 // Overrides the popup's --note-bg/--note-text CSS variables (normally
 // fixed to the "yellow" pair in assets/theme.css) on the document root,
 // so the whole popup -- not just the note being composed -- reflects

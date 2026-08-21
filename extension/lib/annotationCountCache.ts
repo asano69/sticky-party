@@ -19,3 +19,10 @@ export async function getCachedAnnotationCount(): Promise<number | undefined> {
 export async function setCachedAnnotationCount(count: number): Promise<void> {
   await browser.storage.local.set({ [COUNT_KEY]: count });
 }
+
+// Clears the cached annotation count. Used by lib/session.ts's
+// logout(): the count belongs to the profile being logged out of, and
+// would otherwise show a stale number until the next fetch.
+export async function clearCachedAnnotationCount(): Promise<void> {
+  await browser.storage.local.remove(COUNT_KEY);
+}
