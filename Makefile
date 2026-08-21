@@ -10,17 +10,6 @@ BINARY := sticky-party
 # Port used by the backend dev server
 PORTS := 3000
 
-# ============================================================
-# Project setup
-# ============================================================
-
-init:
-	fastmod --hidden sticky-party $(notdir $(CURDIR)) --glob '!Makefile'
-	fastmod --hidden MYAPP $(shell echo '$(notdir $(CURDIR))' | tr '[:lower:]' '[:upper:]') --glob '!Makefile'
-	find . -depth \( -type f -o -type d \) -name '*sticky-party*' | while read -r f; do \
-		mv -- "$$f" "$$(dirname "$$f")/$$(basename "$$f" | sed 's/sticky-party/$(notdir $(CURDIR))/g')"; \
-	done
-	fastmod sticky-party $(notdir $(CURDIR))
 
 # ============================================================
 # Build
@@ -49,6 +38,12 @@ zip-extension-firefox: extension-deps
 icons:
 	cd extension && pnpm run icons
 
+frontend-deps:
+	cd frontend && pnpm install
+
+build-frontend: frontend-deps
+	cd frontend && pnpm run build
+
 # ============================================================
 # Run / dev servers
 # ============================================================
@@ -63,7 +58,7 @@ kill-ports:
 	done
 
 # Runs the built binary directly, without the live-reload dev server.
-all:
+all: build-frontend
 	go run ./cmd/$(BINARY) superuser upsert admin@mail.internal password --dir=pb_data
 	go run ./cmd/$(BINARY) serve
 
@@ -87,6 +82,10 @@ dev-back: clean
 # dev:firefox script.
 dev-ext:
 	cd extension && pnpm exec wxt -b firefox --mv3
+
+dev-front: clean
+	npx concurrently -n "frontend,backend" -c "blue,green" "cd frontend && pnpm dev" "go run ./cmd/$(BINARY) serve --dev"
+
 
 # ============================================================
 # Test / lint / format

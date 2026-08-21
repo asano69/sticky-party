@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* Semantic color tokens live in @theme so Tailwind generates matching
+ * utilities (bg-bg, text-text, border-border, ...). Default values here
+ * are the light theme; the dark-mode override below reassigns the same
+ * variable names, so components can keep referencing var(--color-*)
+ * once instead of pairing every utility with a dark: variant. */
+@theme {
+  --font-sans: system-ui, "Inter", -apple-system, sans-serif;
+  --font-serif: "TeX Gyre Termes", "Nimbus Roman No9 L", Georgia, serif;
+  --font-mono: "Menlo", "Consolas", "Monaco", "Courier New", monospace;
+
+  --color-bg: #ffffff;
+  --color-text: #000000;
+  --color-panel: #f8f8f8;
+  --color-surface: #fcfcfc;
+  --color-card: #ffffff;
+  --color-field: #ffffff;
+  --color-border: #000000;
+  --color-border-soft: #999999;
+  --color-hover-bg: #f0f0f0;
+  --color-hover-border: #777777;
+  --color-active-bg: #e4e4e4;
+  --color-active-border: #666666;
+  --color-shadow: #cccccc;
+  /* ---custom ---*/
+  --color-progress: palegreen;
+  --color-muted: #e5e5e5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1a1a1a;
+    --color-text: #e0e0e0;
+    --color-panel: #252525;
+    --color-surface: #1e1e1e;
+    --color-card: #2a2a2a;
+    --color-field: #333333;
+    --color-border: #444444;
+    --color-border-soft: #555555;
+    --color-hover-bg: #3a3a3a;
+    --color-hover-border: #666666;
+    --color-active-bg: #444444;
+    --color-active-border: #777777;
+    --color-shadow: #111111;
+    /* ---custom ---*/
+    --color-progress: #2a6e2a;
+    --color-muted: #202020;
+  }
+}
+
+@layer base {
+  body {
+    @apply h-screen w-screen;
+    font-family: var(--font-serif);
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  strong {
+    font-weight: bold;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply my-1.5 cursor-pointer appearance-none rounded-md px-3 py-[7px]
+         font-sans text-base font-semibold
+         transition-colors transition-shadow duration-150 md:mx-3 md:my-0
+         disabled:cursor-not-allowed disabled:opacity-40
+         shadow-[0_1px_3px_0_var(--color-shadow)]
+         border border-[var(--color-border-soft)] bg-[var(--color-field)] text-[var(--color-text)]
+         enabled:hover:bg-[var(--color-hover-bg)] enabled:hover:border-[var(--color-hover-border)]
+         enabled:active:bg-[var(--color-active-bg)] enabled:active:border-[var(--color-active-border)];
+  }
+}

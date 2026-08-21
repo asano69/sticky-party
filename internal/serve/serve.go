@@ -8,12 +8,11 @@ package serve
 
 import (
 	"fmt"
-	"net/http"
 
 	"log/slog"
 
 	"github.com/asano69/sticky-party/internal/config"
-
+	"github.com/asano69/sticky-party/internal/static"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -25,11 +24,8 @@ func Run(app *pocketbase.PocketBase, cfg *config.Config) error {
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		// No custom frontend is bundled with this app; PocketBase already
-		// serves its own admin UI at "/_/", so "/" just redirects there.
-		e.Router.GET("/", func(re *core.RequestEvent) error {
-			return re.Redirect(http.StatusFound, "/_/")
-		})
+
+		e.Router.GET("/{path...}", apis.Static(static.FS, true))
 
 		// See internal/serve/handler.go's embedHandler for why this exists.
 		e.Router.GET("/embed", embedHandler())
