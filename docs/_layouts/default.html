@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ page.title | default: site.title }}</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+      }
+
+      .layout {
+        display: flex;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      nav {
+        width: 220px;
+        padding: 30px 20px;
+        border-right: 1px solid #ddd;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        box-sizing: border-box;
+      }
+
+      nav a {
+        display: block;
+        padding: 6px 0;
+      }
+
+      main {
+        flex: 1;
+        padding: 30px 40px;
+        max-width: 800px;
+      }
+
+      @media (max-width: 700px) {
+        .layout {
+          display: block;
+        }
+
+        nav {
+          width: auto;
+          height: auto;
+          position: static;
+          border-right: 0;
+          border-bottom: 1px solid #ddd;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="layout">
+      <nav>
+        <strong>Sticky Party</strong>
+
+        <a href="{{ '/' | relative_url }}">概要</a>
+        <a href="{{ '/architecture' | relative_url }}">Architecture</a>
+        <a href="{{ '/attachment-embeds' | relative_url }}"
+          >Attachment Embeds</a
+        >
+        <a href="{{ '/communication-architecture' | relative_url }}"
+          >Communication Architecture</a
+        >
+        <a href="{{ '/realtime-sync' | relative_url }}">Realtime Sync</a>
+        <a href="{{ '/target-list-sync' | relative_url }}">Target List Sync</a>
+        <a href="{{ '/pocketbase-auth' | relative_url }}">PocketBase Auth</a>
+        <a href="{{ '/note-sizing' | relative_url }}">Note Sizing</a>
+      </nav>
+
+      <main>
+        {{ content }}
+      </main>
+    </div>
+  </body>
+</html>
