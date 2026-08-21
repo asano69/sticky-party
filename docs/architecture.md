@@ -2,8 +2,8 @@
 
 ## 前提
 
-- 拡張機能はほぼ全ページで動作するため、`content script` が付箋ルールを表示するたびに
-  PocketBase へ問い合わせるのは避ける（ネットワーク遅延・オフライン耐性・結合度の観点）。
+- `content script` が付箋ルールを表示するたびに PocketBase へ問い合わせるのは避ける
+  （ネットワーク遅延・オフライン耐性・結合度の観点）。
 - ただし全レコード（本文・位置情報含む）をローカルにミラーする必要はない。
   URL 判定に使う `target` の一覧だけをローカルにキャッシュし、マッチしたページでのみ
   DB に本文を問い合わせる、という中間的な設計を採る。
@@ -11,6 +11,12 @@
   worker はイベントが来ない状態が続くと終了し、内部状態や長時間接続（SSE など）は
   すべて失われる。この制約と相性の悪い仕組み（realtime subscribe 常時接続など）は
   採用しない。
+- `content script` は「ほぼ全ページで動作する」設計ではない。`registration: "runtime"`
+  で宣言され（`entrypoints/content/index.ts`）、マニフェストの静的 `content_scripts`
+  には載らない。実際にどのページで動くかは、キャッシュ済み `target` 一覧から
+  動的に生成した match pattern を `chrome.scripting` API へ登録する
+  `lib/dynamicContentScript.ts` が決める（詳細は後述の「content script の動的登録」
+  節を参照）。
 
 ## 原則: DB is source of truth / local storage は「target 一覧」のみの読み取り専用ミラー
 
@@ -102,6 +108,56 @@ target がキャッシュに残っていても、実害は「マッチしたペ�
 
 同期時刻はフェッチ開始前のタイムスタンプ（UTC, ISO 8601）を保存する。フェッチ完了後の
 時刻を保存すると、フェッチ中に更新されたレコードを次回取りこぼすため。
+
+## content script の動的登録
+
+### なぜ「ほぼ全ページ」ではなく動的登録なのか
+
+初期の設計では「content script はほぼ全ページに注入され、ローカルキャッシュとの
+突き合わせだけを行う（ネットワーク通信なし）」という前提だったが、現在の実装は
+`registration: "runtime"` により、マニフェストでの静的注入をやめ、
+`lib/dynamicContentScript.ts` の `syncContentScriptMatches` が
+キャッシュ済み `target` 一覧から生成した match pattern だけを
+`browser.scripting.registerContentScripts`/`updateContentScripts` で
+動的に登録する方式に変わっている。これにより、そもそも付箋が存在しない
+ページには content script 自体が存在しなくなり、「ほぼ全ページで動作」
+前提だった旧来の説明よりもさらに一歩、通信・実行コストを絞れている。
+
+match pattern はクエリ文字列を表現できずパスレベルのワイルドカードしか
+持たないため、`target` の exact match よりもやや広めのパターンになる
+（詳細は `lib/dynamicContentScript.ts` のコメント参照）。ただし実際に
+付箋を出すかどうかの最終判定は従来通り `background.ts` の
+`isTargetMatch`（正規化した URL の完全一致）が担うため、パターンが
+広いこと自体が誤ってページに付箋を表示させることはない。
+
+`syncContentScriptMatches` は、`target` 一覧を書き換えるすべての経路
+（popup の write-through、`fullSyncTargets`/`syncTargets`、削除）から
+共通して呼ばれるため、「target 一覧が変わったら、content script の
+登録パターンも必ず追従する」という保証が1箇所に集約されている。
+
+### 既知の落とし穴: 動的登録は「今後のナビゲーション」にしか効かない
+
+`registerContentScripts`/`updateContentScripts` は、登録・更新した時点で
+**すでに開いているタブ**には遡って注入されない。次にそのタブがナビゲート
+した時点で初めて効果を持つ。
+
+これが原因で、popup から新規付箋を保存した直後、`addCachedTarget` で
+target 一覧に新しい URL が追加されても、その URL をすでに開いている
+タブには content script がまだ存在せず、`background.ts` が続けて送る
+`CHECK_ANNOTATION_MESSAGE` の宛先（`browser.tabs.sendMessage`）が
+静かに失敗し、新規付箋がその場でマウントされない、という不具合があった。
+
+対処として、`syncContentScriptMatches` は登録/更新の直後に
+`injectIntoOpenTabs()` を呼び、開いている全タブへ
+`browser.scripting.executeScript` で content script を直接実行する。
+すでにその script が走っているタブへ重ねて実行しても、
+`entrypoints/content/index.ts` 冒頭の `__stickyPartyContentLoaded` ガード
+により二重マウントは起きず、単なる no-op で済む。
+
+この `injectIntoOpenTabs()` は popup の write-through 経路だけでなく、
+`background.ts` の5分間隔の定期同期（`syncTargets` → `setCachedTargets`）
+からも同じ経路で必ず呼ばれるため、「target 一覧が変わるたびに、開いている
+全タブへの注入を試みる」という保証は全ての更新経路で一律にかかる。
 
 ## background script（service worker）の実装イメージ
 

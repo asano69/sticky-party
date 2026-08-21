@@ -2,10 +2,13 @@ docs/communication-architecture.md
 # Communication Architecture
 
 This document describes how the three runtimes that make up Sticky Party
-talk to each other: the **content script** (injected into every page the
-browser visits), the **background script** (the MV3 service worker), the
-**popup** (the extension's own privileged page), and the **backend**
-(the Go server, exposing PocketBase's REST API).
+talk to each other: the **content script** (dynamically registered/injected
+only for pages matching a cached annotation target -- see
+`lib/dynamicContentScript.ts` and `docs/architecture.md`'s "content script
+の動的登録" section, not statically injected on every page), the
+**background script** (the MV3 service worker), the **popup** (the
+extension's own privileged page), and the **backend** (the Go server,
+exposing PocketBase's REST API).
 
 For *why* the system is split this way, see `docs/architecture.md` (sync
 design) and `docs/note-sizing.md` (note sizing). This document focuses on
@@ -51,7 +54,8 @@ sequenceDiagram
     PB-->>BG: target list
     BG->>BG: overwrite cachedTargets (full sync)
 
-    Note over Content: Injected on every page load
+    Note over Content: Dynamically registered/injected only for
+    Note over Content: cached target match patterns (lib/dynamicContentScript.ts)
     Page->>Content: script runs
     Content->>BG: CHECK_ANNOTATION_MESSAGE(url)
     BG->>BG: isTargetMatch(url, cachedTargets)
