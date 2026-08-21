@@ -30,12 +30,30 @@ export default function Settings(props: { onSaved?: () => void }) {
 
   onMount(async () => {
     const settings = await getSettings();
+    // Tracks the actually-stored settings regardless of dev prefill
+    // below, so handleSave's switchingProfile diff (and its logout()
+    // call) is always based on what's really saved, never on the
+    // literal text sitting in the form.
+    savedSettings = settings;
 
     if (settings) {
+      // Real saved settings always win, dev or not -- once someone
+      // (including a previous dev session) has actually saved an
+      // account, the form should reflect that, not silently swap it
+      // out for the dev default underneath them.
       setEmail(settings.email);
       setPassword(settings.password);
       setBackendUrl(settings.backendUrl);
-      savedSettings = settings;
+    } else if (import.meta.env.DEV) {
+      // Dev convenience only: when nothing is saved yet, prefill the
+      // form with these literals when running the dev server -- makes
+      // it trivial to try the default local account without typing it
+      // out. Nothing here is persisted or enforced; pressing Save
+      // still saves whatever the fields currently contain, exactly
+      // like any other edit.
+      setEmail("admin@mail.dev");
+      setPassword("password");
+      setBackendUrl("http://localhost:3000");
     }
   });
 
