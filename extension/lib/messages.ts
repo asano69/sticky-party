@@ -7,6 +7,18 @@ import type { PositionData } from "./positions";
 // background -> content
 export const SHOW_ANNOTATION_MESSAGE = "sticky-party:show-annotation";
 export const HIDE_ANNOTATION_MESSAGE = "sticky-party:hide-annotation";
+
+// background -> content: checks whether this tab's content script
+// listener is still alive, with no side effects. Used by
+// ensureContentScriptInjected (see entrypoints/background.ts) to
+// decide whether re-injection is needed, instead of a tabId
+// bookkeeping Set -- a Set can drift out of sync with reality (e.g.
+// an extension reload invalidates every tab's content script without
+// firing tabs.onUpdated/onRemoved).
+export const PING_MESSAGE = "sticky-party:ping";
+export interface PingMessage {
+  type: typeof PING_MESSAGE;
+}
 // content -> background
 export const CHECK_ANNOTATION_MESSAGE = "sticky-party:check-annotation";
 

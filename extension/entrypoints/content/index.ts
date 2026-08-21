@@ -28,10 +28,12 @@
 import {
   ADD_CACHED_TARGET_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
+  PING_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type AddCachedTargetMessage,
   type AnnotationData,
   type AnnotationMessage,
+  type PingMessage,
 } from "../../lib/messages";
 import {
   ANNOTATION_CREATED_MESSAGE,
@@ -199,6 +201,14 @@ export default defineContentScript({
       } else if (message?.type === HIDE_ANNOTATION_MESSAGE) {
         hideOverlay();
       }
+    });
+
+    // Answers ensureContentScriptInjected's liveness check (see
+    // entrypoints/background.ts) -- returning anything at all proves
+    // this listener is alive, so background.ts knows re-injection
+    // isn't needed.
+    browser.runtime.onMessage.addListener((message: PingMessage) => {
+      if (message?.type === PING_MESSAGE) return Promise.resolve(true);
     });
 
     // Relays from the orchestrator iframe: another user created or

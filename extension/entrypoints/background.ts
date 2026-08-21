@@ -14,12 +14,14 @@ import {
   CHECK_ANNOTATION_MESSAGE,
   GET_POSITION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
+  PING_MESSAGE,
   RECHECK_ALL_TABS_MESSAGE,
   SAVE_POSITION_MESSAGE,
   SESSION_RESET_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type AddCachedTargetMessage,
   type CheckAnnotationMessage,
+  type PingMessage,
   type PositionMessage,
   type RecheckAllTabsMessage,
   type SessionResetMessage,
@@ -42,44 +44,52 @@ import {
 // script entrypoint after its folder.
 const MAIN_CONTENT_SCRIPT_JS = ["content-scripts/content.js"];
 
-// Tabs the main content script is currently believed to be running in.
-// Cleared on any real navigation (see the tabs.onUpdated "loading"
-// listener below) and on tab close, so an entry never outlives the page
-// context it was recorded for.
+// Checks whether `tabId`'s content script is still alive by pinging its
+// message listener, rather than tracking injected tabs in a Set here.
+// Re-running executeScript into a tab that already has the content
+// script alive is NOT a safe no-op: the script's own
+// __stickyPartyContentLoaded guard only prevents a second mount within
+// that same execution, but WXT's ContentScriptContext (the `ctx` passed
+// into main(ctx)) detects the fresh injection first and treats the
+// *previous* instance as invalidated -- tearing down every UI mounted
+// via createIframeUi(ctx, ...) (every note's iframe, plus the realtime
+// orchestrator) before the new instance's top-level guard even runs.
+// That combination is what silently wiped every mounted note whenever
+// something (e.g. the popup's RECHECK_ALL_TABS_MESSAGE) re-checked an
+// already-matching tab.
 //
-// This bookkeeping is required because re-running executeScript into a
-// tab that already has the content script alive is NOT a safe no-op:
-// the script's own __stickyPartyContentLoaded guard only prevents a
-// second mount within that same execution, but WXT's ContentScriptContext
-// (the `ctx` passed into main(ctx)) detects the fresh injection first and
-// treats the *previous* instance as invalidated -- tearing down every UI
-// mounted via createIframeUi(ctx, ...) (every note's iframe, plus the
-// realtime orchestrator) before the new instance's top-level guard even
-// runs. That combination is what silently wiped every mounted note
-// whenever something (e.g. the popup's RECHECK_ALL_TABS_MESSAGE)
-// re-checked an already-matching tab.
-const injectedTabs = new Set<number>();
+// A ping avoids the tabId-bookkeeping Set this used to require: that
+// Set could drift out of sync with reality (e.g. an extension reload
+// invalidates every tab's content script without firing
+// tabs.onUpdated/onRemoved), whereas sendMessage rejecting always means
+// "nothing is listening right now", whatever the reason.
+async function isContentScriptAlive(tabId: number): Promise<boolean> {
+  try {
+    await browser.tabs.sendMessage(tabId, {
+      type: PING_MESSAGE,
+    } satisfies PingMessage);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // Injects the main content script into `tabId`, once runCheckTab has
-// confirmed this page's URL matches a cached target. Skipped entirely
-// when injectedTabs already marks this tab as running the script -- see
-// injectedTabs' comment for why a repeat injection is not actually safe
-// to make unconditionally. Restricted pages (chrome://, the extension
-// store, etc.) reject the injection; caught so that alone doesn't stop
-// the rest of runCheckTab from proceeding, and such a tab is simply
-// never marked as injected, so a later attempt (e.g. after the user
-// navigates away and back) can try again.
+// confirmed this page's URL matches a cached target. Skipped when the
+// content script is already alive there -- see isContentScriptAlive
+// above for why a repeat injection is not actually safe to make
+// unconditionally. Restricted pages (chrome://, the extension store,
+// etc.) reject the injection; caught so that alone doesn't stop the
+// rest of runCheckTab from proceeding.
 async function ensureContentScriptInjected(tabId: number): Promise<void> {
-  if (injectedTabs.has(tabId)) return;
+  if (await isContentScriptAlive(tabId)) return;
   try {
     await browser.scripting.executeScript({
       target: { tabId },
       files: MAIN_CONTENT_SCRIPT_JS,
     });
-    injectedTabs.add(tabId);
   } catch {
-    // Restricted page, or the tab closed mid-call -- leave tabId
-    // unmarked.
+    // Restricted page, or the tab closed mid-call.
   }
 }
 
@@ -259,23 +269,6 @@ export default defineBackground(() => {
     if (!changeInfo.url) return;
     checkTab(tabId, changeInfo.url);
   });
-
-  // A real navigation (including a plain reload of the same URL)
-  // always fires a "loading" status transition, unlike a client-side
-  // route change (history.pushState), which only ever updates
-  // changeInfo.url with no status transition at all. That distinction
-  // is exactly what's needed here: a real navigation destroys the
-  // tab's previous JS context -- and with it, whatever content script
-  // instance was running -- so injectedTabs must forget about it.
-  // Without this, ensureContentScriptInjected would wrongly skip
-  // re-injecting into a tab whose content script no longer exists.
-  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (changeInfo.status === "loading") injectedTabs.delete(tabId);
-  });
-
-  // Keeps injectedTabs from leaking entries for tabs that no longer
-  // exist.
-  browser.tabs.onRemoved.addListener((tabId) => injectedTabs.delete(tabId));
 
   // Sent only by the popup, right after saving a new annotation, so
   // the sticky note appears immediately instead of waiting for the
