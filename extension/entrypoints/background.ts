@@ -34,6 +34,28 @@ import {
   syncTargets,
 } from "../lib/targets";
 
+// Path WXT builds entrypoints/content/index.ts to (that entrypoint uses
+// registration: "runtime", so the browser never auto-injects it -- this
+// file must do so explicitly, see ensureContentScriptInjected below).
+// Verify this against the actual `wxt build` output (content-scripts/ in
+// the bundle) after building -- WXT names a directory-based content
+// script entrypoint after its folder.
+const MAIN_CONTENT_SCRIPT_JS = ["content-scripts/content.js"];
+
+// Injects the main content script into `tabId`, once runCheckTab has
+// confirmed this page's URL matches a cached target. Safe to call even
+// when it's already running there: its own top-level guard (see
+// entrypoints/content/index.ts's __stickyPartyContentLoaded) makes a
+// repeat injection a no-op, so this needs no "already injected"
+// bookkeeping of its own. Restricted pages (chrome://, the extension
+// store, etc.) reject the injection; caught so that alone doesn't stop
+// the rest of runCheckTab from proceeding.
+async function ensureContentScriptInjected(tabId: number): Promise<void> {
+  await browser.scripting
+    .executeScript({ target: { tabId }, files: MAIN_CONTENT_SCRIPT_JS })
+    .catch(() => {});
+}
+
 export default defineBackground(() => {
   // Keeps the local target cache fresh: a differential sync (only
   // annotations touched since the last sync) once a previous sync
@@ -142,6 +164,13 @@ export default defineBackground(() => {
       updateTitle();
       return;
     }
+
+    // The heavy content script (entrypoints/content/index.ts) is never
+    // auto-injected -- it only exists in a tab once a match is confirmed
+    // right here. Awaited before the fetch/send below so its message
+    // listener is guaranteed registered before SHOW_ANNOTATION_MESSAGE
+    // is sent to it.
+    await ensureContentScriptInjected(tabId);
 
     try {
       // withSyncErrorBadge retries once before it lets a failure

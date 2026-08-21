@@ -33,10 +33,11 @@ export default defineConfig({
   // docs/realtime-sync.md); without this entry, the browser silently
   // refuses to load it as an iframe, so it never runs at all.
   manifest: {
-    // "scripting" is required for lib/dynamicContentScript.ts's
-    // registerContentScripts/updateContentScripts/
-    // unregisterContentScripts calls (see entrypoints/content/index.ts's
-    // registration: "runtime").
+    // "scripting" is required for entrypoints/background.ts's
+    // browser.scripting.executeScript call, which injects the main
+    // content script (entrypoints/content/index.ts, registration:
+    // "runtime") only into tabs whose page matches a cached target --
+    // triggered by entrypoints/bootstrap.ts's always-on ping.
     permissions: ["storage", "activeTab", "tabs", "alarms", "scripting"],
     web_accessible_resources: [
       {

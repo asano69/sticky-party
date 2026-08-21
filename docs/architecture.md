@@ -11,12 +11,13 @@
   worker はイベントが来ない状態が続くと終了し、内部状態や長時間接続（SSE など）は
   すべて失われる。この制約と相性の悪い仕組み（realtime subscribe 常時接続など）は
   採用しない。
-- `content script` は「ほぼ全ページで動作する」設計ではない。`registration: "runtime"`
-  で宣言され（`entrypoints/content/index.ts`）、マニフェストの静的 `content_scripts`
-  には載らない。実際にどのページで動くかは、キャッシュ済み `target` 一覧から
-  動的に生成した match pattern を `chrome.scripting` API へ登録する
-  `lib/dynamicContentScript.ts` が決める（詳細は後述の「content script の動的登録」
-  節を参照）。
+- `content script`（`entrypoints/content/index.ts`、note のマウント処理本体）は
+  「ほぼ全ページで動作する」設計ではない。`registration: "runtime"` で宣言され、
+  マニフェストの静的 `content_scripts` には載らない。全ページに静的登録される
+  軽量な `entrypoints/bootstrap.ts` が起動のたびに `background.ts` へ問い合わせ、
+  キャッシュ済み `target` 一覧とのローカル一致判定（`isTargetMatch`）で実際に
+  マッチしたページに対してだけ、`background.ts` が `browser.scripting.executeScript`
+  でこの本体スクリプトを注入する（詳細は後述の「content script の動的注入」節を参照）。
 
 ## 原則: DB is source of truth / local storage は「target 一覧」のみの読み取り専用ミラー
 
@@ -109,55 +110,70 @@ target がキャッシュに残っていても、実害は「マッチしたペ�
 同期時刻はフェッチ開始前のタイムスタンプ（UTC, ISO 8601）を保存する。フェッチ完了後の
 時刻を保存すると、フェッチ中に更新されたレコードを次回取りこぼすため。
 
-## content script の動的登録
+## content script の動的注入
 
-### なぜ「ほぼ全ページ」ではなく動的登録なのか
+### なぜ静的な `content_scripts` 登録ではないのか
 
-初期の設計では「content script はほぼ全ページに注入され、ローカルキャッシュとの
-突き合わせだけを行う（ネットワーク通信なし）」という前提だったが、現在の実装は
-`registration: "runtime"` により、マニフェストでの静的注入をやめ、
-`lib/dynamicContentScript.ts` の `syncContentScriptMatches` が
-キャッシュ済み `target` 一覧から生成した match pattern だけを
-`browser.scripting.registerContentScripts`/`updateContentScripts` で
-動的に登録する方式に変わっている。これにより、そもそも付箋が存在しない
-ページには content script 自体が存在しなくなり、「ほぼ全ページで動作」
-前提だった旧来の説明よりもさらに一歩、通信・実行コストを絞れている。
+`entrypoints/content/index.ts`（note のマウント処理本体）を全ページへ
+静的注入すると、付箋が存在しない大多数のページでも note のマウント/
+ドラッグ/リサイズ用のイベントリスナー一式が無駄に走ることになる。
+これを避けるため、この本体は `registration: "runtime"` で宣言され、
+マニフェストには載らない。
 
-match pattern はクエリ文字列を表現できずパスレベルのワイルドカードしか
-持たないため、`target` の exact match よりもやや広めのパターンになる
-（詳細は `lib/dynamicContentScript.ts` のコメント参照）。ただし実際に
-付箋を出すかどうかの最終判定は従来通り `background.ts` の
-`isTargetMatch`（正規化した URL の完全一致）が担うため、パターンが
-広いこと自体が誤ってページに付箋を表示させることはない。
+### 経緯: `registerContentScripts`/`updateContentScripts` を採用しなかった理由
 
-`syncContentScriptMatches` は、`target` 一覧を書き換えるすべての経路
-（popup の write-through、`fullSyncTargets`/`syncTargets`、削除）から
-共通して呼ばれるため、「target 一覧が変わったら、content script の
-登録パターンも必ず追従する」という保証が1箇所に集約されている。
+以前は `lib/dynamicContentScript.ts` が `browser.scripting.registerContentScripts`/
+`updateContentScripts` で、キャッシュ済み `target` 一覧から生成した match
+pattern を動的に登録・更新する方式を取っていたが、これは以下の理由により
+撤回した。
 
-### 既知の落とし穴: 動的登録は「今後のナビゲーション」にしか効かない
+- これらのAPIは1つの `id` に対して1組の `matches` 配列しか持てず、
+  メタデータ（「このパターンはどの target 由来か」）を一切保持できない。
+  そのため、`target` 一覧を書き換えるすべての経路
+  （popup の write-through、`fullSyncTargets`/`syncTargets`、削除）から
+  漏れなく同期呼び出しを行うことでしか正しさを保てず、1箇所でも
+  呼び忘れるとサイレントにバグる。
+- 登録・更新は「今後のナビゲーション」にしか効かず、すでに開いている
+  タブには遡って適用されない。この穴を埋めるためだけに
+  `injectIntoOpenTabs()`（開いている全タブへ `browser.scripting.executeScript`
+  で直接実行する別経路）を持つ必要があり、仕組みが二重になっていた。
 
-`registerContentScripts`/`updateContentScripts` は、登録・更新した時点で
-**すでに開いているタブ**には遡って注入されない。次にそのタブがナビゲート
-した時点で初めて効果を持つ。
+### 現在の方式: 常時起動する軽量bootstrap + マッチ時のみ本体を注入
 
-これが原因で、popup から新規付箋を保存した直後、`addCachedTarget` で
-target 一覧に新しい URL が追加されても、その URL をすでに開いている
-タブには content script がまだ存在せず、`background.ts` が続けて送る
-`CHECK_ANNOTATION_MESSAGE` の宛先（`browser.tabs.sendMessage`）が
-静かに失敗し、新規付箋がその場でマウントされない、という不具合があった。
+```
+entrypoints/bootstrap.ts（全ページに静的登録、matches: ["*://*/*"]）
+        │ ページ読み込みのたびに実行。やることは1行の
+        │ CHECK_ANNOTATION_MESSAGE(url) 送信のみ。
+        ▼
+background.ts の checkTab/runCheckTab
+        │ isTargetMatch(url, cachedTargets) でローカル判定（通信なし）
+        │
+   ┌────┴────┐
+  no match   match
+    │          │
+  何もしない   ensureContentScriptInjected(tabId)
+              → browser.scripting.executeScript で
+                entrypoints/content/index.ts のビルド成果物を注入
+              │
+              ▼
+            以降は従来通り fetchAnnotations → SHOW_ANNOTATION_MESSAGE
+```
 
-対処として、`syncContentScriptMatches` は登録/更新の直後に
-`injectIntoOpenTabs()` を呼び、開いている全タブへ
-`browser.scripting.executeScript` で content script を直接実行する。
-すでにその script が走っているタブへ重ねて実行しても、
+`bootstrap.ts` は note のマウント処理を一切持たないため、実行コストは
+「1回のメッセージ送信」のみで、`registerContentScripts` 相当の絞り込みを
+一切行わなくても、非対象ページでの実行コストはほぼ無視できる。
+
+`ensureContentScriptInjected` は `checkTab` を経由するすべての呼び出し元
+（`tabs.onUpdated`、popup からの `CHECK_ANNOTATION_MESSAGE`、
+`RECHECK_ALL_TABS_MESSAGE` 経由の `recheckAllTabs`）で共通して通るため、
+「target 一覧が変わるたびに開いている全タブへ注入を試みる」という
+以前の `injectIntoOpenTabs()` が担っていた保証は、専用の別経路を持たずに
+自然に成立する。
+
+二重注入の心配もない: 同じタブへ `executeScript` を重ねて呼んでも、
 `entrypoints/content/index.ts` 冒頭の `__stickyPartyContentLoaded` ガード
-により二重マウントは起きず、単なる no-op で済む。
-
-この `injectIntoOpenTabs()` は popup の write-through 経路だけでなく、
-`background.ts` の5分間隔の定期同期（`syncTargets` → `setCachedTargets`）
-からも同じ経路で必ず呼ばれるため、「target 一覧が変わるたびに、開いている
-全タブへの注入を試みる」という保証は全ての更新経路で一律にかかる。
+により二重マウントは起きず、単なる no-op で済む（この点は旧方式の
+`injectIntoOpenTabs()` から変わっていない）。
 
 ## background script（service worker）の実装イメージ
 

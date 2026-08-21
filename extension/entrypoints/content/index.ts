@@ -27,13 +27,11 @@
 
 import {
   ADD_CACHED_TARGET_MESSAGE,
-  CHECK_ANNOTATION_MESSAGE,
   HIDE_ANNOTATION_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type AddCachedTargetMessage,
   type AnnotationData,
   type AnnotationMessage,
-  type CheckAnnotationMessage,
 } from "../../lib/messages";
 import {
   ANNOTATION_CREATED_MESSAGE,
@@ -243,15 +241,12 @@ export default defineContentScript({
       },
     );
 
-    // Ask the background script to check this page as soon as this
-    // script starts. tabs.onUpdated in entrypoints/background.ts already
-    // checks on navigation, but it can fire before this script finishes
-    // injecting, and a message sent to a tab with no listener yet is
-    // silently dropped. Without this ping, that race meant a matching
-    // page's annotation only ever showed up after a second navigation.
-    browser.runtime.sendMessage({
-      type: CHECK_ANNOTATION_MESSAGE,
-      url: location.href,
-    } satisfies CheckAnnotationMessage);
+    // No self-ping here anymore: this script is only ever injected by
+    // background.ts's runCheckTab (see entrypoints/background.ts) after
+    // it has already confirmed this page matches a cached target, and
+    // only once the resulting SHOW_ANNOTATION_MESSAGE send is guaranteed
+    // to reach the listener registered above. Every page, matching or
+    // not, still runs entrypoints/bootstrap.ts's tiny ping that starts
+    // that check off in the first place.
   },
 });

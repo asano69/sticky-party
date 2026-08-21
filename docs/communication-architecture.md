@@ -2,13 +2,14 @@ docs/communication-architecture.md
 # Communication Architecture
 
 This document describes how the three runtimes that make up Sticky Party
-talk to each other: the **content script** (dynamically registered/injected
-only for pages matching a cached annotation target -- see
-`lib/dynamicContentScript.ts` and `docs/architecture.md`'s "content script
-の動的登録" section, not statically injected on every page), the
-**background script** (the MV3 service worker), the **popup** (the
-extension's own privileged page), and the **backend** (the Go server,
-exposing PocketBase's REST API).
+talk to each other: the **content script** (`entrypoints/content/index.ts`,
+imperatively injected via `browser.scripting.executeScript` only into tabs
+whose page matches a cached annotation target -- see `docs/architecture.md`'s
+"content script の動的注入" section -- not statically injected on every
+page; a separate, always-on `entrypoints/bootstrap.ts` is what pings
+background.ts to trigger that check), the **background script** (the MV3
+service worker), the **popup** (the extension's own privileged page), and
+the **backend** (the Go server, exposing PocketBase's REST API).
 
 For *why* the system is split this way, see `docs/architecture.md` (sync
 design) and `docs/note-sizing.md` (note sizing). This document focuses on
@@ -44,6 +45,7 @@ PocketBase itself; it always asks the background script to do it, via
 ```mermaid
 sequenceDiagram
     participant Page as Host page
+    participant Boot as bootstrap.ts
     participant Content as content.ts
     participant BG as background.ts
     participant Popup as popup (Home.tsx)
@@ -54,15 +56,16 @@ sequenceDiagram
     PB-->>BG: target list
     BG->>BG: overwrite cachedTargets (full sync)
 
-    Note over Content: Dynamically registered/injected only for
-    Note over Content: cached target match patterns (lib/dynamicContentScript.ts)
-    Page->>Content: script runs
-    Content->>BG: CHECK_ANNOTATION_MESSAGE(url)
+    Note over Boot: Statically injected on every page
+    Page->>Boot: script runs
+    Boot->>BG: CHECK_ANNOTATION_MESSAGE(url)
     BG->>BG: isTargetMatch(url, cachedTargets)
 
     alt no match
         BG-->>Content: HIDE_ANNOTATION_MESSAGE
     else match
+        Note over Content: Imperatively injected only now, via executeScript
+        BG->>Content: executeScript(content.ts)
         BG->>PB: getFullList(annotations, filter target=url)
         PB-->>BG: annotations
         BG-->>Content: SHOW_ANNOTATION_MESSAGE(annotations)
@@ -75,7 +78,7 @@ sequenceDiagram
             Content->>Content: mount sticky note at saved/default position
         end
     end
-
+```
     Note over Content: User drags or resizes a note
     Content->>BG: SAVE_POSITION_MESSAGE(annotationId, position, viewport)
     BG->>PB: create/update(positions)
