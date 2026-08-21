@@ -11,6 +11,7 @@
 // that basis's size changes (see mountNote.ts's recomputePosition).
 
 import type { Anchor } from "../../lib/positions";
+import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
 
 // The whole document's size in CSS px. Used as the ratio basis for a
 // pinned note (see lib/positions.ts).
@@ -78,4 +79,37 @@ export function closestEdge(
   return distEnd < distStart
     ? ["end", distEnd / basisSize]
     : ["start", distStart / basisSize];
+}
+
+// Only the header's minimum horizontal visibility is enforced
+// (MIN_VISIBLE_PX), not the whole note width -- a note can be wider
+// than the viewport itself, so requiring full horizontal visibility
+// would make it impossible to drag/resize into place at all in that
+// case. Vertically the full header height is enforced since that's
+// fixed at TITLE_ROW_HEIGHT_PX regardless of note width.
+const MIN_VISIBLE_PX = 40;
+
+// Clamps a note's top/left so its header can never drift entirely off
+// any of the four edges of the current viewport (offset by scroll for
+// a pinned note -- see mountNote.ts's header comment on pin modes).
+// Shared by every place that sets top/left directly: the drag gesture
+// (noteDragging.ts) and viewport/document-resize recomputation
+// (noteViewportTracking.ts) -- without this being shared, a note could
+// stay clamped while being dragged but still drift off-screen on a
+// window resize, or vice versa.
+export function clampPosition(
+  top: number,
+  left: number,
+  widthPx: number,
+  pinned: boolean,
+): { top: number; left: number } {
+  const offsetX = pinned ? window.scrollX : 0;
+  const offsetY = pinned ? window.scrollY : 0;
+  const maxTop = offsetY + window.innerHeight - TITLE_ROW_HEIGHT_PX;
+  const minLeft = offsetX - (widthPx - MIN_VISIBLE_PX);
+  const maxLeft = offsetX + window.innerWidth - MIN_VISIBLE_PX;
+  return {
+    top: Math.min(Math.max(top, offsetY), Math.max(maxTop, offsetY)),
+    left: Math.min(Math.max(left, minLeft), Math.max(maxLeft, minLeft)),
+  };
 }

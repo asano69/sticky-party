@@ -12,10 +12,8 @@
 // wrapper element when the note is removed (see mountNote.ts's
 // onRemove), so these listeners never need explicit teardown.
 
-import {
-  START_EDIT_TITLE_MESSAGE,
-  TITLE_ROW_HEIGHT_PX,
-} from "../../lib/iframe-messages";
+import { START_EDIT_TITLE_MESSAGE } from "../../lib/iframe-messages";
+import { clampPosition } from "./viewport";
 
 export interface NoteDragState {
   // Whether a drag gesture is currently in progress. Read by
@@ -50,32 +48,6 @@ export function wireDragging(params: {
   let dragStart: { x: number; y: number; top: number; left: number } | null =
     null;
 
-  // Keeps the header row draggable within the currently visible area,
-  // so it can never be dragged out where the user could no longer
-  // grab it. Clamped against the viewport either way: even a pinned
-  // (position: absolute) note is being dragged relative to what the
-  // user can currently see, so the bound is the visible viewport
-  // shifted by the current scroll offset, not the whole document.
-  //
-  // Only the header's minimum horizontal visibility is enforced
-  // (MIN_VISIBLE_PX), not the whole note width -- a note can be wider
-  // than the viewport itself, so requiring full horizontal visibility
-  // would make it impossible to drag at all in that case. Vertically
-  // the full header height is enforced since that's fixed at
-  // TITLE_ROW_HEIGHT_PX regardless of note width.
-  const MIN_VISIBLE_PX = 40;
-  const clampDragPosition = (nextTop: number, nextLeft: number) => {
-    const offsetX = note.pinned ? window.scrollX : 0;
-    const offsetY = note.pinned ? window.scrollY : 0;
-    const maxTop = offsetY + window.innerHeight - TITLE_ROW_HEIGHT_PX;
-    const minLeft = offsetX - (wrapper.offsetWidth - MIN_VISIBLE_PX);
-    const maxLeft = offsetX + window.innerWidth - MIN_VISIBLE_PX;
-    return {
-      top: Math.min(Math.max(nextTop, offsetY), Math.max(maxTop, offsetY)),
-      left: Math.min(Math.max(nextLeft, minLeft), Math.max(maxLeft, minLeft)),
-    };
-  };
-
   header.addEventListener("pointerdown", (e) => {
     // Skip drag/capture when the pointerdown landed on the Dismiss
     // button: setPointerCapture below redirects all subsequent
@@ -96,9 +68,11 @@ export function wireDragging(params: {
 
   header.addEventListener("pointermove", (e) => {
     if (!dragStart) return;
-    const next = clampDragPosition(
+    const next = clampPosition(
       dragStart.top + (e.clientY - dragStart.y),
       dragStart.left + (e.clientX - dragStart.x),
+      wrapper.offsetWidth,
+      note.pinned,
     );
     setNote({ top: next.top, left: next.left });
   });

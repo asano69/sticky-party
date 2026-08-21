@@ -9,7 +9,12 @@
 // visible area regardless of pin mode.
 
 import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
-import { documentSize, resolveOffset, viewportSize } from "./viewport";
+import {
+  clampPosition,
+  documentSize,
+  resolveOffset,
+  viewportSize,
+} from "./viewport";
 import type { PositionRatioState } from "./notePosition";
 
 const RECOMPUTE_DEBOUNCE_MS = 300;
@@ -29,20 +34,24 @@ export function wireViewportTracking(params: {
   const recomputePosition = () => {
     const basis = note.pinned ? documentSize() : viewportSize();
     const heightPx = TITLE_ROW_HEIGHT_PX + note.contentHeightPx;
-    setNote({
-      top: resolveOffset(
-        ratioState.anchorY,
-        ratioState.yRatio,
-        basis.height,
-        heightPx,
-      ),
-      left: resolveOffset(
-        ratioState.anchorX,
-        ratioState.xRatio,
-        basis.width,
-        wrapper.offsetWidth,
-      ),
-    });
+    const top = resolveOffset(
+      ratioState.anchorY,
+      ratioState.yRatio,
+      basis.height,
+      heightPx,
+    );
+    const left = resolveOffset(
+      ratioState.anchorX,
+      ratioState.xRatio,
+      basis.width,
+      wrapper.offsetWidth,
+    );
+    // A window/document resize can shrink the basis enough that the
+    // ratio-derived position now falls outside the new viewport (e.g.
+    // a note anchored near the right edge on a wide screen, viewed
+    // again on a narrow one) -- clamp the same way drag does (see
+    // noteDragging.ts), so the note never ends up stuck off any edge.
+    setNote(clampPosition(top, left, wrapper.offsetWidth, note.pinned));
   };
 
   let docResizeTimer: ReturnType<typeof setTimeout> | undefined;
