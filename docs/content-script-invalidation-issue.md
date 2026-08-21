@@ -134,18 +134,63 @@ RECHECK_ALL_TABS_MESSAGE → 同じタブへ executeScript を再度呼ぶ
 状態であるにもかかわらず、`runCheckTab` → `ensureContentScriptInjected` の
 経路を通ると無条件に再注入が起きる、という共通点がある。
 
-## 考えるべき論点
+## 解決: pingによる生存確認への切り替え
 
-- 「このタブで content script が現在生きているか」をどこで・どう判定するか
-  （background.ts側でタブごとに記録する／content.ts側から生存を伝える／
-  `browser.tabs.sendMessage` の成否で判定する、等の選択肢がある）
-- 「生きている」という記録を、どのタイミングで破棄すべきか
-  （実際のナビゲーション・リロード・タブクローズ時にはcontextが本当に失われるため、
-  記録も追従して破棄する必要がある）
-- SPA遷移（同一タブ内でtargetが変わるケース）は、既存の `showAnnotations()` が
-  「差分だけ再マウントする」設計になっている（`mountedNotes`のreconciliation）ため、
-  そもそも content script 自体の再注入が必要なのかどうか
-- `background.ts` 側の判定と、実際のタブの状態（拡張機能の再読み込み・
-  ブラウザ再起動でタブは残るがcontent scriptは失われる、等）がズレた場合の
-  フォールバック（再注入が必要なのに「生きている」と誤判定してしまうケースの
-  救済経路）をどう用意するか
+前節「考えるべき論点」で挙がっていた3つの選択肢のうち、
+`browser.tabs.sendMessage` の成否で判定する方式を採用した。
+
+`lib/messages.ts` に `PING_MESSAGE` を追加し、`content/index.ts` はこれに
+応答するだけの軽量なリスナーを登録する:
+
+```ts
+browser.runtime.onMessage.addListener((message: PingMessage) => {
+  if (message?.type === PING_MESSAGE) return Promise.resolve(true);
+});
+```
+
+`background.ts` 側は、タブごとの記録（`injectedTabs`のような `Set<number>`）を
+一切持たず、注入前に毎回このpingを送って生存を直接確認する:
+
+```ts
+async function isContentScriptAlive(tabId: number): Promise<boolean> {
+  try {
+    await browser.tabs.sendMessage(tabId, { type: PING_MESSAGE });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureContentScriptInjected(tabId: number): Promise<void> {
+  if (await isContentScriptAlive(tabId)) return;
+  try {
+    await browser.scripting.executeScript({
+      target: { tabId },
+      files: MAIN_CONTENT_SCRIPT_JS,
+    });
+  } catch {
+    // Restricted page, or the tab closed mid-call.
+  }
+}
+```
+
+`browser.tabs.sendMessage` は、受信側のリスナーが存在しなければ必ず reject
+される。存在しない理由が「そもそも注入されていない」でも「実際のナビゲーション
+でcontextが破棄された」でも「拡張機能自体がreloadされた」でも、どのケースでも
+一貫して「今この瞬間、生きていない」という事実をそのまま返す。
+
+これにより、前節で挙がっていた論点はすべて解消された。
+
+- **「生きているか」の判定**: background.ts側で状態を持たず、都度実タブに
+  聞きに行くので、記録とタブの実際の状態がズレるという問題がそもそも起きない。
+- **記録の破棄タイミング**: 記録自体を持たないので、`tabs.onUpdated`
+  （`status === "loading"`）や `tabs.onRemoved` を使ったクリア処理が丸ごと
+  不要になった。
+- **拡張機能の再読み込み・ブラウザ再起動でタブは残るがcontent scriptは失われる
+  ケース**: pingが単に失敗するので、フォールバックを別途用意する必要がない。
+
+コスト面では、`isTargetMatch` でマッチしたページに限られるレアパスに
+`sendMessage` の1往復が追加されるだけであり、許容範囲内と判断した。
+
+SPA遷移時に content script 自体の再注入が本当に必要かどうか（`showAnnotations()`
+の差分再マウントで足りるのでは、という論点）は、今回のスコープ外のまま残っている。
