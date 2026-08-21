@@ -71,7 +71,7 @@ export function wireDragging(params: {
     const next = clampPosition(
       dragStart.top + (e.clientY - dragStart.y),
       dragStart.left + (e.clientX - dragStart.x),
-      wrapper.offsetWidth,
+      wrapper,
       note.pinned,
     );
     setNote({ top: next.top, left: next.left });

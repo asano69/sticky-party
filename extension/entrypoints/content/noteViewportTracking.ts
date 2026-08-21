@@ -51,7 +51,7 @@ export function wireViewportTracking(params: {
     // a note anchored near the right edge on a wide screen, viewed
     // again on a narrow one) -- clamp the same way drag does (see
     // noteDragging.ts), so the note never ends up stuck off any edge.
-    setNote(clampPosition(top, left, wrapper.offsetWidth, note.pinned));
+    setNote(clampPosition(top, left, wrapper, note.pinned));
   };
 
   let docResizeTimer: ReturnType<typeof setTimeout> | undefined;
