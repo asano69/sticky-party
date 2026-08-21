@@ -1,3 +1,8 @@
+---
+layout: default
+title: Architecture
+---
+
 # 付箋データの同期アーキテクチャ
 
 ## 前提
