@@ -111,3 +111,13 @@ export interface AddCachedTargetMessage {
   target: string;
   updated: string;
 }
+
+// popup -> background: log out of the current profile. lib/session.ts's
+// logout() clears every profile-scoped storage key directly, but a
+// tab's mounted notes/orchestrator and the toolbar's per-tab badge/
+// title are live state in already-running contexts, not storage --
+// only background.ts (which can enumerate every tab) can reach them.
+export const SESSION_RESET_MESSAGE = "sticky-party:session-reset";
+export interface SessionResetMessage {
+  type: typeof SESSION_RESET_MESSAGE;
+}

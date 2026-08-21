@@ -16,6 +16,7 @@ import { clearTargets } from "./targets";
 import { clearCachedAnnotationCount } from "./annotationCountCache";
 import { clearSyncErrorBadge } from "./syncBadge";
 import { clearDraftNote } from "./draft";
+import { SESSION_RESET_MESSAGE, type SessionResetMessage } from "./messages";
 
 export async function logout(): Promise<void> {
   await Promise.all([
@@ -26,4 +27,18 @@ export async function logout(): Promise<void> {
     clearSyncErrorBadge(),
     clearDraftNote(),
   ]);
+
+  // Storage is now clean, but a tab's mounted notes/orchestrator (and
+  // the toolbar's per-tab badge/title) are live state in
+  // already-running contexts, not storage -- only background.ts, which
+  // can enumerate every tab, can reach them. Caught rather than
+  // awaited-and-thrown: a failure to tear down an on-page overlay
+  // shouldn't block the profile switch itself, since the storage
+  // clear above (the part that actually matters for correctness) has
+  // already succeeded.
+  await browser.runtime
+    .sendMessage({ type: SESSION_RESET_MESSAGE } satisfies SessionResetMessage)
+    .catch((err: unknown) =>
+      console.error("[sticky-party] session reset failed", err),
+    );
 }

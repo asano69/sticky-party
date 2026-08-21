@@ -16,11 +16,13 @@ import {
   HIDE_ANNOTATION_MESSAGE,
   RECHECK_ALL_TABS_MESSAGE,
   SAVE_POSITION_MESSAGE,
+  SESSION_RESET_MESSAGE,
   SHOW_ANNOTATION_MESSAGE,
   type AddCachedTargetMessage,
   type CheckAnnotationMessage,
   type PositionMessage,
   type RecheckAllTabsMessage,
+  type SessionResetMessage,
 } from "../lib/messages";
 import { fetchPosition, savePosition } from "../lib/positions";
 import {
@@ -268,4 +270,32 @@ export default defineBackground(() => {
       addCachedTarget(message.target, message.updated).then(recheckAllTabs);
     }
   });
+
+  // Sent by lib/session.ts's logout() when Settings switches to a
+  // different backend/account. Storage-backed profile data is cleared
+  // by logout() itself; this only reaches state that lives outside
+  // storage, in each tab's already-running content script and the
+  // toolbar's per-tab badge/title -- clearing the target cache alone
+  // doesn't unmount a note that's already on screen.
+  browser.runtime.onMessage.addListener((message: SessionResetMessage) => {
+    if (message?.type !== SESSION_RESET_MESSAGE) return;
+    return resetSession();
+  });
+
+  const resetSession = async () => {
+    const tabs = await browser.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id == null) continue;
+      // Tears down mounted notes and the realtime orchestrator on
+      // every tab (see entrypoints/content/index.ts's hideOverlay).
+      // Same fire-and-forget pattern as checkTab's HIDE_ANNOTATION_MESSAGE
+      // send -- a tab with no content script yet just has nothing to
+      // tear down, which is not an error.
+      browser.tabs
+        .sendMessage(tab.id, { type: HIDE_ANNOTATION_MESSAGE })
+        .catch(() => {});
+      clearAnnotationCountBadge(tab.id);
+      browser.action.setTitle({ tabId: tab.id, title: formatActionTitle() });
+    }
+  };
 });
