@@ -144,7 +144,22 @@ export async function mountNote(
   let isEditingNote = false;
 
   let resizeObserver: ResizeObserver | undefined;
-  let resizeSaveTimer: ReturnType<typeof setTimeout> | undefined;
+  // Set only while a native drag-resize gesture is in progress (see
+  // the resizeObserver callback below); removes itself and calls
+  // persistPosition() once the gesture's pointer is released, so the
+  // final size is the only one ever sent to the backend -- no size
+  // data is sent while the resize handle is still being dragged.
+  let resizePointerUpListener: ((e: PointerEvent) => void) | undefined;
+  // Fallback for resizePointerUpListener: the native resize handle's
+  // drag is implemented by the browser itself, and in Chrome its
+  // pointerup sometimes never reaches window (e.g. released outside
+  // the viewport) -- without a fallback, `resizing` would then stay
+  // true forever, permanently ignoring every future remote position
+  // update for this note (see applyRemotePosition below). Reset on
+  // every ResizeObserver callback; if it ever fires, the gesture is
+  // treated as finished even though no pointerup was seen.
+  let resizeEndTimer: ReturnType<typeof setTimeout> | undefined;
+  const RESIZE_END_FALLBACK_MS = 500;
   // Redraws this note's on-screen position from xRatio/yRatio whenever
   // its basis changes -- document size for a pinned note, viewport
   // size for an unpinned one -- see this file's header comment and
@@ -158,6 +173,16 @@ export async function mountNote(
   // its height-recalculation logic from outside the onMount closure.
   let wrapperEl: HTMLElement | undefined;
   let applyWrapperHeight: (() => void) | undefined;
+  // Whether this note is currently mid-drag or mid-resize. While
+  // either is true, applyRemotePosition ignores incoming updates --
+  // including this client's own self-echoed save from persistPosition
+  // (PocketBase realtime always echoes a write back to its author).
+  // Without this guard, a stale echo arriving mid-gesture snaps the
+  // note back to wherever it was when that particular save fired,
+  // which reads as the note jittering or hopping backward while being
+  // dragged or resized.
+  let dragging = false;
+  let resizing = false;
   // Tracks the media query used below to keep the Dismiss icon and
   // loading spinner colors in sync with the system color scheme,
   // and the listener function so it can be removed again in
@@ -423,6 +448,7 @@ export async function mountNote(
         // from pointerup) to the header, which otherwise silently
         // swallows the button's own click handler.
         if ((e.target as HTMLElement).closest("button")) return;
+        dragging = true;
         bringToFront();
         dragStart = { x: e.clientX, y: e.clientY, top, left };
         header.setPointerCapture(e.pointerId);
@@ -470,6 +496,7 @@ export async function mountNote(
       const endDrag = () => {
         if (!dragStart) return;
         dragStart = null;
+        dragging = false;
         persistPosition();
       };
       header.addEventListener("pointerup", endDrag);
@@ -509,8 +536,47 @@ export async function mountNote(
           0,
           wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX - footer,
         );
-        clearTimeout(resizeSaveTimer);
-        resizeSaveTimer = setTimeout(persistPosition, 300);
+
+        // Ends the current resize gesture exactly once, however it was
+        // detected (pointerup/pointercancel, or the fallback timer
+        // below) -- guarded so a pointerup arriving right as the
+        // fallback timer also fires can't run this twice.
+        const endResize = () => {
+          if (!resizing) return;
+          resizing = false;
+          if (resizePointerUpListener) {
+            window.removeEventListener("pointerup", resizePointerUpListener);
+            window.removeEventListener(
+              "pointercancel",
+              resizePointerUpListener,
+            );
+            resizePointerUpListener = undefined;
+          }
+          clearTimeout(resizeEndTimer);
+          resizeEndTimer = undefined;
+          persistPosition();
+        };
+
+        // Every observed change (including the first) pushes the
+        // fallback timer back out, so it only fires once the resize
+        // has actually gone quiet -- see RESIZE_END_FALLBACK_MS above.
+        clearTimeout(resizeEndTimer);
+        resizeEndTimer = setTimeout(endResize, RESIZE_END_FALLBACK_MS);
+
+        if (resizing) return; // already waiting for this gesture to end
+
+        // First observed change of a new resize gesture: nothing is
+        // sent to the backend yet. Instead, wait for the native
+        // resize handle's pointer to be released -- CSS `resize: both`
+        // is handled entirely by the browser, so there is no
+        // resize-start/resize-end event to listen to directly. A
+        // window-level pointerup/pointercancel is the fastest signal
+        // that the drag has finished; the fallback timer above covers
+        // the case where that event never arrives (see its comment).
+        resizing = true;
+        resizePointerUpListener = endResize;
+        window.addEventListener("pointerup", resizePointerUpListener);
+        window.addEventListener("pointercancel", resizePointerUpListener);
       });
       resizeObserver.observe(wrapper);
 
@@ -607,7 +673,12 @@ export async function mountNote(
         darkModeQuery.removeEventListener("change", applyThemeColors);
       }
       resizeObserver?.disconnect();
-      clearTimeout(resizeSaveTimer);
+      if (resizePointerUpListener) {
+        window.removeEventListener("pointerup", resizePointerUpListener);
+        window.removeEventListener("pointercancel", resizePointerUpListener);
+        resizePointerUpListener = undefined;
+      }
+      clearTimeout(resizeEndTimer);
       docResizeObserver?.disconnect();
       clearTimeout(docResizeTimer);
       if (onWindowResize) window.removeEventListener("resize", onWindowResize);
@@ -635,6 +706,10 @@ export async function mountNote(
     const wrapper = wrapperEl;
     const applyHeight = applyWrapperHeight;
     if (!wrapper || !applyHeight) return;
+    // Ignore remote position updates while this note is actively
+    // being dragged or resized -- see the `dragging`/`resizing`
+    // declaration above for why.
+    if (dragging || resizing) return;
 
     pinned = update.pin;
     xRatio = update.x;
