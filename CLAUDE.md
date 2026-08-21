@@ -22,6 +22,7 @@ import math
 from flask import Flask
 >>>>>>> REPLACE
 ```
+- ただし、全面的に書き換える場合は、SEARCH/REPLACEを使わずに 新規ファイルとして生成してください
 
 ## Tech Stack
 

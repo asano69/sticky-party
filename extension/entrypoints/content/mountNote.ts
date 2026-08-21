@@ -158,14 +158,15 @@ export async function mountNote(
   // from it, so every writer in this file just patches the store
   // instead of touching wrapper.style directly -- see this file's
   // header comment and docs/note-sizing.md for the height formula.
-  // One-time floor for the iframe's first NOTE_CONTENT_RESIZE_MESSAGE
-  // report after mount (see that handler below), so a manually
-  // widened/heightened note doesn't snap back down to the text's own
-  // height the instant the page reloads. Cleared right after that
-  // first report is applied -- later reports (the body actually
-  // growing or shrinking) are meant to resize the note, so only the
-  // very first one after mount needs this protection.
-  let restoredFloorPx = savedHeightPx
+  // Floor for the iframe's one-and-only non-editing content-height
+  // report (see the NOTE_CONTENT_RESIZE_MESSAGE handler below for why
+  // there is exactly one), so a note that was manually resized taller
+  // than its text doesn't snap back down to the text's own height
+  // right after a reload. Derived once and never reassigned: nothing
+  // needs to invalidate it by hand, since editingFloorPx already takes
+  // priority over it in that handler once editing begins, and no
+  // second non-editing report will ever arrive to misuse it later.
+  const restoredFloorPx = savedHeightPx
     ? Math.max(0, savedHeightPx - TITLE_ROW_HEIGHT_PX)
     : undefined;
 
@@ -696,22 +697,19 @@ export async function mountNote(
           // main content, restoring the old Shadow DOM version's
           // auto-growing textarea. contentHeightPx (not the footer) is
           // what the note store's effect and persistPosition build on.
-          // While editing, never go below editingFloorPx (see its
-          // declaration above) -- this is what stops an existing note
-          // from shrinking the instant editing starts. On the first
-          // report after a reload, never go below restoredFloorPx
-          // either, so a note that was manually resized taller than
-          // its text doesn't immediately snap back down to the text's
-          // own height.
-          const floor = editingFloorPx ?? restoredFloorPx;
-          const height =
-            floor !== undefined ? Math.max(e.data.height, floor) : e.data.height;
-          setNote("contentHeightPx", height);
-          // Only the very first report after mount should be floored
-          // by the restored size -- later reports reflect the body
-          // actually growing or shrinking, and must be free to shrink
-          // the note below that original restored size.
-          restoredFloorPx = undefined;
+          // Never go below whichever floor currently applies:
+          // editingFloorPx while editing (so an existing note doesn't
+          // shrink the instant editing starts), or restoredFloorPx
+          // otherwise (so a note manually resized taller than its
+          // text doesn't snap back down right after a reload). The
+          // `??` chain alone is enough to pick the right one -- no
+          // "first report" bookkeeping needed, since restoredFloorPx
+          // is structurally only ever consulted for that one report
+          // (see its declaration above).
+          setNote(
+            "contentHeightPx",
+            Math.max(e.data.height, editingFloorPx ?? restoredFloorPx ?? 0),
+          );
           // The iframe has now measured and reported real content,
           // so the note is actually showing something -- remove the
           // loading spinner. loadingOverlay is cleared right after,
