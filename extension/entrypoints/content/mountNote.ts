@@ -211,6 +211,17 @@ export async function mountNote(
   // dragged or resized.
   let dragging = false;
   let resizing = false;
+  // Captured the moment editing starts (see the NOTE_EDITING_MESSAGE
+  // handler below): the note's resting content height right before
+  // editing began. Used as a floor for NOTE_CONTENT_RESIZE_MESSAGE
+  // while editing, so switching into edit mode never shrinks the note
+  // down to whatever the textarea's own (possibly much smaller)
+  // content happens to measure -- e.g. a note whose body is just an
+  // attachment embed (![[id]]) is one line of raw markdown in the
+  // textarea, but rendered much taller in view mode. Reset to
+  // undefined once editing ends, so the next edit session starts from
+  // a fresh floor instead of an earlier one.
+  let editingFloorPx: number | undefined;
   // Tracks the media query used below to keep the Dismiss icon and
   // loading spinner colors in sync with the system color scheme,
   // and the listener function so it can be removed again in
@@ -666,7 +677,14 @@ export async function mountNote(
           // main content, restoring the old Shadow DOM version's
           // auto-growing textarea. contentHeightPx (not the footer) is
           // what the note store's effect and persistPosition build on.
-          setNote("contentHeightPx", e.data.height);
+          // While editing, never go below editingFloorPx (see its
+          // declaration above) -- this is what stops an existing note
+          // from shrinking the instant editing starts.
+          const height =
+            editingFloorPx !== undefined
+              ? Math.max(e.data.height, editingFloorPx)
+              : e.data.height;
+          setNote("contentHeightPx", height);
           // The iframe has now measured and reported real content,
           // so the note is actually showing something -- remove the
           // loading spinner. loadingOverlay is cleared right after,
@@ -674,6 +692,11 @@ export async function mountNote(
           loadingOverlay?.remove();
           loadingOverlay = undefined;
         } else if (e.data?.type === NOTE_EDITING_MESSAGE) {
+          // Capture (or release) the editing floor right as edit mode
+          // toggles -- before this note's own contentHeightPx has any
+          // chance to change, so the captured value is always the
+          // resting (view-mode) height, never an already-shrunk one.
+          editingFloorPx = e.data.editing ? note.contentHeightPx : undefined;
           setNote("editing", e.data.editing);
           // Grows the wrapper by the footer's height while editing
           // (see the note store's effect above), without touching
