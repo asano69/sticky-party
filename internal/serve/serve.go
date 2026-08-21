@@ -8,6 +8,7 @@ package serve
 
 import (
 	"fmt"
+	"net/http"
 
 	"log/slog"
 
@@ -25,7 +26,23 @@ func Run(app *pocketbase.PocketBase, cfg *config.Config) error {
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 
-		e.Router.GET("/{path...}", apis.Static(static.FS, true))
+		staticHandler := apis.Static(static.FS, true)
+
+		// TEMPORARY: the web frontend isn't finished yet, so send root-path
+		// visitors straight to PocketBase's own admin UI instead of the
+		// incomplete static site. Every other path still falls through to
+		// the normal static handler. Can't register a separate "GET /"
+		// route for this: net/http's ServeMux treats "GET /{path...}" as
+		// already matching "/" too, so a second explicit route for it
+		// panics as a duplicate registration. Remove this branch once web/
+		// is ready to be the real root.
+		e.Router.GET("/{path...}", func(re *core.RequestEvent) error {
+			if re.Request.URL.Path == "/" {
+				http.Redirect(re.Response, re.Request, "/_/", http.StatusFound)
+				return nil
+			}
+			return staticHandler(re)
+		})
 
 		// See internal/serve/handler.go's embedHandler for why this exists.
 		e.Router.GET("/embed", embedHandler())
