@@ -232,6 +232,8 @@ export default defineContentScript({
         } else if (e.data?.type === ANNOTATION_POSITION_UPDATED_MESSAGE) {
           mountedNotes.get(e.data.annotationId)?.applyRemotePosition({
             pin: e.data.pin,
+            anchorX: e.data.anchorX,
+            anchorY: e.data.anchorY,
             x: e.data.x,
             y: e.data.y,
             width: e.data.width,

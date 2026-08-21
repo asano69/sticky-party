@@ -10,6 +10,8 @@
 // re-derived from its stored ratio and the appropriate basis whenever
 // that basis's size changes (see mountNote.ts's recomputePosition).
 
+import type { Anchor } from "../../lib/positions";
+
 // The whole document's size in CSS px. Used as the ratio basis for a
 // pinned note (see lib/positions.ts).
 export function documentSize(): { width: number; height: number } {
@@ -39,4 +41,41 @@ export function remToPx(rem: number): number {
 }
 export function pxToRem(px: number): number {
   return px / rootFontSizePx();
+}
+
+// Resolves a stored margin ratio (relative to the anchored edge -- see
+// lib/positions.ts's Anchor type) back into a top/left pixel offset
+// from the start (left/top) edge, given the current basis size
+// (document or viewport, matching pin mode) and the note's own size in
+// that axis. The decode-side counterpart of closestEdge below.
+export function resolveOffset(
+  anchor: Anchor,
+  marginRatio: number,
+  basisSize: number,
+  sizePx: number,
+): number {
+  return anchor === "end"
+    ? basisSize - marginRatio * basisSize - sizePx
+    : marginRatio * basisSize;
+}
+
+// Picks whichever edge (start or end) `offsetPx` currently sits closer
+// to along a single axis, and returns that edge plus the note's margin
+// from it as a ratio of `basisSize`. Used when persisting a note's
+// position, so one dragged flush against the right/bottom edge is
+// remembered relative to that edge -- keeping it visually pinned to
+// that corner across screens of a different size, instead of always
+// being measured from the left/top (see lib/positions.ts's Anchor
+// type). The encode-side counterpart of resolveOffset above.
+export function closestEdge(
+  offsetPx: number,
+  sizePx: number,
+  basisSize: number,
+): [Anchor, number] {
+  if (!basisSize) return ["start", 0];
+  const distStart = offsetPx;
+  const distEnd = basisSize - offsetPx - sizePx;
+  return distEnd < distStart
+    ? ["end", distEnd / basisSize]
+    : ["start", distStart / basisSize];
 }

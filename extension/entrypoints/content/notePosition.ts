@@ -13,8 +13,15 @@ import {
   type SavePositionMessage,
 } from "../../lib/messages";
 import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
-import type { StoredPosition } from "../../lib/positions";
-import { documentSize, pxToRem, remToPx, viewportSize } from "./viewport";
+import type { Anchor, StoredPosition } from "../../lib/positions";
+import {
+  closestEdge,
+  documentSize,
+  pxToRem,
+  remToPx,
+  resolveOffset,
+  viewportSize,
+} from "./viewport";
 
 // This note's anchor, as a ratio of the whole document or the current
 // viewport (depending on pin mode) -- the source of truth for
@@ -28,6 +35,10 @@ import { documentSize, pxToRem, remToPx, viewportSize } from "./viewport";
 export interface PositionRatioState {
   xRatio: number;
   yRatio: number;
+  // Which edge x/y are each measured from -- see lib/positions.ts's
+  // Anchor type.
+  anchorX: Anchor;
+  anchorY: Anchor;
   positionRecordId?: string;
 }
 
@@ -66,6 +77,11 @@ export async function fetchInitialPosition(params: {
   let heightPx: number | undefined;
   let xRatio = 0;
   let yRatio = 0;
+  // Default anchor for a brand-new note (no saved position yet) --
+  // always measured from the top-left, matching the old unconditional
+  // left/top semantics.
+  let anchorX: Anchor = "start";
+  let anchorY: Anchor = "start";
 
   try {
     const saved: StoredPosition | undefined = await browser.runtime.sendMessage(
@@ -79,13 +95,15 @@ export async function fetchInitialPosition(params: {
       pinned = saved.pin;
       xRatio = saved.x;
       yRatio = saved.y;
+      anchorX = saved.anchorX;
+      anchorY = saved.anchorY;
       widthPx = remToPx(saved.width);
       heightPx = remToPx(saved.height);
       // Basis matches this note's pin mode -- see mountNote.ts's
       // header comment.
       const basis = pinned ? documentSize() : viewportSize();
-      top = saved.y * basis.height;
-      left = saved.x * basis.width;
+      top = resolveOffset(anchorY, saved.y, basis.height, heightPx);
+      left = resolveOffset(anchorX, saved.x, basis.width, widthPx);
       z = saved.z;
       bumpZCounter(z);
     } else {
@@ -100,7 +118,8 @@ export async function fetchInitialPosition(params: {
     // No saved position: derive the initial ratio from the cascade
     // default so persistPosition/recomputePosition have a sane anchor
     // to work from until the first real save. A brand-new note is
-    // never pinned yet, so this always uses the viewport basis.
+    // never pinned yet, so this always uses the viewport basis, and
+    // always the top-left edges (anchorX/anchorY default above).
     const basis = viewportSize();
     xRatio = basis.width ? left / basis.width : 0;
     yRatio = basis.height ? top / basis.height : 0;
@@ -111,7 +130,7 @@ export async function fetchInitialPosition(params: {
     left,
     z,
     pinned,
-    ratioState: { xRatio, yRatio, positionRecordId },
+    ratioState: { xRatio, yRatio, anchorX, anchorY, positionRecordId },
     widthPx,
     restoredFloorPx: heightPx
       ? Math.max(0, heightPx - TITLE_ROW_HEIGHT_PX)
@@ -140,22 +159,35 @@ export function createPersistPosition(params: {
 
   return () => {
     const basis = note.pinned ? documentSize() : viewportSize();
-    if (basis.width) ratioState.xRatio = note.left / basis.width;
-    if (basis.height) ratioState.yRatio = note.top / basis.height;
+    const widthPx = wrapper.offsetWidth;
+    // Use contentHeightPx (the resting/non-editing size), not
+    // wrapper.offsetHeight -- the wrapper is temporarily taller than
+    // that while editing (see mountNote.ts's note-store effect).
+    const heightPx = TITLE_ROW_HEIGHT_PX + note.contentHeightPx;
+
+    // Picks whichever edge each axis currently sits closer to, so a
+    // note dragged flush against the right/bottom edge is remembered
+    // relative to that edge instead of always the left/top -- see
+    // lib/positions.ts's Anchor type.
+    const [anchorX, xRatio] = closestEdge(note.left, widthPx, basis.width);
+    const [anchorY, yRatio] = closestEdge(note.top, heightPx, basis.height);
+    ratioState.anchorX = anchorX;
+    ratioState.xRatio = xRatio;
+    ratioState.anchorY = anchorY;
+    ratioState.yRatio = yRatio;
+
     browser.runtime
       .sendMessage({
         type: SAVE_POSITION_MESSAGE,
         annotationId,
         position: {
           pin: note.pinned,
-          x: ratioState.xRatio,
-          y: ratioState.yRatio,
-          width: pxToRem(wrapper.offsetWidth),
-          // Use contentHeightPx (the resting/non-editing size), not
-          // wrapper.offsetHeight -- the wrapper is temporarily taller
-          // than that while editing (see mountNote.ts's note-store
-          // effect).
-          height: pxToRem(TITLE_ROW_HEIGHT_PX + note.contentHeightPx),
+          anchorX,
+          anchorY,
+          x: xRatio,
+          y: yRatio,
+          width: pxToRem(widthPx),
+          height: pxToRem(heightPx),
           z: note.z,
         },
         existingId: ratioState.positionRecordId,

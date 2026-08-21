@@ -39,12 +39,13 @@ import { createEffect, createRoot } from "solid-js";
 import { createStore } from "solid-js/store";
 
 import type { AnnotationData } from "../../lib/messages";
+import type { Anchor } from "../../lib/positions";
 import {
   NOTE_PIN_MESSAGE,
   TITLE_ROW_HEIGHT_PX,
   type NotePinMessage,
 } from "../../lib/iframe-messages";
-import { documentSize, remToPx, viewportSize } from "./viewport";
+import { documentSize, remToPx, resolveOffset, viewportSize } from "./viewport";
 import { animateMove } from "./moveAnimation";
 import { removeFaded, removeShredded } from "./removeAnimation";
 import { createPersistPosition, fetchInitialPosition } from "./notePosition";
@@ -227,6 +228,7 @@ export async function mountNote(
 
       const viewportTracking = wireViewportTracking({
         ratioState,
+        wrapper,
         note,
         setNote,
       });
@@ -268,6 +270,8 @@ export async function mountNote(
   // is only one shared position now, and it's already in `update`.
   function applyRemotePosition(update: {
     pin: boolean;
+    anchorX: Anchor;
+    anchorY: Anchor;
     x: number;
     y: number;
     width: number; // rem
@@ -288,11 +292,25 @@ export async function mountNote(
 
     ratioState.xRatio = update.x;
     ratioState.yRatio = update.y;
+    ratioState.anchorX = update.anchorX;
+    ratioState.anchorY = update.anchorY;
     // Basis matches the pin mode this update carries -- see header
     // comment.
     const basis = update.pin ? documentSize() : viewportSize();
-    const nextTop = update.y * basis.height;
-    const nextLeft = update.x * basis.width;
+    const widthPx = remToPx(update.width);
+    const heightPx = remToPx(update.height);
+    const nextTop = resolveOffset(
+      update.anchorY,
+      update.y,
+      basis.height,
+      heightPx,
+    );
+    const nextLeft = resolveOffset(
+      update.anchorX,
+      update.x,
+      basis.width,
+      widthPx,
+    );
 
     // Animates the visual move (and applies the new width) before
     // patching the note store: animateMove's FLIP technique needs to
@@ -300,16 +318,13 @@ export async function mountNote(
     // note store's effect would otherwise instantly overwrite before
     // animateMove got a chance to measure it.
     animateMove(wrapper, nextTop, nextLeft);
-    wrapper.style.width = `${remToPx(update.width)}px`;
+    wrapper.style.width = `${widthPx}px`;
 
     setNote({
       pinned: update.pin,
       top: nextTop,
       left: nextLeft,
-      contentHeightPx: Math.max(
-        0,
-        remToPx(update.height) - TITLE_ROW_HEIGHT_PX,
-      ),
+      contentHeightPx: Math.max(0, heightPx - TITLE_ROW_HEIGHT_PX),
       z: Math.max(note.z, update.z),
     });
   }

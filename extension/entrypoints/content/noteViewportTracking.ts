@@ -8,7 +8,8 @@
 // Both are watched, debounced, so a note never drifts outside the
 // visible area regardless of pin mode.
 
-import { documentSize, viewportSize } from "./viewport";
+import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
+import { documentSize, resolveOffset, viewportSize } from "./viewport";
 import type { PositionRatioState } from "./notePosition";
 
 const RECOMPUTE_DEBOUNCE_MS = 300;
@@ -19,16 +20,28 @@ export interface NoteViewportTrackingState {
 
 export function wireViewportTracking(params: {
   ratioState: PositionRatioState;
-  note: { pinned: boolean };
+  wrapper: HTMLElement;
+  note: { pinned: boolean; contentHeightPx: number };
   setNote: (patch: { top: number; left: number }) => void;
 }): NoteViewportTrackingState {
-  const { ratioState, note, setNote } = params;
+  const { ratioState, wrapper, note, setNote } = params;
 
   const recomputePosition = () => {
     const basis = note.pinned ? documentSize() : viewportSize();
+    const heightPx = TITLE_ROW_HEIGHT_PX + note.contentHeightPx;
     setNote({
-      top: ratioState.yRatio * basis.height,
-      left: ratioState.xRatio * basis.width,
+      top: resolveOffset(
+        ratioState.anchorY,
+        ratioState.yRatio,
+        basis.height,
+        heightPx,
+      ),
+      left: resolveOffset(
+        ratioState.anchorX,
+        ratioState.xRatio,
+        basis.width,
+        wrapper.offsetWidth,
+      ),
     });
   };
 

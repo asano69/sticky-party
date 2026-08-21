@@ -29,6 +29,7 @@ import {
 } from "../../lib/realtime-channel";
 import { getAuthedPb } from "../../lib/pb";
 import type { AnnotationData } from "../../lib/messages";
+import type { Anchor } from "../../lib/positions";
 import type { RecordSubscription } from "pocketbase";
 
 // How many times to retry the *initial* subscribe() call if it fails
@@ -87,6 +88,8 @@ interface PositionRecord {
   id: string;
   annotation: string;
   pin: boolean;
+  anchorX: Anchor;
+  anchorY: Anchor;
   x: number;
   y: number;
   width: number;
@@ -245,6 +248,8 @@ async function subscribePositions(
             type: ANNOTATION_POSITION_UPDATED_MESSAGE,
             annotationId: e.record.annotation,
             pin: e.record.pin,
+            anchorX: e.record.anchorX,
+            anchorY: e.record.anchorY,
             x: e.record.x,
             y: e.record.y,
             width: e.record.width,

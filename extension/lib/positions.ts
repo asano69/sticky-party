@@ -4,11 +4,15 @@
 // Shared across every viewer now (no more per-user `user` field): x/y
 // are stored as ratios of the whole document, not the viewport, so a
 // note renders at the same relative spot for everyone regardless of
-// window size. width/height are stored in rem rather than raw pixels,
-// so a note's on-screen size stays proportionally consistent across
-// viewers with different root font sizes. z is a shared stacking
-// order: whichever viewer last brought a note to front decides its
-// place in the stack for everyone.
+// window size. Each axis also picks its own anchor edge (anchorX/
+// anchorY, see the Anchor type below), so a note dragged flush against
+// the right or bottom edge stays flush against that edge on a
+// different screen size too, instead of drifting in from the left/top.
+// width/height are stored in rem rather than raw pixels, so a note's
+// on-screen size stays proportionally consistent across viewers with
+// different root font sizes. z is a shared stacking order: whichever
+// viewer last brought a note to front decides its place in the stack
+// for everyone.
 //
 // This module runs in the background script, not the content script
 // (see lib/messages.ts for why), which has no DOM of its own. Unlike
@@ -28,12 +32,25 @@ import { ClientResponseError } from "pocketbase";
 
 import { getAuthedPb } from "./pb";
 
+// Which edge x/y are measured from, chosen independently per axis.
+// "start" means the left/top edge; "end" means the right/bottom edge.
+// Letting each axis pick its own anchor (rather than always a
+// top-left origin) is what makes a note dragged flush against the
+// right edge of the screen stay flush against the right edge on a
+// different screen size -- see extension/entrypoints/content/viewport.ts's
+// resolveOffset/closestEdge, the encode/decode pair for this.
+export type Anchor = "start" | "end";
+
 export interface PositionData {
   // Whether this note follows the viewport (position: fixed) or stays
   // anchored to a point in the page (position: absolute). x/y use the
   // same document-relative ratio either way -- see mountNote.ts's
   // header comment for why toggling pin needs no coordinate math.
   pin: boolean;
+  anchorX: Anchor;
+  anchorY: Anchor;
+  // Margin ratio from the anchored edge (anchorX/anchorY above), not
+  // always from the left/top -- see the Anchor comment above.
   x: number; // ratio of document width, 0-1
   y: number; // ratio of document height, 0-1
   width: number; // rem

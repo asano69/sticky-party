@@ -10,6 +10,7 @@
 
 import type { AnnotationData } from "./messages";
 import type { HistoryEntry } from "./history";
+import type { Anchor } from "./positions";
 
 // content.ts -> orchestrator, sent once on mount and again whenever
 // the page's matched target changes (e.g. a client-side route change),
@@ -104,6 +105,8 @@ export interface AnnotationPositionUpdatedMessage {
   type: typeof ANNOTATION_POSITION_UPDATED_MESSAGE;
   annotationId: string;
   pin: boolean;
+  anchorX: Anchor;
+  anchorY: Anchor;
   x: number;
   y: number;
   width: number;

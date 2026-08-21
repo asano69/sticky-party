@@ -1123,12 +1123,32 @@ func init() {
 					{
 						"help": "",
 						"hidden": false,
-						"id": "bool3116547842",
-						"name": "heightAuto",
+						"id": "select2573298395",
+						"maxSelect": 0,
+						"name": "anchorX",
 						"presentable": false,
 						"required": false,
 						"system": false,
-						"type": "bool"
+						"type": "select",
+						"values": [
+							"start",
+							"end"
+						]
+					},
+					{
+						"help": "",
+						"hidden": false,
+						"id": "select3999685197",
+						"maxSelect": 0,
+						"name": "anchorY",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "select",
+						"values": [
+							"start",
+							"end"
+						]
 					},
 					{
 						"hidden": false,
