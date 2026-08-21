@@ -44,6 +44,7 @@ import {
 } from "../../lib/realtime-messages";
 import { IFRAME_PAGE, mountNote } from "./mountNote";
 import { mountOrchestrator, ORCHESTRATOR_PAGE } from "./mountOrchestrator";
+import { log } from "../../lib/log";
 
 export default defineContentScript({
   // "*://*/*" is kept here so WXT declares it as a host permission
@@ -66,6 +67,12 @@ export default defineContentScript({
     };
     if (w.__stickyPartyContentLoaded) return;
     w.__stickyPartyContentLoaded = true;
+
+    // Confirms the dynamically-registered content script (see
+    // lib/dynamicContentScript.ts) actually ran on this page -- useful
+    // for checking, from the page's own devtools console, whether a
+    // given URL's match pattern was registered as expected.
+    log.info("content script loaded", { url: location.href });
 
     // Extension pages only accept a postMessage whose targetOrigin
     // matches their own origin; every note's iframe shares this origin.
