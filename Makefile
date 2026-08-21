@@ -38,11 +38,11 @@ zip-extension-firefox: extension-deps
 icons:
 	cd extension && pnpm run icons
 
-frontend-deps:
-	cd frontend && pnpm install
+web-deps:
+	cd web && pnpm install
 
-build-frontend: frontend-deps
-	cd frontend && pnpm run build
+build-web: web-deps
+	cd web && pnpm run build
 
 # ============================================================
 # Run / dev servers
@@ -58,7 +58,7 @@ kill-ports:
 	done
 
 # Runs the built binary directly, without the live-reload dev server.
-all: build-frontend
+all: build-web
 	go run ./cmd/$(BINARY) superuser upsert admin@mail.internal password --dir=pb_data
 	go run ./cmd/$(BINARY) serve
 
@@ -84,7 +84,7 @@ dev-ext:
 	cd extension && pnpm exec wxt -b firefox --mv3
 
 dev-front: clean
-	npx concurrently -n "frontend,backend" -c "blue,green" "cd frontend && pnpm dev" "go run ./cmd/$(BINARY) serve --dev"
+	npx concurrently -n "web,backend" -c "blue,green" "cd web && pnpm dev" "go run ./cmd/$(BINARY) serve --dev"
 
 
 # ============================================================
@@ -92,7 +92,7 @@ dev-front: clean
 # ============================================================
 
 test:
-	#cd frontend && pnpm test
+	#cd web && pnpm test
 	go test ./...
 
 lint:

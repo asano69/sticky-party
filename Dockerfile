@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1
 
 # ==========================================
-# Stage 0: Node (vendor frontend assets via npm)
+# Stage 0: Node (vendor web assets via npm)
 # ==========================================
 FROM node:22-alpine AS node-builder
-WORKDIR /build/frontend
+WORKDIR /build/web
 # Copy only dependency manifests first to leverage Docker layer caching
-COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/pnpm-workspace.yaml* ./
+COPY web/package.json web/pnpm-lock.yaml* web/pnpm-workspace.yaml* ./
 RUN corepack enable
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install
-# Copy the rest of the frontend source code and build
-COPY frontend/ ./
+# Copy the rest of the web source code and build
+COPY web/ ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm run build
 
@@ -24,7 +24,7 @@ WORKDIR /build
 COPY go.mod go.sum* ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
-# Copy frontend build artifacts just before the Go compilation step
+# Copy web build artifacts just before the Go compilation step
 COPY --from=node-builder /build/internal/static/dist ./internal/static/dist
 # Copy Go source files last, as they change most frequently
 COPY cmd/ ./cmd/

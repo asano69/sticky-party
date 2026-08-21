@@ -1,7 +1,7 @@
 import PocketBase from "pocketbase";
 
 // Single shared PocketBase client, used to call sticky-party' custom API routes
-// (e.g. POST /api/admin/jobs/rescan) from the frontend.
+// (e.g. POST /api/admin/jobs/rescan) from the web.
 const pb = new PocketBase("/");
 
 // A 401 means the server rejected the request as unauthenticated. A 403
