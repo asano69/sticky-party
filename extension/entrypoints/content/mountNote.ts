@@ -19,6 +19,7 @@
 // convert top/left between them (accounting for scroll), not just
 // flip a flag.
 
+import { createEffect, createRoot, createSignal } from "solid-js";
 import X from "lucide-solid/icons/x";
 
 import {
@@ -138,10 +139,17 @@ export async function mountNote(
   // recovered from a manual drag-resize -- see the ResizeObserver
   // below). This, not the wrapper's current on-screen size, is what
   // gets persisted (converted to rem), so temporarily growing the
-  // wrapper for the edit-mode footer (see applyWrapperHeight below)
-  // never changes the note's saved size.
-  let contentHeight = savedWidthPx !== undefined ? 0 : 0;
-  let isEditingNote = false;
+  // wrapper for the edit-mode footer (see the height effect in onMount
+  // below) never changes the note's saved size.
+  //
+  // Signals (not plain `let`s): the wrapper's height is a pure
+  // derivation of these two values (see the createEffect in onMount
+  // below), so every writer just updates the signal and the DOM always
+  // stays in sync -- no call site can forget to also apply the height.
+  const [contentHeight, setContentHeight] = createSignal(
+    savedWidthPx !== undefined ? 0 : 0,
+  );
+  const [isEditingNote, setIsEditingNote] = createSignal(false);
 
   let resizeObserver: ResizeObserver | undefined;
   // Set only while a native drag-resize gesture is in progress (see
@@ -172,7 +180,13 @@ export async function mountNote(
   // exposed on the returned handle) can reach the wrapper element and
   // its height-recalculation logic from outside the onMount closure.
   let wrapperEl: HTMLElement | undefined;
-  let applyWrapperHeight: (() => void) | undefined;
+  // Disposes the createEffect (created in onMount below) that keeps
+  // the wrapper's height derived from contentHeight/isEditingNote.
+  // Solid effects created outside a component tree need an explicit
+  // owner (createRoot) and an explicit dispose call once the note is
+  // unmounted (see onRemove) -- otherwise the effect (and its
+  // subscription to the signals above) would leak.
+  let disposeHeightEffect: (() => void) | undefined;
   // Whether this note is currently mid-drag or mid-resize. While
   // either is true, applyRemotePosition ignores incoming updates --
   // including this client's own self-echoed save from persistPosition
@@ -226,17 +240,21 @@ export async function mountNote(
         zIndex: `${Z_BASE + z}`,
       });
 
-      // Sets the wrapper's total height from contentHeight, plus
+      // Derives the wrapper's total height from contentHeight, plus
       // TITLE_ROW_HEIGHT_PX for the edit-mode footer whenever the
       // note is being edited (see NOTE_EDITING_MESSAGE below). The
       // footer's extra space is purely visual -- persistPosition
       // never includes it (see below) -- so entering/leaving edit
-      // mode never changes the note's saved size.
-      applyWrapperHeight = () => {
-        const footer = isEditingNote ? TITLE_ROW_HEIGHT_PX : 0;
-        wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + contentHeight + footer}px`;
-      };
-      applyWrapperHeight();
+      // mode never changes the note's saved size. This runs once
+      // immediately (Solid effects run on creation) and again
+      // automatically whenever contentHeight/isEditingNote change.
+      disposeHeightEffect = createRoot((dispose) => {
+        createEffect(() => {
+          const footer = isEditingNote() ? TITLE_ROW_HEIGHT_PX : 0;
+          wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + contentHeight() + footer}px`;
+        });
+        return dispose;
+      });
 
       const bringToFront = () => {
         z = deps.nextZ();
@@ -272,7 +290,7 @@ export async function mountNote(
               // wrapper.offsetHeight -- the wrapper is temporarily
               // taller than that while editing (see applyWrapperHeight
               // above).
-              height: pxToRem(TITLE_ROW_HEIGHT_PX + contentHeight),
+              height: pxToRem(TITLE_ROW_HEIGHT_PX + contentHeight()),
               z,
             },
             existingId: positionRecordId,
@@ -528,13 +546,12 @@ export async function mountNote(
         }
         // Re-derive contentHeight from the wrapper's actual size, so
         // a manual drag-resize (which sets the wrapper's height
-        // directly, bypassing applyWrapperHeight) updates what gets
-        // persisted -- minus the edit-mode footer, if currently
+        // directly, bypassing the height effect above) updates what
+        // gets persisted -- minus the edit-mode footer, if currently
         // editing, so the resting size stays footer-free either way.
-        const footer = isEditingNote ? TITLE_ROW_HEIGHT_PX : 0;
-        contentHeight = Math.max(
-          0,
-          wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX - footer,
+        const footer = isEditingNote() ? TITLE_ROW_HEIGHT_PX : 0;
+        setContentHeight(
+          Math.max(0, wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX - footer),
         );
 
         // Ends the current resize gesture exactly once, however it was
@@ -636,9 +653,8 @@ export async function mountNote(
           // Grow (or shrink back) the wrapper to fit the iframe's
           // main content, restoring the old Shadow DOM version's
           // auto-growing textarea. contentHeight (not the footer) is
-          // what applyWrapperHeight and persistPosition build on.
-          contentHeight = e.data.height;
-          applyWrapperHeight();
+          // what the height effect above and persistPosition build on.
+          setContentHeight(e.data.height);
           // The iframe has now measured and reported real content,
           // so the note is actually showing something -- remove the
           // loading spinner. loadingOverlay is cleared right after,
@@ -646,12 +662,11 @@ export async function mountNote(
           loadingOverlay?.remove();
           loadingOverlay = undefined;
         } else if (e.data?.type === NOTE_EDITING_MESSAGE) {
-          isEditingNote = e.data.editing;
+          setIsEditingNote(e.data.editing);
           // Grows the wrapper by the footer's height while editing
-          // (see applyWrapperHeight above), without touching
+          // (see the height effect above), without touching
           // contentHeight -- so the note's saved size stays the same
           // whether or not the footer is currently showing.
-          applyWrapperHeight();
           // Stop the header from intercepting pointer events while
           // editing, so clicks reach the title input inside the
           // iframe (see the header comment above).
@@ -683,7 +698,8 @@ export async function mountNote(
       clearTimeout(docResizeTimer);
       if (onWindowResize) window.removeEventListener("resize", onWindowResize);
       wrapperEl = undefined;
-      applyWrapperHeight = undefined;
+      disposeHeightEffect?.();
+      disposeHeightEffect = undefined;
     },
   });
 
@@ -704,8 +720,7 @@ export async function mountNote(
     z: number;
   }) {
     const wrapper = wrapperEl;
-    const applyHeight = applyWrapperHeight;
-    if (!wrapper || !applyHeight) return;
+    if (!wrapper) return;
     // Ignore remote position updates while this note is actively
     // being dragged or resized -- see the `dragging`/`resizing`
     // declaration above for why.
@@ -719,14 +734,15 @@ export async function mountNote(
     const basis = pinned ? documentSize() : viewportSize();
     top = update.y * basis.height;
     left = update.x * basis.width;
-    contentHeight = Math.max(0, remToPx(update.height) - TITLE_ROW_HEIGHT_PX);
+    // Setting the signal alone re-triggers the height effect (created
+    // in onMount above), so no separate "apply" call is needed here.
+    setContentHeight(Math.max(0, remToPx(update.height) - TITLE_ROW_HEIGHT_PX));
     z = Math.max(z, update.z);
 
     wrapper.style.position = pinned ? "absolute" : "fixed";
     wrapper.style.zIndex = `${Z_BASE + z}`;
     animateMove(wrapper, top, left);
     wrapper.style.width = `${remToPx(update.width)}px`;
-    applyHeight();
   }
 
   // Wrappers around removeAnimation.ts's pure animation functions,

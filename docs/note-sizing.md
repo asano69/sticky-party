@@ -38,9 +38,18 @@ wrapper.height = TITLE_ROW_HEIGHT_PX
                 + (isEditingNote ? TITLE_ROW_HEIGHT_PX : 0)  // footer
 ```
 
-この式を実装しているのが `content.ts` の `applyWrapperHeight()`。
-`contentHeight` あるいは `isEditingNote` が変化するたびにこれを呼び直すことで
-wrapperの高さを更新する。
+`contentHeight`・`isEditingNote` は（生の変数ではなく）solid.jsの
+`createSignal`で持たれており、この式自体は `content.ts`（`mountNote.ts`）
+の `onMount` 内で1つの `createEffect` として実装されている。エフェクトは
+生成時に一度実行され、以降は購読している2つのシグナルのどちらかが変化する
+たびに自動で再実行されるため、「値が変わったら明示的に高さ再計算関数を
+呼び直す」という手続きが呼び出し側から消えている（後述の更新経路は、
+すべて対応するsetter（`setContentHeight`/`setIsEditingNote`）を呼ぶだけで、
+DOM更新はこのエフェクトが自動的に追従する）。
+
+エフェクトはコンポーネントツリーの外（プレーンなTS関数の中）で使われて
+いるため、`createRoot`で明示的にownerを作り、返り値の`dispose`関数を
+ノート削除時（`onRemove`）に呼んで購読を解放している。
 
 ## `contentHeight` の更新経路
 
@@ -66,10 +75,12 @@ iframe側（`NoteContent.tsx`）の `reportContentHeight()` が、本文の実�
 
 ```ts
 } else if (e.data?.type === NOTE_CONTENT_RESIZE_MESSAGE) {
-  contentHeight = e.data.height;
-  applyWrapperHeight();
+  setContentHeight(e.data.height);
 }
 ```
+
+`contentHeight`はシグナルなので、setterを呼ぶだけで上記のエフェクトが
+自動的に再実行され、wrapperの高さが更新される。
 
 `reportContentHeight()` の中身は編集中/非編集中で計算方法が違う（詳細は
 下記「編集中の高さ計算」節）。この経路が呼ばれるのは:
@@ -90,8 +101,8 @@ wrapperには `resize: both`（ネイティブCSSのリサイズハンドル）�
 ```ts
 resizeObserver = new ResizeObserver(() => {
   if (skipNextResizeSave) { skipNextResizeSave = false; return; }
-  const footer = isEditingNote ? TITLE_ROW_HEIGHT_PX : 0;
-  contentHeight = Math.max(0, wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX - footer);
+  const footer = isEditingNote() ? TITLE_ROW_HEIGHT_PX : 0;
+  setContentHeight(Math.max(0, wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX - footer));
   clearTimeout(resizeSaveTimer);
   resizeSaveTimer = setTimeout(persistPosition, 300);
 });
@@ -150,13 +161,12 @@ createEffect(() => {
 
 ```ts
 } else if (e.data?.type === NOTE_EDITING_MESSAGE) {
-  isEditingNote = e.data.editing;
-  applyWrapperHeight();
+  setIsEditingNote(e.data.editing);
   header.style.pointerEvents = e.data.editing ? "none" : "auto";
 }
 ```
 
-- `isEditingNote` を更新して `applyWrapperHeight()` を呼ぶだけで、
+- `setIsEditingNote()` を呼ぶだけで高さ用のエフェクトが自動的に再実行され、
   **`contentHeight` 自体は変更しない**。つまり編集モードのON/OFFは
   footer分（`TITLE_ROW_HEIGHT_PX`）の増減だけをもたらし、本文の表示に
   使われる高さ（`contentHeight`）はそのまま保持される。
@@ -251,8 +261,11 @@ Object.assign(wrapper.style, {
 
 ```
 [wrapper (content.ts, ホストページ側)]
-  height = TITLE_ROW_HEIGHT_PX + contentHeight + (editing ? TITLE_ROW_HEIGHT_PX : 0)
+  height = TITLE_ROW_HEIGHT_PX + contentHeight() + (isEditingNote() ? TITLE_ROW_HEIGHT_PX : 0)
   ただし CSS min-height = TITLE_ROW_HEIGHT_PX + MIN_CONTENT_HEIGHT_PX が下限として効く
+  上記の式は createEffect として実装されており、contentHeight/isEditingNote
+  （どちらもsolid.jsのsignal）のどちらかが変化するたびに自動で再適用される
+  （呼び出し側は各setterを呼ぶだけでよい）
 
   contentHeight の更新源:
     ① マウント時: savedHeight - TITLE_ROW_HEIGHT_PX (positionsテーブルから復元)
