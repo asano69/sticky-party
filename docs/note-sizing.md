@@ -146,18 +146,16 @@ if (note.editing) {
 
 ### 初期値（そのノートを初めて編集する時）
 
-保存済みの `editorHeight` があればそこから復元する。無ければ（一度も編集
-されたことのない付箋、あるいはこのフィールドが存在しなかった頃に保存され
-た付箋）`0` からスタートし、`previewHeightPx` を引き継ぐことはしない ――
-編集を開始した瞬間、iframe側のtextareaがその時点の本文をそのまま流し込ん
-だ自然な高さ（`resizeTextarea()` の `scrollHeight`）を計測し、それがその
-まま最初の実測報告として反映される。
+`editorHeightPx` はDBに永続化しない。textareaの実測値でほぼ即座に上書き
+される値であり、復元して得られるメリットは「編集開始直後の一瞬のチラつき
+防止」程度でしかなく、そのためにDBスキーマ・保存/復元ロジックを持つコス
+トには見合わないと判断した。常に `0` からスタートする。
 
-```ts
-editorHeightPx: saved.editorHeight
-  ? Math.max(0, remToPx(saved.editorHeight) - TITLE_ROW_HEIGHT_PX)
-  : 0
-```
+編集を開始した瞬間、iframe側のtextareaがその時点の本文をそのまま流し込ん
+だ自然な高さ（`resizeTextarea()` の `scrollHeight`）を計測し、それが最初
+の実測報告として反映される。復元値が無いことで、編集ボタンを押した瞬間に
+一瞬タイトル行だけの高さに潰れてから本来のサイズへジャンプする、という軽
+微なチラつきが起こり得るが、これは許容している。
 
 ### 更新経路
 
@@ -242,19 +240,78 @@ if (editing() && textareaRef && contentRef) {
 1. マウント時（`setContentRef` のref callback、`queueMicrotask` 経由）
 2. 編集中、テキスト（タイトル or 本文）が変化するたび（`draft`/`draftTitle`
    を購読する `createEffect`）
-3. **`contentRef` を監視する `ResizeObserver`** ―― `contentRef` 自身の箱の
-   サイズが、テキスト入力とは無関係に変わったとき（貼り付けた画像の非同
-   期ロード完了、サーバー側でハイライトされたコードブロックのHTMLが届く
-   （`lib/renders.ts`）など）に発火する。編集中・非編集中どちらのモード
-   でも無条件に発火し、`reportContentHeight()` 自体が現在のモードに応じ
-   た正しい計測方法を選ぶので、呼び出し側でモード判定をする必要はない。
+3. **`setBodyRef`（プレビュー時に`AnnotationBody`を包む素のブロックdiv）
+   を監視する `ResizeObserver`** ―― そのdiv自身の箱のサイズが、テキスト
+   入力とは無関係に変わったとき（貼り付けた画像の非同期ロード完了、サー
+   バー側でハイライトされたコードブロックのHTMLが届く（`lib/renders.ts`）
+   など）に発火する。`contentRef`（`<main>` 自身）ではなく、あえてその
+   内側のdivを監視対象にしている理由は後述の「既知の落とし穴」を参照。
+   編集中はこの`ResizeObserver`に頼らず、上記2番目（`draft`/`draftTitle`
+   を購読する`createEffect`）が直接 `reportContentHeight()` を呼ぶことで
+   追従している。
 
 この3番目（`ResizeObserver`）が、画像やコードブロックの高さがコンテンツ側
-の都合で非同期に確定するケースへの追従を可能にしている最大の変更点であり、
+の都合で非同期に確定するケースへの追従を可能にしている変更点であり、
 `previewHeightPx`/`editorHeightPx` どちらのフィールドに反映されるかは、
 送信されたメッセージを受け取った `noteIframeProtocol.ts` 側が `note.editing`
 だけを見て振り分ける ―― iframe側は自分がどちらのフィールドに書き込まれる
 かを一切意識しない。
+
+## 既知の落とし穴: `ResizeObserver` の監視対象を `<main>` 自身にしない
+
+`<main>`（`NoteMain.tsx`、`flex-1 overflow-auto`）を直接 `ResizeObserver`
+で監視すると、**添付画像の非同期ロード完了やコードブロックのシンタックス
+ハイライトHTML到着（`lib/renders.ts`）で内容が増えても、高さの変化が検知
+できない**という不具合が過去に発生した。
+
+原因は `<main>` 自身のボックスサイズが、コンテンツの量ではなく **flexレイ
+アウトによって wrapper（ホスト側）から与えられたスペース** で決まっている
+ため。`ResizeObserver` は「要素自身のボックスサイズの変化」だけを検知する
+ので、`overflow-auto` の中身がどれだけ増えても `<main>` 自身の
+`offsetHeight` が変わらない限り一切発火しない。
+
+### 修正
+
+`useContentHeight.ts` の `contentResizeObserver` の監視対象に、`<main>`
+ではなく **プレビューモード時に `AnnotationBody` を包む素のブロック
+`<div>`**（`NoteMain.tsx`、`setBodyRef` 経由）を追加した。このdivは
+flex/overflow制約を持たないため、コンテンツの実際のサイズに応じて自然に
+伸縮し、`ResizeObserver` が正しく発火する。
+
+```ts
+// useContentHeight.ts
+const setBodyRef = (el: HTMLElement) => {
+  contentResizeObserver.observe(el);
+};
+```
+
+このdivはプレビュー/編集モードの切り替え（`NoteMain.tsx` の `<Show>`）の
+たびに再生成されるため、`setBodyRef` はその都度呼ばれ、新しいインスタンス
+を再監視する。`contentResizeObserver` インスタンス自体は使い回しでよい
+（`ResizeObserver` は複数要素を同時に監視できる）。
+
+### 教訓: 汎用的な再発防止策
+
+**`ResizeObserver` で「コンテンツの量に応じた高さ変化」を検知したい場合、
+監視対象は必ず「自身のボックスがコンテンツに応じて伸縮する要素」でなけれ
+ばならない。** `flex-1`・`overflow-auto`・固定 `height` など、親から与え
+られたスペースいっぱいに広がる・収まるよう制約された要素を監視対象にする
+と、中身がどれだけ変化しても外側のボックス自体は変化しないため、
+`ResizeObserver` は永遠に発火しない。
+
+同じ罠を踏まないためのチェックリスト:
+
+- 監視したい要素に `flex: 1`（`flex-1`）や `overflow: auto/hidden` が付い
+  ていないか確認する。付いている場合、その要素は「親の都合でサイズが決ま
+  る」側であり、監視対象としては不適切。
+- 監視対象は、devtoolsで実際にコンテンツを増減させたとき、要素自身の
+  `offsetHeight`/`scrollHeight` が実際に変化するかを確認してから選ぶ。
+- 非同期に確定するコンテンツ（画像ロード、サーバーレンダリング結果の到着
+  など）を伴うUIでは、テキスト入力などの同期イベントだけでなく
+  `ResizeObserver` のような汎用的な変化検知の仕組みが必要になりやすい
+  ――個別のロード完了コールバックを都度追加する（per-source
+  special-casing）よりも、こちらの方が `CLAUDE.md` のsimplicity-first
+  方針に沿う。
 
 ## 永続化される値（`positions` コレクション）
 
@@ -271,7 +328,6 @@ savePosition(
     // Always the resting (view-mode) size, regardless of whether this
     // save happens to run while the note is being edited.
     height: pxToRem(TITLE_ROW_HEIGHT_PX + note.previewHeightPx),
-    editorHeight: pxToRem(TITLE_ROW_HEIGHT_PX + note.editorHeightPx),
     autoHeight: note.autoHeight,
     z: note.z,
   },
@@ -281,8 +337,7 @@ savePosition(
 
 - `height` には常に `previewHeightPx`（閲覧時の高さ）を使う。編集モード中
   に保存が走っても、`editorHeightPx` が `height` を汚染することはない。
-- `editorHeight` は `editorHeightPx` をそのまま反映する ―― footer分は
-  `editorHeightPx` に既に含まれているので、ここでも二重に足す必要はない。
+- `editorHeightPx` はそもそもDBに永続化しない（前節参照）。
 - `autoHeight` はそのまま渡す。
 
 `persistPosition()` の呼び出し元は以下の4箇所のみ（旧設計から変更なし）:
@@ -304,13 +359,15 @@ savePosition(
 previewHeightPx: heightPx
   ? Math.max(0, heightPx - TITLE_ROW_HEIGHT_PX)
   : 0,
-editorHeightPx,   // 上記の通り saved.editorHeight から復元、無ければ 0
 autoHeight,       // saved.autoHeight ?? true
 ```
 
 これらを使って `note` store が初期化され、wrapperのマウント時に即座に反映
 される。これにより保存済みの付箋は「デフォルト位置に一瞬表示されてから
 ジャンプする」ことなく、最初から正しい位置・サイズで描画される。
+
+`editorHeightPx` は `fetchInitialPosition` の返り値には含まれず、`mountNote.ts`
+の `note` store 初期化時に直接 `0` を渡す（前述の通りDBに永続化しないため）。
 
 ## `min-height` / `min-width` によるフロア（CSS制約）
 
@@ -373,8 +430,8 @@ setNote({
          同時に autoHeight を永久に false にする（編集中のリサイズでも）
 
   note.editorHeightPx の更新源:
-    ① マウント時: saved.editorHeight から復元（無ければ0、初回編集開始時の
-                  実測で上書きされる）
+    ① マウント時: 常に0からスタート（DBには永続化しない。初回編集開始時
+                  の実測で上書きされる）
     ② NOTE_CONTENT_RESIZE_MESSAGE（編集時は常に、autoHeightと無関係）:
          editorHeightPx = 実測値(main) + TITLE_ROW_HEIGHT_PX(footer分)
     ③ ResizeObserver（編集中のドラッグリサイズ）:
@@ -386,8 +443,9 @@ setNote({
     のみを制御し、editorHeightPx には無関係。
 
   永続化: height = TITLE_ROW_HEIGHT_PX + previewHeightPx（常に閲覧時の高さ）
-          editorHeight = TITLE_ROW_HEIGHT_PX + editorHeightPx
           autoHeight
+          （editorHeightPx はDBに永続化しない ―― 常にtextareaの実測値へ
+            即座に追従するため、復元する意味がない）
 
 [iframe (NoteContent.tsx / useContentHeight.ts, 拡張機能オリジン)]
   reportContentHeight():
@@ -405,8 +463,10 @@ setNote({
 
 主な変更点だけ要約すると:
 - 旧`contentHeightPx`＋`editingFloorPx`/`restoredFloorPx`の優先順位チェーンを廃止し、`previewHeightPx`/`editorHeightPx`の完全独立フィールドに分割したことを明記
-- DB新フィールド`editorHeight`/`autoHeight`のスキーマ的な意味と初期値ルールを追加
+- DB新フィールド`autoHeight`のスキーマ的な意味と初期値ルールを追加
 - `autoHeight`が編集中のリサイズでも`false`になる（モード横断の副作用がある）点を明記
 - 500pxキャップが`autoHeight===true`の自動計算のみに効く点を明記
 - iframe側`ResizeObserver`（画像・コードブロックの非同期高さ変化への追従）を新設計の中心的変更として説明
-- リアルタイム同期に`autoHeight`が乗るが`editorHeight`は乗らない、という非対称性を明記
+- リアルタイム同期に`autoHeight`は乗るが、編集中の高さは他の閲覧者に配る価値がないため乗らない、という非対称性を明記
+- `editorHeight`をDBから廃止: textareaの実測値でほぼ即座に上書きされる値であり、復元してもメリットが薄いため`editorHeightPx`は常に0スタートのインメモリ値に変更した
+- `ResizeObserver`の監視対象は`<main>`自身ではなく、コンテンツに応じて伸縮する内側のdiv（`setBodyRef`）にする必要があるという既知の落とし穴を追記
