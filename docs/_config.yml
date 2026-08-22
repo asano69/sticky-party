@@ -1,1 +1,26 @@
 theme: jekyll-theme-minimal
+
+title: Sticky Party
+description: Sticky Party のドキュメント
+show_downloads: false
+
+# Sidebar navigation, rendered inside the theme's own <header> element
+# (jekyll-theme-minimal turns <header> into a fixed left sidebar on wide
+# screens). Add/remove entries here -- no template changes needed.
+nav:
+  - title: 概要
+    url: /
+  - title: Architecture
+    url: /architecture
+  - title: Attachment Embeds
+    url: /attachment-embeds
+  - title: Communication Architecture
+    url: /communication-architecture
+  - title: Realtime Sync
+    url: /realtime-sync
+  - title: Target List Sync
+    url: /target-list-sync
+  - title: PocketBase Auth
+    url: /pocketbase-auth
+  - title: Note Sizing
+    url: /note-sizing

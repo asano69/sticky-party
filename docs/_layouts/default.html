@@ -1,80 +1,95 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8" />
+    <title>
+      {% if page.title %}{{ page.title }}{% else %}{{ site.title }}{% endif %}
+    </title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ page.title | default: site.title }}</title>
-    <style>
-      body {
-        margin: 0;
-        font-family: system-ui, sans-serif;
-      }
-
-      .layout {
-        display: flex;
-        max-width: 1200px;
-        margin: 0 auto;
-      }
-
-      nav {
-        width: 220px;
-        padding: 30px 20px;
-        border-right: 1px solid #ddd;
-        position: sticky;
-        top: 0;
-        height: 100vh;
-        box-sizing: border-box;
-      }
-
-      nav a {
-        display: block;
-        padding: 6px 0;
-      }
-
-      main {
-        flex: 1;
-        padding: 30px 40px;
-        max-width: 800px;
-      }
-
-      @media (max-width: 700px) {
-        .layout {
-          display: block;
-        }
-
-        nav {
-          width: auto;
-          height: auto;
-          position: static;
-          border-right: 0;
-          border-bottom: 1px solid #ddd;
-        }
-      }
-    </style>
+    <link
+      rel="stylesheet"
+      href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}"
+    />
+    <!--[if lt IE 9]>
+      <script src="https://cdn.jsdelivr.net/npm/html5shiv@3.7.3/dist/html5shiv.min.js"></script>
+    <![endif]-->
   </head>
-
   <body>
-    <div class="layout">
-      <nav>
-        <strong>Sticky Party</strong>
+    <div class="wrapper">
+      <header>
+        <h1>
+          <a href="{{ '/' | absolute_url }}"
+            >{{ site.title | default: site.github.repository_name }}</a
+          >
+        </h1>
 
-        <a href="{{ '/' | relative_url }}">概要</a>
-        <a href="{{ '/architecture' | relative_url }}">Architecture</a>
-        <a href="{{ '/attachment-embeds' | relative_url }}"
-          >Attachment Embeds</a
-        >
-        <a href="{{ '/communication-architecture' | relative_url }}"
-          >Communication Architecture</a
-        >
-        <a href="{{ '/realtime-sync' | relative_url }}">Realtime Sync</a>
-        <a href="{{ '/target-list-sync' | relative_url }}">Target List Sync</a>
-        <a href="{{ '/pocketbase-auth' | relative_url }}">PocketBase Auth</a>
-        <a href="{{ '/note-sizing' | relative_url }}">Note Sizing</a>
-      </nav>
+        {% if site.logo %}
+        <img src="{{ site.logo | relative_url }}" alt="Logo" />
+        {% endif %}
 
-      <main>
+        <p>{{ site.description | default: site.github.project_tagline }}</p>
+
+        {% if site.nav %}
+        <!-- Sidebar navigation, configured via _config.yml's `nav` list. -->
+        <nav>
+          <ul>
+            {% for item in site.nav %}
+            <li>
+              <a href="{{ item.url | relative_url }}">{{ item.title }}</a>
+            </li>
+            {% endfor %}
+          </ul>
+        </nav>
+        {% endif %} {% if site.github.is_project_page %}
+        <p class="view">
+          <a href="{{ site.github.repository_url }}"
+            >View the Project on GitHub
+            <small>{{ site.github.repository_nwo }}</small></a
+          >
+        </p>
+        {% endif %} {% if site.github.is_user_page %}
+        <p class="view">
+          <a href="{{ site.github.owner_url }}">View My GitHub Profile</a>
+        </p>
+        {% endif %} {% if site.show_downloads %}
+        <ul>
+          <li>
+            <a href="{{ site.github.zip_url }}"
+              >Download <strong>ZIP File</strong></a
+            >
+          </li>
+          <li>
+            <a href="{{ site.github.tar_url }}"
+              >Download <strong>TAR Ball</strong></a
+            >
+          </li>
+          <li>
+            <a href="{{ site.github.repository_url }}"
+              >View On <strong>GitHub</strong></a
+            >
+          </li>
+        </ul>
+        {% endif %}
+      </header>
+      <section>
         {{ content }}
-      </main>
+
+      </section>
+      <footer>
+        {% if site.github.is_project_page %}
+        <p>
+          This project is maintained by
+          <a href="{{ site.github.owner_url }}">{{ site.github.owner_name }}</a>
+        </p>
+        {% endif %}
+        <p>
+          <small
+            >Hosted on GitHub Pages &mdash; Theme by
+            <a href="https://github.com/orderedlist">orderedlist</a></small
+          >
+        </p>
+      </footer>
     </div>
+    <script src="{{ '/assets/js/scale.fix.js' | relative_url }}"></script>
   </body>
 </html>
