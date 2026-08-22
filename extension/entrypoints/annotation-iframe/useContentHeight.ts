@@ -4,7 +4,7 @@
 // implements). Extracted out of NoteContent.tsx since this logic is
 // pure sizing/measurement, independent of the rest of the note's UI.
 
-import { createEffect } from "solid-js";
+import { createEffect, onCleanup } from "solid-js";
 import { NOTE_CONTENT_RESIZE_MESSAGE } from "../../lib/iframe-messages";
 
 export function useContentHeight(params: {
@@ -77,6 +77,19 @@ export function useContentHeight(params: {
     queueMicrotask(reportContentHeight);
   });
 
+  // Watches contentRef for size changes that happen entirely on their
+  // own -- e.g. a pasted image's async load finishing, or a code
+  // block's syntax-highlighted HTML arriving from the backend (see
+  // lib/renders.ts) -- so the wrapper's auto-sized preview height
+  // (see docs/note-sizing.md) keeps following the content instead of
+  // only ever reflecting whatever was measurable at mount time.
+  // reportContentHeight already picks the right measurement for the
+  // current mode (editing vs. view -- see above), so this observer
+  // fires unconditionally in either mode without sending a wrong
+  // value.
+  const contentResizeObserver = new ResizeObserver(() => reportContentHeight());
+  onCleanup(() => contentResizeObserver.disconnect());
+
   // Ref callback for the textarea: also resizes immediately on mount,
   // matching the old inline `ref={(el) => { textareaRef = el; resizeTextarea(); }}`.
   const setTextareaRef = (el: HTMLTextAreaElement) => {
@@ -86,13 +99,14 @@ export function useContentHeight(params: {
 
   const setContentRef = (el: HTMLElement) => {
     contentRef = el;
-    // Reports the note's initial (non-editing) content height once on
-    // mount. The createEffect above only reports while editing (see
-    // its early return), so a note that's never entered edit mode
-    // would otherwise never send NOTE_CONTENT_RESIZE_MESSAGE at all --
+    // Reports the note's initial content height once on mount. The
+    // createEffect above only reports while editing (see its early
+    // return), so a note that's never entered edit mode would
+    // otherwise never send NOTE_CONTENT_RESIZE_MESSAGE at all --
     // leaving content.ts's loading spinner (see entrypoints/content.ts)
     // spinning forever.
     queueMicrotask(reportContentHeight);
+    contentResizeObserver.observe(el);
   };
 
   const focusTextarea = () => textareaRef?.focus();

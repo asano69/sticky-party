@@ -238,6 +238,7 @@ export default defineContentScript({
             y: e.data.y,
             width: e.data.width,
             height: e.data.height,
+            autoHeight: e.data.autoHeight,
             z: e.data.z,
           });
         } else if (e.data?.type === TARGET_HISTORY_CREATED_MESSAGE) {

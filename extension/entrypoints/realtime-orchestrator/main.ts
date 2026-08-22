@@ -116,6 +116,7 @@ interface PositionRecord {
   y: number;
   width: number;
   height: number;
+  autoHeight: boolean;
   z: number;
 }
 
@@ -276,6 +277,7 @@ async function subscribePositions(
             y: e.record.y,
             width: e.record.width,
             height: e.record.height,
+            autoHeight: e.record.autoHeight,
             z: e.record.z,
           } satisfies AnnotationPositionUpdatedMessage,
           "*",

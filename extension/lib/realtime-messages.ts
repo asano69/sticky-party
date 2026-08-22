@@ -111,5 +111,10 @@ export interface AnnotationPositionUpdatedMessage {
   y: number;
   width: number;
   height: number;
+  // Whether the preview height should keep auto-following the
+  // content's natural size (see docs/note-sizing.md). Relayed so a
+  // remote viewer's manual resize (which permanently disables
+  // auto-sizing) is reflected here too, not just the height itself.
+  autoHeight: boolean;
   z: number;
 }

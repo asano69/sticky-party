@@ -22,7 +22,11 @@ export interface NoteResizeState {
 export function wireResizing(params: {
   wrapper: HTMLElement;
   note: { editing: boolean };
-  setNote: (patch: { contentHeightPx: number }) => void;
+  setNote: (patch: {
+    previewHeightPx?: number;
+    editorHeightPx?: number;
+    autoHeight?: boolean;
+  }) => void;
   persistPosition: () => void;
 }): NoteResizeState {
   const { wrapper, note, setNote, persistPosition } = params;
@@ -45,18 +49,23 @@ export function wireResizing(params: {
       skipNextResizeSave = false;
       return;
     }
-    // Re-derive contentHeightPx from the wrapper's actual size, so a
-    // manual drag-resize (which sets the wrapper's height directly,
+    // Re-derive the content height from the wrapper's actual size, so
+    // a manual drag-resize (which sets the wrapper's height directly,
     // bypassing the note store's effect in mountNote.ts) updates what
-    // gets persisted -- minus the edit-mode footer, if currently
-    // editing, so the resting size stays footer-free either way.
-    const footer = note.editing ? TITLE_ROW_HEIGHT_PX : 0;
-    setNote({
-      contentHeightPx: Math.max(
-        0,
-        wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX - footer,
-      ),
-    });
+    // gets persisted. Whichever height is currently on screen
+    // (preview or editor -- see mountNote.ts's own effect) is the one
+    // being dragged, so that's the one updated here.
+    //
+    // A manual resize permanently opts this note out of auto-sizing
+    // its preview height (see docs/note-sizing.md) -- editorHeightPx
+    // is never gated by autoHeight, so setting it here doesn't change
+    // that field's own behavior, only its stored value.
+    const contentPx = Math.max(0, wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX);
+    if (note.editing) {
+      setNote({ editorHeightPx: contentPx, autoHeight: false });
+    } else {
+      setNote({ previewHeightPx: contentPx, autoHeight: false });
+    }
 
     // Ends the current resize gesture exactly once, however it was
     // detected (pointerup/pointercancel, or the fallback timer below)

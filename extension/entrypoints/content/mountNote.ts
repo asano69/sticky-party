@@ -104,13 +104,23 @@ export async function mountNote(
     pinned: initial.pinned,
     top: initial.top,
     left: initial.left,
-    // Resting (non-editing) content height in px, as last reported by
-    // the iframe (see noteIframeProtocol.ts) or recovered from a
-    // manual drag-resize (see noteResizing.ts). This, not the
-    // wrapper's current on-screen size, is what gets persisted
-    // (converted to rem), so temporarily growing the wrapper for the
-    // edit-mode footer never changes the note's saved size.
-    contentHeightPx: initial.restoredFloorPx ?? 0,
+    // View-mode (preview) content height in px, restored from the
+    // saved `height` field, or 0 for a brand-new note -- see
+    // docs/note-sizing.md. This, not the wrapper's current on-screen
+    // size, is what gets persisted (converted to rem).
+    previewHeightPx: initial.previewHeightPx,
+    // Edit-mode content height in px, footer included -- restored
+    // from the saved `editorHeight` field, or 0 for a note that has
+    // never been edited yet. Entirely separate from previewHeightPx
+    // above, so the two never need to be reconciled against each
+    // other (see docs/note-sizing.md).
+    editorHeightPx: initial.editorHeightPx,
+    // Whether previewHeightPx should keep auto-following the
+    // content's natural size. Starts true for every note and flips to
+    // false permanently the first time the native resize handle is
+    // dragged (see noteResizing.ts) -- editorHeightPx is never gated
+    // by this, it always follows the textarea.
+    autoHeight: initial.autoHeight,
     editing: false,
     z: initial.z,
   });
@@ -149,8 +159,14 @@ export async function mountNote(
           wrapper.style.position = note.pinned ? "absolute" : "fixed";
           wrapper.style.top = `${note.top}px`;
           wrapper.style.left = `${note.left}px`;
-          const footer = note.editing ? TITLE_ROW_HEIGHT_PX : 0;
-          wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + note.contentHeightPx + footer}px`;
+          // editorHeightPx already includes the footer (see
+          // noteIframeProtocol.ts), so no separate footer term is
+          // needed here -- just pick whichever of the two heights is
+          // currently active.
+          const contentPx = note.editing
+            ? note.editorHeightPx
+            : note.previewHeightPx;
+          wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + contentPx}px`;
           wrapper.style.zIndex = `${Z_BASE + note.z}`;
         });
         return dispose;
@@ -241,7 +257,6 @@ export async function mountNote(
         header: chrome.header,
         note,
         setNote,
-        restoredFloorPx: initial.restoredFloorPx,
         removeLoadingOverlay: chrome.removeLoadingOverlay,
         bringToFront,
         togglePin,
@@ -276,6 +291,7 @@ export async function mountNote(
     y: number;
     width: number; // rem
     height: number; // rem
+    autoHeight: boolean;
     z: number;
   }) {
     const wrapper = wrapperEl;
@@ -324,7 +340,8 @@ export async function mountNote(
       pinned: update.pin,
       top: nextTop,
       left: nextLeft,
-      contentHeightPx: Math.max(0, heightPx - TITLE_ROW_HEIGHT_PX),
+      previewHeightPx: Math.max(0, heightPx - TITLE_ROW_HEIGHT_PX),
+      autoHeight: update.autoHeight,
       z: Math.max(note.z, update.z),
     });
   }

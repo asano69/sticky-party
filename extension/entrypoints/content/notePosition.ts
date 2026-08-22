@@ -50,12 +50,18 @@ export interface InitialPosition {
   pinned: boolean;
   ratioState: PositionRatioState;
   widthPx?: number;
-  // Floor for the iframe's one-and-only non-editing content-height
-  // report (see mountNote.ts's header comment and
-  // docs/note-sizing.md), so a note that was manually resized taller
-  // than its text doesn't snap back down to the text's own height
-  // right after a reload.
-  restoredFloorPx?: number;
+  // View-mode (preview) content height, restored from the saved
+  // `height` field, or 0 for a brand-new note -- see
+  // docs/note-sizing.md.
+  previewHeightPx: number;
+  // Edit-mode content height (including the footer), restored from
+  // the saved `editorHeight` field, or 0 for a note that has never
+  // been edited yet.
+  editorHeightPx: number;
+  // Whether the preview height should keep auto-following the
+  // content's natural size. Defaults to true for a note with no saved
+  // value yet.
+  autoHeight: boolean;
 }
 
 // Fetches this annotation's saved position, if any, falling back to a
@@ -76,6 +82,8 @@ export async function fetchInitialPosition(params: {
   let positionRecordId: string | undefined;
   let widthPx: number | undefined;
   let heightPx: number | undefined;
+  let editorHeightPx = 0;
+  let autoHeight = true;
   let xRatio = 0;
   let yRatio = 0;
   // Default anchor for a brand-new note (no saved position yet) --
@@ -100,6 +108,13 @@ export async function fetchInitialPosition(params: {
       anchorY = saved.anchorY;
       widthPx = remToPx(saved.width);
       heightPx = remToPx(saved.height);
+      // `editorHeight`/`autoHeight` may be missing on records saved
+      // before these fields existed; fall back to "never edited yet"
+      // (0) and "still auto-sizing" (true) respectively.
+      editorHeightPx = saved.editorHeight
+        ? Math.max(0, remToPx(saved.editorHeight) - TITLE_ROW_HEIGHT_PX)
+        : 0;
+      autoHeight = saved.autoHeight ?? true;
       // Basis matches this note's pin mode -- see mountNote.ts's
       // header comment.
       const basis = pinned ? documentSize() : viewportSize();
@@ -133,9 +148,11 @@ export async function fetchInitialPosition(params: {
     pinned,
     ratioState: { xRatio, yRatio, anchorX, anchorY, positionRecordId },
     widthPx,
-    restoredFloorPx: heightPx
+    previewHeightPx: heightPx
       ? Math.max(0, heightPx - TITLE_ROW_HEIGHT_PX)
-      : undefined,
+      : 0,
+    editorHeightPx,
+    autoHeight,
   };
 }
 
@@ -153,7 +170,9 @@ export function createPersistPosition(params: {
     top: number;
     left: number;
     z: number;
-    contentHeightPx: number;
+    previewHeightPx: number;
+    editorHeightPx: number;
+    autoHeight: boolean;
   };
 }): () => void {
   const { annotationId, wrapper, ratioState, note } = params;
@@ -161,10 +180,10 @@ export function createPersistPosition(params: {
   return () => {
     const basis = note.pinned ? documentSize() : viewportSize();
     const widthPx = wrapper.offsetWidth;
-    // Use contentHeightPx (the resting/non-editing size), not
+    // Use previewHeightPx (the resting/non-editing size), not
     // wrapper.offsetHeight -- the wrapper is temporarily taller than
     // that while editing (see mountNote.ts's note-store effect).
-    const heightPx = TITLE_ROW_HEIGHT_PX + note.contentHeightPx;
+    const heightPx = TITLE_ROW_HEIGHT_PX + note.previewHeightPx;
 
     // Picks whichever edge each axis currently sits closer to, so a
     // note dragged flush against the right/bottom edge is remembered
@@ -189,6 +208,8 @@ export function createPersistPosition(params: {
           y: yRatio,
           width: pxToRem(widthPx),
           height: pxToRem(heightPx),
+          editorHeight: pxToRem(TITLE_ROW_HEIGHT_PX + note.editorHeightPx),
+          autoHeight: note.autoHeight,
           z: note.z,
         },
         existingId: ratioState.positionRecordId,

@@ -26,14 +26,17 @@ export interface NoteViewportTrackingState {
 export function wireViewportTracking(params: {
   ratioState: PositionRatioState;
   wrapper: HTMLElement;
-  note: { pinned: boolean; contentHeightPx: number };
+  note: { pinned: boolean; previewHeightPx: number };
   setNote: (patch: { top: number; left: number }) => void;
 }): NoteViewportTrackingState {
   const { ratioState, wrapper, note, setNote } = params;
 
   const recomputePosition = () => {
     const basis = note.pinned ? documentSize() : viewportSize();
-    const heightPx = TITLE_ROW_HEIGHT_PX + note.contentHeightPx;
+    // Same as before: this doesn't add the edit-mode footer even
+    // while editing -- non-interactive repositioning always works off
+    // the note's resting (view-mode) size.
+    const heightPx = TITLE_ROW_HEIGHT_PX + note.previewHeightPx;
     const top = resolveOffset(
       ratioState.anchorY,
       ratioState.yRatio,

@@ -54,7 +54,21 @@ export interface PositionData {
   x: number; // ratio of document width, 0-1
   y: number; // ratio of document height, 0-1
   width: number; // rem
+  // Total wrapper height (header + content, no footer) while this
+  // note is in view mode -- see docs/note-sizing.md.
   height: number; // rem
+  // Total wrapper height (header + content + footer) while this note
+  // is being edited. Kept as its own field, entirely separate from
+  // `height` above, so the view-mode and edit-mode sizes never need
+  // to be reconciled against each other -- see docs/note-sizing.md.
+  editorHeight: number; // rem
+  // Whether `height` (the view-mode size) should keep auto-following
+  // the content's natural size as it changes. Starts true for every
+  // note and flips to false permanently the first time the note's
+  // native resize handle is dragged, so a manual resize is never
+  // silently overwritten by a later auto-recalculation. `editorHeight`
+  // is not gated by this flag -- it always follows the textarea.
+  autoHeight: boolean;
   z: number;
 }
 

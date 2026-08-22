@@ -12,10 +12,18 @@ import {
   NOTE_FOCUS_MESSAGE,
   NOTE_PIN_MESSAGE,
   NOTE_READY_MESSAGE,
+  TITLE_ROW_HEIGHT_PX,
   TOGGLE_PIN_MESSAGE,
   type NotePinMessage,
 } from "../../lib/iframe-messages";
 import type { AnnotationData } from "../../lib/messages";
+
+// Upper bound for an auto-sized preview height (see docs/note-sizing.md):
+// a note with a lot of content (long text, several images) shouldn't
+// grow to fill the whole page on its own. Only applied while
+// note.autoHeight is true -- a manually resized note can be made
+// taller than this without limit (see noteResizing.ts).
+const MAX_AUTO_PREVIEW_HEIGHT_PX = 500;
 
 export interface NoteIframeProtocolState {
   cleanup: () => void;
@@ -26,12 +34,12 @@ export function wireIframeProtocol(params: {
   iframeOrigin: string;
   annotation: AnnotationData;
   header: HTMLElement;
-  note: { pinned: boolean; contentHeightPx: number };
-  setNote: (patch: { contentHeightPx?: number; editing?: boolean }) => void;
-  // Floor for the iframe's one-and-only non-editing content-height
-  // report -- see mountNote.ts's header comment and
-  // docs/note-sizing.md.
-  restoredFloorPx?: number;
+  note: { pinned: boolean; editing: boolean; autoHeight: boolean };
+  setNote: (patch: {
+    previewHeightPx?: number;
+    editorHeightPx?: number;
+    editing?: boolean;
+  }) => void;
   removeLoadingOverlay: () => void;
   bringToFront: () => void;
   togglePin: () => void;
@@ -44,23 +52,11 @@ export function wireIframeProtocol(params: {
     header,
     note,
     setNote,
-    restoredFloorPx,
     removeLoadingOverlay,
     bringToFront,
     togglePin,
     onDeleted,
   } = params;
-
-  // Captured the moment editing starts: the note's resting content
-  // height right before editing began. Used as a floor for
-  // NOTE_CONTENT_RESIZE_MESSAGE while editing, so switching into edit
-  // mode never shrinks the note down to whatever the textarea's own
-  // (possibly much smaller) content happens to measure -- e.g. a note
-  // whose body is just an attachment embed (![[id]]) is one line of
-  // raw markdown in the textarea, but rendered much taller in view
-  // mode. Reset to undefined once editing ends, so the next edit
-  // session starts from a fresh floor instead of an earlier one.
-  let editingFloorPx: number | undefined;
 
   const onMessage = (e: MessageEvent) => {
     if (e.source !== iframe.contentWindow) return;
@@ -88,29 +84,27 @@ export function wireIframeProtocol(params: {
     } else if (e.data?.type === NOTE_FOCUS_MESSAGE) {
       bringToFront();
     } else if (e.data?.type === NOTE_CONTENT_RESIZE_MESSAGE) {
-      // Grow (or shrink back) the wrapper to fit the iframe's main
-      // content, restoring the old Shadow DOM version's auto-growing
-      // textarea. Never go below whichever floor currently applies:
-      // editingFloorPx while editing (so an existing note doesn't
-      // shrink the instant editing starts), or restoredFloorPx
-      // otherwise (so a note manually resized taller than its text
-      // doesn't snap back down right after a reload).
-      setNote({
-        contentHeightPx: Math.max(
-          e.data.height,
-          editingFloorPx ?? restoredFloorPx ?? 0,
-        ),
-      });
+      // The iframe reports the main area's own content height for
+      // whichever mode it's currently in (see useContentHeight.ts) --
+      // it has no notion of the footer, since that's only rendered
+      // while editing and lives entirely in this document (see
+      // NoteContent.tsx / entrypoints/content/index.ts's header
+      // comment). Editing and view mode write to entirely separate
+      // fields, so neither can ever clobber the other's saved size.
+      if (note.editing) {
+        setNote({ editorHeightPx: e.data.height + TITLE_ROW_HEIGHT_PX });
+      } else if (note.autoHeight) {
+        // Auto-sizing is only ever capped, never floored -- a note
+        // that's genuinely short is allowed to stay short.
+        setNote({
+          previewHeightPx: Math.min(e.data.height, MAX_AUTO_PREVIEW_HEIGHT_PX),
+        });
+      }
       // The iframe has now measured and reported real content, so the
       // note is actually showing something -- remove the loading
       // spinner.
       removeLoadingOverlay();
     } else if (e.data?.type === NOTE_EDITING_MESSAGE) {
-      // Capture (or release) the editing floor right as edit mode
-      // toggles -- before this note's own contentHeightPx has any
-      // chance to change, so the captured value is always the
-      // resting (view-mode) height, never an already-shrunk one.
-      editingFloorPx = e.data.editing ? note.contentHeightPx : undefined;
       setNote({ editing: e.data.editing });
       // Stop the header from intercepting pointer events while
       // editing, so clicks reach the title input inside the iframe.
