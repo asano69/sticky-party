@@ -62,6 +62,15 @@ export const NOTE_CONTENT_RESIZE_MESSAGE = "sticky-party:note-content-resize";
 export interface NoteContentResizeMessage {
   type: typeof NOTE_CONTENT_RESIZE_MESSAGE;
   height: number;
+  // Which mode the iframe was actually in when it took this
+  // measurement. content.ts keeps its own mirrored copy of the editing
+  // flag (see NOTE_EDITING_MESSAGE above), but that copy can lag one
+  // message behind this one -- e.g. a measurement taken just before
+  // editing ends can arrive after NOTE_EDITING_MESSAGE(false) already
+  // flipped the mirror. Carrying the flag here lets
+  // noteIframeProtocol.ts route the measurement correctly regardless
+  // of that ordering, instead of trusting its own possibly-stale copy.
+  editing: boolean;
 }
 
 // content script -> iframe, sent when the user double-clicks the drag

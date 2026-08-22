@@ -84,14 +84,17 @@ export function wireIframeProtocol(params: {
     } else if (e.data?.type === NOTE_FOCUS_MESSAGE) {
       bringToFront();
     } else if (e.data?.type === NOTE_CONTENT_RESIZE_MESSAGE) {
-      // The iframe reports the main area's own content height for
-      // whichever mode it's currently in (see useContentHeight.ts) --
-      // it has no notion of the footer, since that's only rendered
-      // while editing and lives entirely in this document (see
-      // NoteContent.tsx / entrypoints/content/index.ts's header
-      // comment). Editing and view mode write to entirely separate
-      // fields, so neither can ever clobber the other's saved size.
-      if (note.editing) {
+      // Which field this measurement belongs to is decided from the
+      // message's own `editing` flag -- the mode the iframe was
+      // actually in when it measured -- rather than this document's
+      // mirrored `note.editing`. NOTE_EDITING_MESSAGE (which updates
+      // that mirror) and this message travel independently, so a
+      // measurement taken just before editing ends can arrive after
+      // the mirror has already flipped to false; trusting the mirror
+      // here would then route that stale edit-mode measurement into
+      // previewHeightPx, leaving the note stuck at its editing-mode
+      // (footer-included) height even after returning to view mode.
+      if (e.data.editing) {
         setNote({ editorHeightPx: e.data.height + TITLE_ROW_HEIGHT_PX });
       } else if (note.autoHeight) {
         // Auto-sizing is only ever capped, never floored -- a note

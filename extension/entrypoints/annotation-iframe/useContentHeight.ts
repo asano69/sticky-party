@@ -52,7 +52,11 @@ export function useContentHeight(params: {
   // in while editing.
   const reportContentHeight = () => {
     let height = 0;
-    if (params.editing() && textareaRef && contentRef) {
+    // Captured once so the measurement and the `editing` flag sent
+    // alongside it always describe the same moment -- see
+    // lib/iframe-messages.ts's NoteContentResizeMessage comment.
+    const editing = params.editing();
+    if (editing && textareaRef && contentRef) {
       const { paddingTop, paddingBottom } = getComputedStyle(contentRef);
       height =
         textareaRef.offsetHeight +
@@ -62,7 +66,7 @@ export function useContentHeight(params: {
       height = contentRef?.scrollHeight ?? 0;
     }
     window.parent.postMessage(
-      { type: NOTE_CONTENT_RESIZE_MESSAGE, height },
+      { type: NOTE_CONTENT_RESIZE_MESSAGE, height, editing },
       "*",
     );
   };
