@@ -834,6 +834,20 @@ func init() {
 						"type": "text"
 					},
 					{
+						"cascadeDelete": true,
+						"collectionId": "_pb_users_auth_",
+						"help": "",
+						"hidden": false,
+						"id": "relation2375276105",
+						"maxSelect": 0,
+						"minSelect": 0,
+						"name": "user",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
 						"autogeneratePattern": "",
 						"help": "",
 						"hidden": false,
