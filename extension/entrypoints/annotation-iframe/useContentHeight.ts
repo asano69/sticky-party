@@ -90,6 +90,27 @@ export function useContentHeight(params: {
   const contentResizeObserver = new ResizeObserver(() => reportContentHeight());
   onCleanup(() => contentResizeObserver.disconnect());
 
+  // Ref callback for the view-mode content wrapper in NoteMain.tsx --
+  // the plain block div wrapping AnnotationBody, NOT <main> itself.
+  // <main> is a flex-1/overflow-auto box, so its own rendered size is
+  // dictated by the flex layout (i.e. by however tall the host-side
+  // wrapper currently is), not by its content -- ResizeObserver only
+  // reports changes to an element's own box, never to content that
+  // merely overflows within a fixed-size box, so observing <main>
+  // alone misses content that grows without <main>'s own box
+  // resizing (e.g. an attachment image finishing its async load, or a
+  // code block's highlighted HTML arriving -- see lib/renders.ts).
+  // This inner div has no such constraint, so its box does grow/
+  // shrink with its actual content, and observing it here catches
+  // those cases. It's recreated every time the note toggles out of
+  // and back into view mode (see NoteMain.tsx's <Show>), so this ref
+  // callback re-observes the new instance each time; reusing the same
+  // contentResizeObserver instance is fine since ResizeObserver can
+  // watch multiple elements at once.
+  const setBodyRef = (el: HTMLElement) => {
+    contentResizeObserver.observe(el);
+  };
+
   // Ref callback for the textarea: also resizes immediately on mount,
   // matching the old inline `ref={(el) => { textareaRef = el; resizeTextarea(); }}`.
   const setTextareaRef = (el: HTMLTextAreaElement) => {
@@ -114,6 +135,7 @@ export function useContentHeight(params: {
   return {
     setTextareaRef,
     setContentRef,
+    setBodyRef,
     resizeTextarea,
     reportContentHeight,
     focusTextarea,

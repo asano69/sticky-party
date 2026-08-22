@@ -410,6 +410,7 @@ export default function NoteContent() {
             onStartEditBody={() => startEdit("body")}
             setContentRef={contentHeight.setContentRef}
             setTextareaRef={contentHeight.setTextareaRef}
+            setBodyRef={contentHeight.setBodyRef}
             resizeTextarea={contentHeight.resizeTextarea}
             revealed={revealed()}
             shaking={shaking()}

@@ -41,6 +41,11 @@ export default function NoteMain(props: {
   onStartEditBody: () => void;
   setContentRef: (el: HTMLElement) => void;
   setTextareaRef: (el: HTMLTextAreaElement) => void;
+  // Ref for the view-mode content wrapper (see AnnotationBody's parent
+  // div below) -- a separate ResizeObserver target from setContentRef,
+  // since <main> itself doesn't resize with its content -- see
+  // useContentHeight.ts's setBodyRef comment.
+  setBodyRef: (el: HTMLElement) => void;
   resizeTextarea: () => void;
   revealed: boolean;
   shaking: boolean;
@@ -114,7 +119,7 @@ export default function NoteMain(props: {
               when content (e.g. a shorter image) got smaller -- see
               docs/note-sizing.md and useContentHeight.ts's comment on
               the same problem for editing mode. */}
-          <div>
+          <div ref={props.setBodyRef}>
             <AnnotationBody
               body={props.note.body}
               annotationId={props.note.id}
