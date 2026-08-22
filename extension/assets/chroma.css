@@ -1,0 +1,225 @@
+/* Styles for chroma's syntax-highlighted code blocks (see
+ * internal/render/code.go, which renders with WithClasses(true) so the
+ * colors live here instead of being baked into the cached HTML -- this
+ * is what lets one cached render adapt to light/dark mode instead of
+ * being stuck with whatever the server happened to choose).
+ *
+ * `.chroma` is the <pre> element chroma wraps every block in.
+ * display:inline-block + min-width:100% makes its box (and therefore
+ * its background) grow to fit the block's actual content width instead
+ * of shrinking to the note's own width -- a plain block-level <pre>
+ * sizes itself to its container, so scrolling a long line horizontally
+ * would otherwise reveal bare space past the note's edge once the
+ * background ran out.
+ */
+.chroma {
+  display: inline-block;
+  min-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.5em;
+  border-radius: 0.25rem;
+  background-color: #f6f8fa;
+  color: #24292e;
+}
+
+/* Light theme token colors, loosely matching GitHub's light syntax theme. */
+.chroma .c,
+.chroma .c1,
+.chroma .cm,
+.chroma .ch,
+.chroma .cs {
+  color: #6a737d;
+  font-style: italic;
+}
+.chroma .cp,
+.chroma .cpf {
+  color: #d73a49;
+}
+.chroma .k,
+.chroma .kc,
+.chroma .kd,
+.chroma .kn,
+.chroma .kp,
+.chroma .kr,
+.chroma .kt,
+.chroma .ow {
+  color: #d73a49;
+}
+.chroma .s,
+.chroma .s1,
+.chroma .s2,
+.chroma .sb,
+.chroma .sc,
+.chroma .sd,
+.chroma .se,
+.chroma .sh,
+.chroma .si,
+.chroma .sx,
+.chroma .ss,
+.chroma .sr,
+.chroma .sa,
+.chroma .dl {
+  color: #032f62;
+}
+.chroma .m,
+.chroma .mb,
+.chroma .mf,
+.chroma .mh,
+.chroma .mi,
+.chroma .mo,
+.chroma .il {
+  color: #005cc5;
+}
+.chroma .nf,
+.chroma .fm {
+  color: #6f42c1;
+}
+.chroma .nc,
+.chroma .nn,
+.chroma .nt {
+  color: #22863a;
+}
+.chroma .na,
+.chroma .py,
+.chroma .nv,
+.chroma .vc,
+.chroma .vg,
+.chroma .vi,
+.chroma .vm {
+  color: #e36209;
+}
+.chroma .no,
+.chroma .bp,
+.chroma .nb {
+  color: #005cc5;
+}
+.chroma .ne {
+  color: #d73a49;
+}
+.chroma .nd {
+  color: #6f42c1;
+}
+.chroma .o,
+.chroma .p {
+  color: #24292e;
+}
+.chroma .gd {
+  color: #b31d28;
+  background-color: #ffeef0;
+}
+.chroma .gi {
+  color: #22863a;
+  background-color: #f0fff4;
+}
+.chroma .gh,
+.chroma .gu {
+  color: #005cc5;
+  font-weight: bold;
+}
+.chroma .gr,
+.chroma .err {
+  color: #b31d28;
+}
+
+@media (prefers-color-scheme: dark) {
+  .chroma {
+    background-color: #0d1117;
+    color: #c9d1d9;
+  }
+  .chroma .c,
+  .chroma .c1,
+  .chroma .cm,
+  .chroma .ch,
+  .chroma .cs {
+    color: #8b949e;
+  }
+  .chroma .cp,
+  .chroma .cpf {
+    color: #ff7b72;
+  }
+  .chroma .k,
+  .chroma .kc,
+  .chroma .kd,
+  .chroma .kn,
+  .chroma .kp,
+  .chroma .kr,
+  .chroma .kt,
+  .chroma .ow {
+    color: #ff7b72;
+  }
+  .chroma .s,
+  .chroma .s1,
+  .chroma .s2,
+  .chroma .sb,
+  .chroma .sc,
+  .chroma .sd,
+  .chroma .se,
+  .chroma .sh,
+  .chroma .si,
+  .chroma .sx,
+  .chroma .ss,
+  .chroma .sr,
+  .chroma .sa,
+  .chroma .dl {
+    color: #a5d6ff;
+  }
+  .chroma .m,
+  .chroma .mb,
+  .chroma .mf,
+  .chroma .mh,
+  .chroma .mi,
+  .chroma .mo,
+  .chroma .il {
+    color: #79c0ff;
+  }
+  .chroma .nf,
+  .chroma .fm {
+    color: #d2a8ff;
+  }
+  .chroma .nc,
+  .chroma .nn,
+  .chroma .nt {
+    color: #7ee787;
+  }
+  .chroma .na,
+  .chroma .py,
+  .chroma .nv,
+  .chroma .vc,
+  .chroma .vg,
+  .chroma .vi,
+  .chroma .vm {
+    color: #ffa657;
+  }
+  .chroma .no,
+  .chroma .bp,
+  .chroma .nb {
+    color: #79c0ff;
+  }
+  .chroma .ne {
+    color: #ff7b72;
+  }
+  .chroma .nd {
+    color: #d2a8ff;
+  }
+  .chroma .o,
+  .chroma .p {
+    color: #c9d1d9;
+  }
+  .chroma .gd {
+    color: #ffa198;
+    background-color: #490202;
+  }
+  .chroma .gi {
+    color: #7ee787;
+    background-color: #04260f;
+  }
+  .chroma .gh,
+  .chroma .gu {
+    color: #79c0ff;
+  }
+  .chroma .gr,
+  .chroma .err {
+    color: #ffa198;
+  }
+}

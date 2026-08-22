@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../../assets/theme.css";
+@import "../../assets/chroma.css";
 
 html,
 body,

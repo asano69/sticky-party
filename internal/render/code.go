@@ -28,9 +28,13 @@ func (codeRenderer) Render(lang, source string) (string, error) {
 		style = styles.Fallback
 	}
 
-	// WithClasses(false): inline styles, so the client never needs to
-	// ship a matching CSS stylesheet for chroma's class names.
-	formatter := chromahtml.New(chromahtml.WithClasses(false))
+	// WithClasses(true): emits CSS classes (e.g. class="kn") instead of
+	// hardcoded inline colors. Token-type-to-class names are fixed
+	// regardless of which style is passed to Format below, so the client
+	// can theme the result for both light and dark mode via a static
+	// stylesheet (extension/assets/chroma.css) instead of being stuck
+	// with whichever colors got baked into the cached HTML.
+	formatter := chromahtml.New(chromahtml.WithClasses(true))
 
 	iterator, err := lexer.Tokenise(nil, source)
 	if err != nil {

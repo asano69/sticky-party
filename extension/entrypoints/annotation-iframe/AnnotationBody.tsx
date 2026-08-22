@@ -78,8 +78,13 @@ function CodeBlock(props: { source: string; html?: string }) {
       }
     >
       {(html) => (
+        // chroma.css (imported in style.css) styles the .chroma <pre>
+        // chroma renders into -- background/text colors (light + dark)
+        // and rounding/padding all live there now, not here. This
+        // wrapper only owns overflow-x-auto and the vertical margin
+        // between blocks.
         <div
-          class="my-1 overflow-x-auto rounded bg-black/10 p-2 text-[0.85em] [&_pre]:m-0 [&_pre]:bg-transparent"
+          class="my-1 overflow-x-auto text-[0.85em]"
           // html comes from our own server-side chroma renderer
           // (internal/render), never from arbitrary user input, so
           // inserting it directly is safe.
