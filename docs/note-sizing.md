@@ -235,6 +235,32 @@ if (editing() && textareaRef && contentRef) {
   ング分を足し戻す。
 - **非編集中**: シンプルに `contentRef.scrollHeight` を読む。
 
+### 既知の落とし穴: `note.editing`ミラーの意味の二重化
+
+`note.editing`（content.ts側、`NOTE_EDITING_MESSAGE`で更新されるミラー）は
+「今どちらの高さをwrapperに適用すべきか」（footerの表示/非表示と連動する、
+このドキュメント自身が確定させる状態）には正しく使える。
+
+しかし以前は、`NOTE_CONTENT_RESIZE_MESSAGE`（iframeからの実測値報告）を
+`previewHeightPx`/`editorHeightPx`のどちらに書き込むかの判定にも、同じ
+`note.editing`ミラーを流用していた。これは別の意味を持つ情報を無理やり
+同居させたことになる ―― 実測値がどちらのモードで取られたかは、あくまで
+**iframe側が測った瞬間の状態**でなければ正しくない。
+
+`NOTE_EDITING_MESSAGE`と`NOTE_CONTENT_RESIZE_MESSAGE`は独立したpostMessage
+なので、編集終了直前（まだ編集中）に測られた高さの報告が、content.ts側が
+すでに`note.editing = false`を受け取った**後**に届くことがある。この場合、
+受信側のミラーで振り分けると本来`editorHeightPx`に入るべき値が
+`previewHeightPx`に書き込まれ、閲覧モードに戻ってもfooter込みの高さが
+残ったままになる。
+
+対策として、`NOTE_CONTENT_RESIZE_MESSAGE`自体に「この計測が編集中に行わ
+れたものか」を持たせ（`lib/iframe-messages.ts`のNoteContentResizeMessage）、
+振り分けは常にこのメッセージ自身のフラグで行うようにした
+（`entrypoints/content/noteIframeProtocol.ts`）。教訓: **cross-document
+のメッセージが運ぶ値の意味は、受信側の使い回しの状態ではなく、常に
+メッセージ自身に自己記述させる**こと。
+
 これが呼ばれるのは:
 
 1. マウント時（`setContentRef` のref callback、`queueMicrotask` 経由）
