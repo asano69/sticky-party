@@ -1,7 +1,7 @@
 theme: jekyll-theme-minimal
 
 title: Sticky Party
-description: Sticky Party のドキュメント
+description: Secure, self-hosted, server-synced sticky notes for web pages — a browser extension
 show_downloads: false
 
 # Sidebar navigation, rendered inside the theme's own <header> element

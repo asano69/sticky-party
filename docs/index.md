@@ -1,4 +1,4 @@
-<img src="../extension/assets/sticky-party.svg" width="100" align="right" />
+<img src="./assets/logo.svg" width="100" align="right" />
 
 無限の拡張性：付箋の中に次のコンテンツを表示できます。
 1. 外部のiframeコンテンツ（Youtube, Google Map, ...）
