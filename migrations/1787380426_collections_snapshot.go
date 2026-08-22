@@ -963,7 +963,7 @@ func init() {
 						"help": "",
 						"hidden": false,
 						"id": "text3685223346",
-						"max": 0,
+						"max": 5000000,
 						"min": 0,
 						"name": "body",
 						"pattern": "",
