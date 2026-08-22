@@ -1116,6 +1116,29 @@ func init() {
 					{
 						"help": "",
 						"hidden": false,
+						"id": "bool1901880158",
+						"name": "autoHeight",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"help": "",
+						"hidden": false,
+						"id": "number2592847649",
+						"max": null,
+						"min": null,
+						"name": "editorHeight",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"help": "",
+						"hidden": false,
 						"id": "number1657960367",
 						"max": null,
 						"min": null,
