@@ -8,7 +8,7 @@ show_downloads: false
 # (jekyll-theme-minimal turns <header> into a fixed left sidebar on wide
 # screens). Add/remove entries here -- no template changes needed.
 nav:
-  - title: 概要
+  - title: Overview
     url: /
   - title: Architecture
     url: /architecture
