@@ -98,8 +98,6 @@ export async function savePosition(
     return existingId;
   }
 
-  const created = await pb
-    .collection("positions")
-    .create<StoredPosition>(data);
+  const created = await pb.collection("positions").create<StoredPosition>(data);
   return created.id;
 }

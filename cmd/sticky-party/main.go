@@ -11,6 +11,7 @@ import (
 
 	"github.com/asano69/sticky-party/internal/gc"
 	"github.com/asano69/sticky-party/internal/history"
+	"github.com/asano69/sticky-party/internal/render"
 )
 
 func main() {
@@ -31,6 +32,11 @@ func main() {
 	// Daily sweep that deletes attachments no longer referenced by their
 	// annotation's body -- see internal/gc.
 	gc.Register(app)
+
+	// Pre-renders fenced code blocks into "renders" so clients can
+	// display syntax highlighting without shipping a highlighter of
+	// their own -- see internal/render.
+	render.Register(app)
 
 	root := app.RootCmd
 	root.Use = "sticky-party"

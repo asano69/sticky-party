@@ -3,6 +3,7 @@ module github.com/asano69/sticky-party
 go 1.25.9
 
 require (
+	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/pocketbase/pocketbase v0.39.4
 	github.com/spf13/cobra v1.10.2
 )
@@ -10,6 +11,7 @@ require (
 require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
+	github.com/dlclark/regexp2 v1.11.0 // indirect
 	github.com/domodwyer/mailyak/v3 v3.6.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/color v1.19.0 // indirect
