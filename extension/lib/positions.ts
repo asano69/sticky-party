@@ -57,11 +57,6 @@ export interface PositionData {
   // Total wrapper height (header + content, no footer) while this
   // note is in view mode -- see docs/note-sizing.md.
   height: number; // rem
-  // Total wrapper height (header + content + footer) while this note
-  // is being edited. Kept as its own field, entirely separate from
-  // `height` above, so the view-mode and edit-mode sizes never need
-  // to be reconciled against each other -- see docs/note-sizing.md.
-  editorHeight: number; // rem
   // Whether `height` (the view-mode size) should keep auto-following
   // the content's natural size as it changes. Starts true for every
   // note and flips to false permanently the first time the note's

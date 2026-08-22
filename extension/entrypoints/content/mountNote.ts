@@ -109,12 +109,13 @@ export async function mountNote(
     // docs/note-sizing.md. This, not the wrapper's current on-screen
     // size, is what gets persisted (converted to rem).
     previewHeightPx: initial.previewHeightPx,
-    // Edit-mode content height in px, footer included -- restored
-    // from the saved `editorHeight` field, or 0 for a note that has
-    // never been edited yet. Entirely separate from previewHeightPx
-    // above, so the two never need to be reconciled against each
-    // other (see docs/note-sizing.md).
-    editorHeightPx: initial.editorHeightPx,
+    // Edit-mode content height in px, footer included. Not persisted
+    // to the backend -- unlike previewHeightPx, it's always derived
+    // live from the textarea's own size while editing, so there's
+    // nothing meaningful to restore on mount. It simply starts at 0
+    // and gets overwritten as soon as the iframe reports its first
+    // measurement (see docs/note-sizing.md).
+    editorHeightPx: 0,
     // Whether previewHeightPx should keep auto-following the
     // content's natural size. Starts true for every note and flips to
     // false permanently the first time the native resize handle is

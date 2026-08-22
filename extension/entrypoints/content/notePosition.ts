@@ -54,10 +54,6 @@ export interface InitialPosition {
   // `height` field, or 0 for a brand-new note -- see
   // docs/note-sizing.md.
   previewHeightPx: number;
-  // Edit-mode content height (including the footer), restored from
-  // the saved `editorHeight` field, or 0 for a note that has never
-  // been edited yet.
-  editorHeightPx: number;
   // Whether the preview height should keep auto-following the
   // content's natural size. Defaults to true for a note with no saved
   // value yet.
@@ -82,7 +78,6 @@ export async function fetchInitialPosition(params: {
   let positionRecordId: string | undefined;
   let widthPx: number | undefined;
   let heightPx: number | undefined;
-  let editorHeightPx = 0;
   let autoHeight = true;
   let xRatio = 0;
   let yRatio = 0;
@@ -108,12 +103,8 @@ export async function fetchInitialPosition(params: {
       anchorY = saved.anchorY;
       widthPx = remToPx(saved.width);
       heightPx = remToPx(saved.height);
-      // `editorHeight`/`autoHeight` may be missing on records saved
-      // before these fields existed; fall back to "never edited yet"
-      // (0) and "still auto-sizing" (true) respectively.
-      editorHeightPx = saved.editorHeight
-        ? Math.max(0, remToPx(saved.editorHeight) - TITLE_ROW_HEIGHT_PX)
-        : 0;
+      // `autoHeight` may be missing on records saved before this
+      // field existed; fall back to "still auto-sizing".
       autoHeight = saved.autoHeight ?? true;
       // Basis matches this note's pin mode -- see mountNote.ts's
       // header comment.
@@ -151,7 +142,6 @@ export async function fetchInitialPosition(params: {
     previewHeightPx: heightPx
       ? Math.max(0, heightPx - TITLE_ROW_HEIGHT_PX)
       : 0,
-    editorHeightPx,
     autoHeight,
   };
 }
@@ -171,7 +161,6 @@ export function createPersistPosition(params: {
     left: number;
     z: number;
     previewHeightPx: number;
-    editorHeightPx: number;
     autoHeight: boolean;
   };
 }): () => void {
@@ -208,7 +197,6 @@ export function createPersistPosition(params: {
           y: yRatio,
           width: pxToRem(widthPx),
           height: pxToRem(heightPx),
-          editorHeight: pxToRem(TITLE_ROW_HEIGHT_PX + note.editorHeightPx),
           autoHeight: note.autoHeight,
           z: note.z,
         },
