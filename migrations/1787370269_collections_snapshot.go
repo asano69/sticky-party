@@ -1510,7 +1510,7 @@ func init() {
 				"id": "pbc_2739921956",
 				"indexes": [],
 				"listRule": "@request.auth.id != ''",
-				"name": "render",
+				"name": "renders",
 				"system": false,
 				"type": "base",
 				"updateRule": "@request.auth.id != ''",
