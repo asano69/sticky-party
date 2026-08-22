@@ -10,7 +10,7 @@
 
 import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
 import {
-  clampPosition,
+  clampToBasis,
   documentSize,
   resolveOffset,
   viewportSize,
@@ -47,11 +47,15 @@ export function wireViewportTracking(params: {
       wrapper.offsetWidth,
     );
     // A window/document resize can shrink the basis enough that the
-    // ratio-derived position now falls outside the new viewport (e.g.
-    // a note anchored near the right edge on a wide screen, viewed
-    // again on a narrow one) -- clamp the same way drag does (see
-    // noteDragging.ts), so the note never ends up stuck off any edge.
-    setNote(clampPosition(top, left, wrapper, note.pinned));
+    // ratio-derived position now falls outside it (e.g. a note
+    // anchored near the right edge on a wide screen, viewed again on
+    // a narrow one) -- clamp against the basis itself (clampToBasis),
+    // not the currently scrolled-into-view region (clampPosition):
+    // this runs non-interactively, including once immediately on
+    // mount (ResizeObserver always fires on initial observe), so it
+    // must not depend on wherever the page happens to be scrolled to
+    // at that moment -- see clampToBasis's comment in viewport.ts.
+    setNote(clampToBasis(top, left, wrapper, basis));
   };
 
   let docResizeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -59,7 +63,20 @@ export function wireViewportTracking(params: {
     clearTimeout(docResizeTimer);
     docResizeTimer = setTimeout(recomputePosition, RECOMPUTE_DEBOUNCE_MS);
   });
-  docResizeObserver.observe(document.documentElement);
+  // Observes document.body, not document.documentElement: per the
+  // CSSOM View spec's root-element special case (the same one behind
+  // documentElement.clientHeight always reporting the viewport size
+  // rather than the element's own box), browsers apply the same
+  // special case to ResizeObserver's content-box for <html> -- it
+  // tracks the viewport, not the page's actual scrollable height. That
+  // means it never fires as below-the-fold content (lazy images,
+  // infinite scroll, etc.) finishes loading in, so a pinned note's
+  // wrong initial position -- computed from an incompletely-loaded
+  // documentSize() in notePosition.ts right after a mid-page reload --
+  // never gets corrected. document.body has no such special case and
+  // grows with its content like any other element, so it reliably
+  // reports when the page's real height changes.
+  docResizeObserver.observe(document.body);
 
   const onWindowResize = () => {
     clearTimeout(docResizeTimer);

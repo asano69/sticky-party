@@ -83,11 +83,11 @@ export function closestEdge(
 // Clamps a note's top/left so none of its four edges can ever drift
 // past the matching edge of the current viewport (offset by scroll
 // for a pinned note -- see mountNote.ts's header comment on pin
-// modes). Shared by every place that sets top/left directly: the drag
-// gesture (noteDragging.ts) and viewport/document-resize
-// recomputation (noteViewportTracking.ts) -- without this being
-// shared, a note could stay clamped while being dragged but still
-// drift off-screen on a window resize, or vice versa.
+// modes). Used only for the drag gesture (noteDragging.ts): dragging
+// is an interactive gesture confined to whatever's currently on
+// screen, so bounding it against the scrolled-into-view region is
+// correct there. Do NOT use this for non-interactive recomputation
+// (noteViewportTracking.ts) -- see clampToBasis below for why.
 //
 // A note taller or wider than the viewport itself can't satisfy both
 // ends of an axis at once -- Math.max(maxTop, offsetY) (and the left
@@ -106,5 +106,33 @@ export function clampPosition(
   return {
     top: Math.min(Math.max(top, offsetY), Math.max(maxTop, offsetY)),
     left: Math.min(Math.max(left, offsetX), Math.max(maxLeft, offsetX)),
+  };
+}
+
+// Clamps a note's top/left against `basis` itself (document size for
+// a pinned note, viewport size for an unpinned one -- see
+// mountNote.ts's header comment on pin modes), rather than against
+// the currently scrolled-into-view region like clampPosition above.
+// Used by noteViewportTracking.ts's recomputePosition: a pinned
+// note's position is document-relative and can legitimately sit far
+// outside whatever happens to be on screen right now, so clamping it
+// against window.scrollY would forcibly snap it into the current
+// scroll position. That's exactly the bug seen after a full reload
+// with a mid-page scroll position restored: a pinned note anchored
+// near the top of a long document would jump down to wherever the
+// page happened to be scrolled to, because ResizeObserver always
+// fires once on initial observe, running this clamp immediately after
+// mount.
+export function clampToBasis(
+  top: number,
+  left: number,
+  wrapper: HTMLElement,
+  basis: { width: number; height: number },
+): { top: number; left: number } {
+  const maxTop = basis.height - wrapper.offsetHeight;
+  const maxLeft = basis.width - wrapper.offsetWidth;
+  return {
+    top: Math.min(Math.max(top, 0), Math.max(maxTop, 0)),
+    left: Math.min(Math.max(left, 0), Math.max(maxLeft, 0)),
   };
 }
