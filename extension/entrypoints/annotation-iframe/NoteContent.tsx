@@ -22,6 +22,7 @@ import { useContentHeight } from "./useContentHeight";
 import { useHistoryUpdates } from "./useHistoryUpdates";
 import { useParentMessaging } from "./useParentMessaging";
 import { useRealtimeUpdates } from "./useRealtimeUpdates";
+import { log } from "../../lib/log";
 import NoteHeader from "./NoteHeader";
 import NoteMain from "./NoteMain";
 import NoteFooter from "./NoteFooter";
@@ -171,7 +172,7 @@ export default function NoteContent() {
           setHistoryLoaded(true);
         })
         .catch((err) => {
-          console.error("[sticky-party] failed to load history", err);
+          log.error("failed to load history", { err });
           setHistoryLoaded(true);
         });
     },
@@ -229,7 +230,7 @@ export default function NoteContent() {
       setState("annotation", { title: draftTitle(), body: draft() });
       setEditing(false);
     } catch (err) {
-      console.error("[sticky-party] failed to save annotation", err);
+      log.error("failed to save annotation", { err });
     } finally {
       setSaving(false);
     }
@@ -263,7 +264,7 @@ export default function NoteContent() {
       await deleteAnnotation(client, current.id);
       parentMessaging.sendDeleted();
     } catch (err) {
-      console.error("[sticky-party] failed to delete annotation", err);
+      log.error("failed to delete annotation", { err });
       setConfirmDelete(false);
     } finally {
       setDeleting(false);
@@ -283,7 +284,7 @@ export default function NoteContent() {
       setState("annotation", "hide", next);
       if (next) setRevealed(false);
     } catch (err) {
-      console.error("[sticky-party] failed to toggle hide", err);
+      log.error("failed to toggle hide", { err });
     } finally {
       setTogglingHide(false);
     }
@@ -301,7 +302,7 @@ export default function NoteContent() {
       await setAnnotationColor(client, current.id, color);
       setState("annotation", "color", color);
     } catch (err) {
-      console.error("[sticky-party] failed to change color", err);
+      log.error("failed to change color", { err });
     } finally {
       setTogglingColor(false);
     }
@@ -324,7 +325,7 @@ export default function NoteContent() {
       });
       setState("annotation", "body", body);
     } catch (err) {
-      console.error("[sticky-party] failed to toggle task", err);
+      log.error("failed to toggle task", { err });
     }
   };
 
@@ -360,7 +361,7 @@ export default function NoteContent() {
       contentHeight.resizeTextarea();
       contentHeight.reportContentHeight();
     } catch (err) {
-      console.error("[sticky-party] failed to upload pasted image", err);
+      log.error("failed to upload pasted image", { err });
     }
   };
 

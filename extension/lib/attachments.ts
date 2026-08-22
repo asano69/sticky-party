@@ -33,6 +33,7 @@
 // tradeoff rather than solved with cleanup logic here.
 
 import { getAuthedPb } from "./pb";
+import { log } from "./log";
 
 export async function uploadAttachment(
   image: File,
@@ -112,7 +113,7 @@ export async function fetchAttachmentBlobUrl(
     const blob = await res.blob();
     return URL.createObjectURL(blob);
   } catch (err) {
-    console.error("[sticky-party] failed to load attachment", err);
+    log.error("failed to load attachment", { err });
     return undefined;
   }
 }

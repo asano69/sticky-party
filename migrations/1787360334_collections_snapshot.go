@@ -899,7 +899,9 @@ func init() {
 					}
 				],
 				"id": "pbc_2769025244",
-				"indexes": [],
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `idx_fvgue0hw5w` + "`" + ` ON ` + "`" + `settings` + "`" + ` (\n  ` + "`" + `user` + "`" + `,\n  ` + "`" + `key` + "`" + `\n)"
+				],
 				"listRule": "@request.auth.id != ''",
 				"name": "settings",
 				"system": false,

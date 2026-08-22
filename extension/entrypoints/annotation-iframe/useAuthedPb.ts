@@ -10,6 +10,7 @@ import { createSignal, onMount } from "solid-js";
 import type PocketBase from "pocketbase";
 
 import { getAuthedPb } from "../../lib/pb";
+import { log } from "../../lib/log";
 
 export function useAuthedPb() {
   const [pb, setPb] = createSignal<PocketBase>();
@@ -18,7 +19,7 @@ export function useAuthedPb() {
     try {
       setPb(await getAuthedPb());
     } catch (err) {
-      console.error("[sticky-party] failed to authenticate", err);
+      log.error("failed to authenticate", { err });
     }
   });
 

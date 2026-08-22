@@ -5,6 +5,7 @@ import { getAuthedPb } from "../../lib/pb";
 import { getDraftNote, saveDraftNote } from "../../lib/draft";
 import { continueListOnEnter } from "../../lib/listContinuation";
 import { linkAttachment, uploadAttachment } from "../../lib/attachments";
+import { log } from "../../lib/log";
 import {
   CHECK_ANNOTATION_MESSAGE,
   type CheckAnnotationMessage,
@@ -134,7 +135,7 @@ export default function Home(props: {
       textarea.selectionStart = textarea.selectionEnd = cursor;
       updateNote(next);
     } catch (err) {
-      console.error("[sticky-party] failed to upload pasted image", err);
+      log.error("failed to upload pasted image", { err });
     }
   };
 
@@ -172,7 +173,7 @@ export default function Home(props: {
         try {
           await linkAttachment(attachmentId, created.id);
         } catch (err) {
-          console.error("[sticky-party] failed to link attachment", err);
+          log.error("failed to link attachment", { err });
         }
       }
       setPendingAttachmentIds([]);

@@ -17,6 +17,7 @@ import { clearCachedAnnotationCount } from "./annotationCountCache";
 import { clearSyncErrorBadge } from "./syncBadge";
 import { clearDraftNote } from "./draft";
 import { SESSION_RESET_MESSAGE, type SessionResetMessage } from "./messages";
+import { log } from "./log";
 
 export async function logout(): Promise<void> {
   await Promise.all([
@@ -38,7 +39,5 @@ export async function logout(): Promise<void> {
   // already succeeded.
   await browser.runtime
     .sendMessage({ type: SESSION_RESET_MESSAGE } satisfies SessionResetMessage)
-    .catch((err: unknown) =>
-      console.error("[sticky-party] session reset failed", err),
-    );
+    .catch((err: unknown) => log.error("session reset failed", { err }));
 }

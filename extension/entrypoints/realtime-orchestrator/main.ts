@@ -31,6 +31,7 @@ import { getAuthedPb } from "../../lib/pb";
 import type { AnnotationData } from "../../lib/messages";
 import type { Anchor } from "../../lib/positions";
 import type { RecordSubscription } from "pocketbase";
+import { log } from "../../lib/log";
 
 // How many times to retry the *initial* subscribe() call if it fails
 // (e.g. a token that's momentarily invalid). Once subscribed, the
@@ -157,7 +158,7 @@ async function subscribeTarget(
     }
     unsubscribe = off;
   } catch (err) {
-    console.error("[sticky-party] orchestrator subscribe failed", err);
+    log.error("orchestrator subscribe failed", { err });
     if (myGeneration !== generation) return;
     const delay = INITIAL_RETRY_DELAYS_MS[attempt];
     if (delay !== undefined) {
@@ -209,7 +210,7 @@ async function subscribeTargetHistoryScoped(
     }
     unsubscribeHistory = off;
   } catch (err) {
-    console.error("[sticky-party] orchestrator history subscribe failed", err);
+    log.error("orchestrator history subscribe failed", { err });
     if (myGeneration !== generation) return;
     const delay = INITIAL_RETRY_DELAYS_MS[attempt];
     if (delay !== undefined) {
@@ -291,10 +292,7 @@ async function subscribePositions(
     }
     unsubscribePositions = off;
   } catch (err) {
-    console.error(
-      "[sticky-party] orchestrator positions subscribe failed",
-      err,
-    );
+    log.error("orchestrator positions subscribe failed", { err });
     if (myGeneration !== generation) return;
     const delay = INITIAL_RETRY_DELAYS_MS[attempt];
     if (delay !== undefined) {
@@ -334,7 +332,7 @@ async function subscribeTargetHistory(attempt = 0) {
       { filter: "action = 'create'" },
     );
   } catch (err) {
-    console.error("[sticky-party] target-history subscribe failed", err);
+    log.error("target-history subscribe failed", { err });
     const delay = INITIAL_RETRY_DELAYS_MS[attempt];
     if (delay !== undefined) {
       setTimeout(() => subscribeTargetHistory(attempt + 1), delay);

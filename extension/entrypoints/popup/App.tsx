@@ -9,6 +9,7 @@ import { getAuthedPb } from "../../lib/pb";
 import { formatActionTitle } from "../../lib/actionTitle";
 import { getSettings } from "../../lib/settings";
 import { getSyncError, withSyncErrorBadge } from "../../lib/syncBadge";
+import { log } from "../../lib/log";
 import {
   applyPopupColor,
   getPopupColor,
@@ -101,7 +102,7 @@ function App() {
         type: RECHECK_ALL_TABS_MESSAGE,
       } satisfies RecheckAllTabsMessage);
     } catch (err) {
-      console.error("[sticky-party] popup sync failed", err);
+      log.error("popup sync failed", { err });
       setSyncError(true);
     }
 
@@ -111,7 +112,7 @@ function App() {
       // Not routed through the sync-error badge: a failed count fetch
       // is minor compared to a failed target sync, so it just logs and
       // leaves the previous count (if any) displayed.
-      console.error("[sticky-party] failed to fetch annotation count", err);
+      log.error("failed to fetch annotation count", { err });
     }
   };
 
@@ -180,7 +181,7 @@ function App() {
       // count (e.g. after annotations were added/removed elsewhere).
       setAnnotationCount(await fetchAnnotationCount(await getAuthedPb()));
     } catch (err) {
-      console.error("[sticky-party] full sync failed", err);
+      log.error("full sync failed", { err });
       setSyncError(true);
     } finally {
       setSyncing(false);
@@ -196,7 +197,7 @@ function App() {
     try {
       setAnnotationCount(await fetchAnnotationCount(await getAuthedPb()));
     } catch (err) {
-      console.error("[sticky-party] failed to refresh annotation count", err);
+      log.error("failed to refresh annotation count", { err });
     }
   };
 

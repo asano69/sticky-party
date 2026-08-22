@@ -27,6 +27,7 @@ import {
   type SessionResetMessage,
 } from "../lib/messages";
 import { fetchPosition, savePosition } from "../lib/positions";
+import { log } from "../lib/log";
 import {
   addCachedTarget,
   getCachedTargets,
@@ -107,7 +108,7 @@ export default defineBackground(() => {
       // its own since sync runs in the background with no UI open, so
       // the badge is what makes the failure visible. withSyncErrorBadge
       // already retried once before giving up and showing the badge.
-      console.error("[sticky-party] target sync failed", err);
+      log.error("target sync failed", { err });
       return;
     }
     // A target that just appeared in the cache might match a tab
@@ -239,7 +240,7 @@ export default defineBackground(() => {
       // backend unreachable) is exactly the kind of silent failure the
       // badge exists to surface -- without it, the user would just see
       // no sticky note and have no idea why.
-      console.error("[sticky-party] failed to fetch annotation", err);
+      log.error("failed to fetch annotation", { err });
       clearAnnotationCountBadge(tabId);
       updateTitle();
     }

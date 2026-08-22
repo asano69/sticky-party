@@ -22,6 +22,7 @@ import {
   resolveOffset,
   viewportSize,
 } from "./viewport";
+import { log } from "../../lib/log";
 
 // This note's anchor, as a ratio of the whole document or the current
 // viewport (depending on pin mode) -- the source of truth for
@@ -110,7 +111,7 @@ export async function fetchInitialPosition(params: {
       z = nextZ();
     }
   } catch (err) {
-    console.error("[sticky-party] failed to load position", err);
+    log.error("failed to load position", { err });
     z = nextZ();
   }
 
@@ -193,8 +194,6 @@ export function createPersistPosition(params: {
         existingId: ratioState.positionRecordId,
       } satisfies SavePositionMessage)
       .then((id: string) => (ratioState.positionRecordId = id))
-      .catch((err: unknown) =>
-        console.error("[sticky-party] failed to save position", err),
-      );
+      .catch((err: unknown) => log.error("failed to save position", { err }));
   };
 }
