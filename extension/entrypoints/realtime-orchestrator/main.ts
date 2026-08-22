@@ -67,6 +67,27 @@ let unsubscribePositions: (() => void) | undefined;
 // unsubscribe itself instead of delivering events for the wrong page.
 let generation = 0;
 
+// All four subscribe functions below need a PocketBase client with a
+// live realtime connection. The SDK multiplexes every subscribe() call
+// onto a single SSE connection per client instance, so sharing one
+// client here means this orchestrator opens exactly one SSE
+// connection instead of four. This matters because browsers cap
+// concurrent connections per origin (6 for HTTP/1.1), and every open
+// tab runs its own orchestrator competing for that same limit -- four
+// connections per tab exhausts it with just two tabs open, starving a
+// later tab's realtime subscriptions (and even ordinary fetches, e.g.
+// attachment downloads) of a connection slot.
+let sharedPbPromise: ReturnType<typeof getAuthedPb> | undefined;
+async function getSharedPb() {
+  if (!sharedPbPromise) sharedPbPromise = getAuthedPb();
+  try {
+    return await sharedPbPromise;
+  } catch (err) {
+    sharedPbPromise = undefined; // let the next call retry with a fresh client
+    throw err;
+  }
+}
+
 // A "histories" row, as needed by both subscribes below -- the
 // target-list subscribe (action="create" only, target-agnostic) reads
 // only target/updated; the history-panel subscribe
@@ -118,7 +139,7 @@ async function subscribeTarget(
   channel = new BroadcastChannel(realtimeChannelName(target));
 
   try {
-    const pb = await getAuthedPb();
+    const pb = await getSharedPb();
     if (myGeneration !== generation) return; // superseded while awaiting auth
 
     const off = await pb.collection("annotations").subscribe<AnnotationData>(
@@ -163,7 +184,7 @@ async function subscribeTargetHistoryScoped(
   historyChannel = new BroadcastChannel(realtimeHistoryChannelName(target));
 
   try {
-    const pb = await getAuthedPb();
+    const pb = await getSharedPb();
     if (myGeneration !== generation) return;
 
     const off = await pb.collection("histories").subscribe<HistoryRecord>(
@@ -235,7 +256,7 @@ async function subscribePositions(
   attempt = 0,
 ) {
   try {
-    const pb = await getAuthedPb();
+    const pb = await getSharedPb();
     if (myGeneration !== generation) return;
 
     const off = await pb.collection("positions").subscribe<PositionRecord>(
@@ -296,7 +317,7 @@ async function subscribePositions(
 // entrypoints/background.ts's handling of ADD_CACHED_TARGET_MESSAGE).
 async function subscribeTargetHistory(attempt = 0) {
   try {
-    const pb = await getAuthedPb();
+    const pb = await getSharedPb();
     await pb.collection("histories").subscribe<HistoryRecord>(
       "*",
       (e) => {
