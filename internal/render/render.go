@@ -141,3 +141,21 @@ func sourceHash(kind, lang, source string) string {
 	h.Write([]byte(source))
 	return strconv.FormatUint(h.Sum64(), 16)
 }
+
+// ValidSourceHashes returns every sourceHash that annotation's current
+// body would still produce, recomputed the same way syncRenders does.
+// Used by internal/gc to tell which "renders" rows for an annotation
+// are still referenced by its body and which are orphaned (the block
+// was edited or removed since that row was cached).
+func ValidSourceHashes(body string) map[string]bool {
+	hashes := make(map[string]bool)
+	for _, m := range fencePattern.FindAllStringSubmatch(body, -1) {
+		lang, source := m[1], m[2]
+		kind := kindForLang(lang)
+		if _, ok := renderers[kind]; !ok {
+			continue // no renderer registered for this kind -- never cached, so never orphaned either
+		}
+		hashes[sourceHash(kind, lang, source)] = true
+	}
+	return hashes
+}

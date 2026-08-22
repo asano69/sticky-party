@@ -1429,7 +1429,7 @@ func init() {
 						"type": "text"
 					},
 					{
-						"cascadeDelete": false,
+						"cascadeDelete": true,
 						"collectionId": "pbc_2353526682",
 						"help": "",
 						"hidden": false,
@@ -1476,7 +1476,7 @@ func init() {
 						"help": "",
 						"hidden": false,
 						"id": "text410646757",
-						"max": 0,
+						"max": 9876543210,
 						"min": 0,
 						"name": "html",
 						"pattern": "",
