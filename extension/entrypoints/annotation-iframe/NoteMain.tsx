@@ -104,10 +104,17 @@ export default function NoteMain(props: {
             </TextField>
           }
         >
-          {/* min-h-full makes this fill the whole main area (not
-              just wrap the text), so double-clicking any blank space
-              below a short body still starts editing. */}
-          <div class="min-h-full">
+          {/* No min-h-full here: onDblClick is bound to <main> itself
+              (see below), which already spans the full flex-1 area, so
+              double-clicking blank space still starts editing without
+              this div. min-h-full previously forced this div to never
+              be shorter than main's *current* box height, which in
+              turn pinned main's scrollHeight to that stale height and
+              prevented previewHeightPx from ever shrinking back down
+              when content (e.g. a shorter image) got smaller -- see
+              docs/note-sizing.md and useContentHeight.ts's comment on
+              the same problem for editing mode. */}
+          <div>
             <AnnotationBody
               body={props.note.body}
               annotationId={props.note.id}

@@ -21,7 +21,7 @@ export interface NoteResizeState {
 
 export function wireResizing(params: {
   wrapper: HTMLElement;
-  note: { editing: boolean };
+  note: { editing: boolean; previewHeightPx: number; editorHeightPx: number };
   setNote: (patch: {
     previewHeightPx?: number;
     editorHeightPx?: number;
@@ -35,6 +35,11 @@ export function wireResizing(params: {
   // First observation always fires on mount, which isn't a real
   // resize -- skipped so it never triggers a spurious save.
   let skipNextResizeSave = true;
+  // Tracks the wrapper's own width across observations, so a
+  // programmatic height-only change (see heightMatchesStore below)
+  // can be told apart from a genuine drag on the native resize
+  // handle, which always changes width too (resize: both).
+  let lastWidthPx = wrapper.offsetWidth;
   let resizePointerUpListener: ((e: PointerEvent) => void) | undefined;
   // Fallback for resizePointerUpListener: sometimes the native resize
   // handle's pointerup never reaches window -- without a fallback,
@@ -47,8 +52,30 @@ export function wireResizing(params: {
   const resizeObserver = new ResizeObserver(() => {
     if (skipNextResizeSave) {
       skipNextResizeSave = false;
+      lastWidthPx = wrapper.offsetWidth;
       return;
     }
+
+    // The note store's own effect (mountNote.ts) also writes
+    // wrapper.style.height whenever previewHeightPx/editorHeightPx
+    // changes -- e.g. the auto-sizing content-height report from the
+    // iframe (see noteIframeProtocol.ts). That's a programmatic
+    // resize, not a user drag, and must not be treated as one: doing
+    // so would permanently disable auto-sizing (autoHeight: false)
+    // the moment a note first reports its natural content height.
+    // Distinguish it from a real drag on the native resize handle
+    // (which always changes width too, since resize:both) by
+    // checking whether the wrapper's current height still matches
+    // what the store expects and its width hasn't moved.
+    const widthChanged = wrapper.offsetWidth !== lastWidthPx;
+    lastWidthPx = wrapper.offsetWidth;
+    const expectedHeightPx =
+      TITLE_ROW_HEIGHT_PX +
+      (note.editing ? note.editorHeightPx : note.previewHeightPx);
+    const heightMatchesStore =
+      Math.abs(wrapper.offsetHeight - expectedHeightPx) < 1;
+    if (!widthChanged && heightMatchesStore) return;
+
     // Re-derive the content height from the wrapper's actual size, so
     // a manual drag-resize (which sets the wrapper's height directly,
     // bypassing the note store's effect in mountNote.ts) updates what
