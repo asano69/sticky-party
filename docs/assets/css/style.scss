@@ -1,0 +1,24 @@
+---
+---
+
+@import "{{ site.theme }}";
+
+// Widen the content column on wide screens only. The theme's own
+// style.css hardcodes .wrapper/header/section to fixed pixel widths
+// (860/270/500px) regardless of viewport size, so on wide screens the
+// content column stays narrow with large empty margins. This override
+// only applies above a wide-screen breakpoint, leaving the theme's
+// default (narrow) layout untouched on smaller/normal screens.
+@media screen and (min-width: 1400px) {
+  .wrapper {
+    width: 1200px;
+  }
+
+  header {
+    width: 270px;
+  }
+
+  section {
+    width: 900px;
+  }
+}
