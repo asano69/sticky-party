@@ -5,25 +5,14 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    env_file:
-      - sticky-party.env
     volumes:
-      - ./data:/sticky-party/data
+      - data:/sticky-party/data
         #- /etc/ssl/certs/root_ca.crt:/certs/root_ca.crt:ro # optional
     environment:
       - TZ=Etc/UTC
       #
       - STICKYPARTY_SERVER_HOST=0.0.0.0
       - STICKYPARTY_SERVER_PORT=3000
-      #networks:
-    #  - traefik_net
-    #labels:
-    #  - traefik.enable=true
-    #  - traefik.http.routers.sticky-party.rule=Host(`sticky-party.app.internal`)
-#volumes:
-#  data:
-
-#networks:
-#  traefik_net:
-#    external: true
-
+      - STICKYPARTY_DATA_DIR=/sticky-party/data
+volumes:
+  data:
