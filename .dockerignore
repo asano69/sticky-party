@@ -5,10 +5,11 @@
 !cmd/
 !internal/
 
-!package.json
-!pnpm-lock.yaml
-!pnpm-workspace.yaml
-
+!web/
+web/node_modules
+web/dist
+web/dist-ssr
+web/*.local
 
 !scripts/
 
