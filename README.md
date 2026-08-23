@@ -21,7 +21,32 @@
 - 管理機能：管理者ユーザは、SQLiteに保存された付箋データをWebUIから操作できます。(PocketBase)
 
 ## Getting Started
-1. https://addons.mozilla.org/ja/firefox/addon/sticky-party/
+
+1. 拡張機能のインストール
+**Firefox**
+- https://addons.mozilla.org/ja/firefox/addon/sticky-party/
+
+**Chrome**
+
+2. バックエンドサーバのセットアップ
+```sh
+git clone https://github.com/asano69/sticky-party.git
+cd sticky-party
+docker compose up -d
+```
+
+3. ユーザアカウントの作成
+```sh
+docker exec -it sticky-party sticky-party user-upsert user@mail.internal userpassword
+```
+
+4. 拡張機能の設定
+ブラウザを開き、Sticky Party拡張機能のポップアップを開き、接続情報の設定をする
+- 作成したユーザメール
+- パスワード
+- サーバURL
+
+5. 付箋を作成する
 
 ## How It Works
 - 専用のフロントエンドは実装していないのでPocketBase管理画面からユーザを作成する。
