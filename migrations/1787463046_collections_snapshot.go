@@ -1119,7 +1119,7 @@ func init() {
 						"id": "bool1901880158",
 						"name": "autoHeight",
 						"presentable": false,
-						"required": true,
+						"required": false,
 						"system": false,
 						"type": "bool"
 					},

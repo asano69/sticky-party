@@ -109,6 +109,14 @@ export async function mountNote(
     // docs/note-sizing.md. This, not the wrapper's current on-screen
     // size, is what gets persisted (converted to rem).
     previewHeightPx: initial.previewHeightPx,
+    // The content's natural (auto-computed) height in px, tracked
+    // unconditionally -- even while autoHeight is false -- so a manual
+    // resize (see noteResizing.ts) always has something to compare
+    // against. Updated from every NOTE_CONTENT_RESIZE_MESSAGE (see
+    // noteIframeProtocol.ts), capped the same way auto-sizing itself
+    // is. Seeded from the restored preview height as a best guess
+    // until the first real measurement arrives.
+    naturalHeightPx: initial.previewHeightPx,
     // Edit-mode content height in px, footer included. Not persisted
     // to the backend -- unlike previewHeightPx, it's always derived
     // live from the textarea's own size while editing, so there's
@@ -117,10 +125,13 @@ export async function mountNote(
     // measurement (see docs/note-sizing.md).
     editorHeightPx: 0,
     // Whether previewHeightPx should keep auto-following the
-    // content's natural size. Starts true for every note and flips to
-    // false permanently the first time the native resize handle is
-    // dragged (see noteResizing.ts) -- editorHeightPx is never gated
-    // by this, it always follows the textarea.
+    // content's natural size. Starts true for every note. A manual
+    // drag on the native resize handle (see noteResizing.ts) flips
+    // this to false only when it shrinks the note below its natural
+    // content height; a drag that would only add blank space below
+    // the content instead flips this back to true and snaps the note
+    // back to its natural size. editorHeightPx is never gated by
+    // this, it always follows the textarea.
     autoHeight: initial.autoHeight,
     editing: false,
     z: initial.z,

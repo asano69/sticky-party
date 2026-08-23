@@ -37,6 +37,7 @@ export function wireIframeProtocol(params: {
   note: { pinned: boolean; editing: boolean; autoHeight: boolean };
   setNote: (patch: {
     previewHeightPx?: number;
+    naturalHeightPx?: number;
     editorHeightPx?: number;
     editing?: boolean;
   }) => void;
@@ -104,12 +105,20 @@ export function wireIframeProtocol(params: {
         // (see useContentHeight.ts's footerRef) -- content.ts no
         // longer needs to guess it as TITLE_ROW_HEIGHT_PX.
         setNote({ editorHeightPx: e.data.height });
-      } else if (note.autoHeight) {
+      } else {
         // Auto-sizing is only ever capped, never floored -- a note
         // that's genuinely short is allowed to stay short.
-        setNote({
-          previewHeightPx: Math.min(e.data.height, MAX_AUTO_PREVIEW_HEIGHT_PX),
-        });
+        const natural = Math.min(e.data.height, MAX_AUTO_PREVIEW_HEIGHT_PX);
+        // naturalHeightPx is tracked unconditionally, even while
+        // autoHeight is false, so a later manual resize (see
+        // noteResizing.ts) always has something to compare against --
+        // without this, a note that was shrunk once would have no
+        // natural size left to snap back to if enlarged again.
+        if (note.autoHeight) {
+          setNote({ previewHeightPx: natural, naturalHeightPx: natural });
+        } else {
+          setNote({ naturalHeightPx: natural });
+        }
       }
       // The iframe has now measured and reported real content, so the
       // note is actually showing something -- remove the loading

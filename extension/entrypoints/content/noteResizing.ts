@@ -21,7 +21,11 @@ export interface NoteResizeState {
 
 export function wireResizing(params: {
   wrapper: HTMLElement;
-  note: { editing: boolean };
+  // naturalHeightPx is the content's current auto-computed height
+  // (see mountNote.ts), used below to decide whether a drag is a
+  // deliberate shrink or an enlargement that would just add blank
+  // space.
+  note: { editing: boolean; naturalHeightPx: number };
   // Returns the height (px) mountNote.ts's own style effect most
   // recently applied to wrapper.style.height. Comparing the wrapper's
   // actual offsetHeight against this snapshot -- instead of
@@ -92,16 +96,24 @@ export function wireResizing(params: {
     // gets persisted. Whichever height is currently on screen
     // (preview or editor -- see mountNote.ts's own effect) is the one
     // being dragged, so that's the one updated here.
-    //
-    // A manual resize permanently opts this note out of auto-sizing
-    // its preview height (see docs/note-sizing.md) -- editorHeightPx
-    // is never gated by autoHeight, so setting it here doesn't change
-    // that field's own behavior, only its stored value.
     const contentPx = Math.max(0, wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX);
     if (note.editing) {
+      // editorHeightPx has no "natural" size of its own to weigh a
+      // shrink/enlarge decision against (it always tracks the
+      // textarea), so resizing while editing always opts the note out
+      // of preview auto-sizing too, same as before.
       setNote({ editorHeightPx: contentPx, autoHeight: false });
-    } else {
+    } else if (contentPx < note.naturalHeightPx) {
+      // Dragged shorter than the content's natural height: a
+      // deliberate shrink, so respect it and stop auto-following the
+      // content's size.
       setNote({ previewHeightPx: contentPx, autoHeight: false });
+    } else {
+      // Dragged at or beyond the content's natural height: this would
+      // only leave blank space below the content, so reject the drag
+      // and snap the note back to its natural size instead of
+      // trusting the dragged value.
+      setNote({ previewHeightPx: note.naturalHeightPx, autoHeight: true });
     }
 
     // Ends the current resize gesture exactly once, however it was
