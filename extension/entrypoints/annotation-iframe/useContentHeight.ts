@@ -80,7 +80,7 @@ export function useContentHeight(params: {
         parseFloat(paddingTop) +
         parseFloat(paddingBottom) +
         (footerRef?.offsetHeight ?? 0);
-    } else {
+    } else if (bodyRef && contentRef) {
       // Same flex-1 trap as the editing branch above, just for view mode:
       // contentRef (<main>) is stretched to fill whatever height the note
       // wrapper currently has. Right when editing ends, the wrapper is
@@ -91,7 +91,23 @@ export function useContentHeight(params: {
       // height, permanently sticking the note at its editing size.
       // bodyRef has no such constraint and always reflects its real
       // content size regardless of the wrapper's current (stale) size.
-      height = bodyRef?.scrollHeight ?? contentRef?.scrollHeight ?? 0;
+      //
+      // bodyRef itself carries no padding of its own though -- the
+      // visual breathing room above/below it (main's own px-2.5 py-1.5)
+      // belongs to contentRef, not bodyRef, so it must be added back
+      // here, mirroring the editing branch's treatment of contentRef's
+      // padding around textareaRef above. Without this, the reported
+      // height came up short by main's own vertical padding, and the
+      // wrapper ended up sized just short of what the content actually
+      // needed -- clipping the bottom padding (and the last line along
+      // with it) out of view.
+      const { paddingTop, paddingBottom } = getComputedStyle(contentRef);
+      height =
+        bodyRef.scrollHeight +
+        parseFloat(paddingTop) +
+        parseFloat(paddingBottom);
+    } else {
+      height = contentRef?.scrollHeight ?? 0;
     }
     window.parent.postMessage(
       { type: NOTE_CONTENT_RESIZE_MESSAGE, height, editing },

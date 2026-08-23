@@ -229,8 +229,14 @@ if (editing() && textareaRef && contentRef) {
     parseFloat(paddingTop) +
     parseFloat(paddingBottom) +
     (footerRef?.offsetHeight ?? 0);
+} else if (bodyRef && contentRef) {
+  const { paddingTop, paddingBottom } = getComputedStyle(contentRef);
+  height =
+    bodyRef.scrollHeight +
+    parseFloat(paddingTop) +
+    parseFloat(paddingBottom);
 } else {
-  height = bodyRef?.scrollHeight ?? contentRef?.scrollHeight ?? 0;
+  height = contentRef?.scrollHeight ?? 0;
 }
 ```
 
@@ -243,8 +249,15 @@ if (editing() && textareaRef && contentRef) {
   content script側は以前のように `TITLE_ROW_HEIGHT_PX` でfooter分を
   推測する必要がなくなった。
 - **非編集中**: `bodyRef`（プレビュー時に`AnnotationBody`を包む素の
-  ブロックdiv）を読む。存在しない場合のみ `contentRef.scrollHeight` に
-  フォールバックする。
+  ブロックdiv）を読む。`bodyRef`自身は`contentRef`（`<main>`）の子要素
+  であり自前のpaddingを持たないため、`contentRef`の`py-1.5`分（上下
+  padding）を編集中の分岐と同じ要領で足し戻す。これを怠ると、報告される
+  高さが`main`のpadding分だけ過小になり、wrapperがその分短くサイズされて
+  本文の最後の行（特にpadding-bottom側）が`overflow-auto`によって視覚的
+  にクリップされる ―― `autoHeight`時に本文の下端がわずかに隠れて見える
+  不具合の原因だった（後述「既知の落とし穴」参照）。`bodyRef`が存在しない
+  稀なケースのみ`contentRef.scrollHeight`にフォールバックする（この場合
+  `scrollHeight`自体がpaddingを含むため、追加の足し戻しは不要）。
 
 ### 既知の落とし穴: `note.editing`ミラーの意味の二重化
 
@@ -336,6 +349,25 @@ if (editing() && textareaRef && contentRef) {
 送信されたメッセージを受け取った `noteIframeProtocol.ts` 側が `note.editing`
 だけを見て振り分ける ―― iframe側は自分がどちらのフィールドに書き込まれる
 かを一切意識しない。
+
+## 既知の落とし穴: `bodyRef` はcontentRefの余白を持たない
+
+`bodyRef`（プレビュー時に`AnnotationBody`を包む素のdiv）は`contentRef`
+（`<main>`）の内側に置かれた子要素であり、`main`自身の`px-2.5 py-1.5`は
+`bodyRef`自身のボックスには一切含まれない。`bodyRef.scrollHeight`だけを
+高さとして報告すると、`main`の上下paddingぶんが常に欠落し、報告値が実際
+に必要な高さより短くなる。`main`は`overflow-auto`なので、この過小な高さ
+でwrapperがサイズされると上端のpaddingは描画されるが下端が押し出され、
+本文の最後の行がわずかにクリップされて見える（`autoHeight`時のみ発生し、
+編集モードでは元々`contentRef`のpaddingを明示的に足し戻していたため症状
+が出ない、という非対称性がこのバグの発見を遅らせた）。
+
+教訓: 子要素の`scrollHeight`だけで親のレイアウト上必要な高さを代表させる
+場合、親自身が持つpadding/border（子要素には現れない、親のボックスにの
+み属するスペース）を見落としていないか確認すること。編集中の分岐
+（`textareaRef` + `contentRef`のpadding足し戻し）と非編集中の分岐
+（`bodyRef` + `contentRef`のpadding足し戻し）は、どちらも同じ理由で
+同じ足し戻しパターンを踏襲する必要がある。
 
 ## 既知の落とし穴: `ResizeObserver` の監視対象を `<main>` 自身にしない
 
