@@ -39,13 +39,13 @@ export default function NoteMain(props: {
   // clipboard has no image. See NoteContent.tsx's handlePasteImage.
   onPaste: (e: ClipboardEvent) => void;
   onStartEditBody: () => void;
-  setContentRef: (el: HTMLElement) => void;
   setTextareaRef: (el: HTMLTextAreaElement) => void;
-  // Ref for the view-mode content wrapper (see AnnotationBody's parent
-  // div below) -- a separate ResizeObserver target from setContentRef,
-  // since <main> itself doesn't resize with its content -- see
-  // useContentHeight.ts's setBodyRef comment.
-  setBodyRef: (el: HTMLElement) => void;
+  // Ref for the single persistent element that owns the note's visual
+  // padding and wraps whichever content (edit textarea or read-only
+  // body) is currently shown -- see useContentHeight.ts's
+  // measuredContentRef comment for why this replaces the old
+  // setContentRef/setBodyRef pair.
+  setMeasuredContentRef: (el: HTMLElement) => void;
   resizeTextarea: () => void;
   revealed: boolean;
   shaking: boolean;
@@ -65,7 +65,6 @@ export default function NoteMain(props: {
     // blurs an element's own rendered content (including children) as
     // a whole.
     <main
-      ref={props.setContentRef}
       onDblClick={(e) => {
         // Only view mode should enter editing here; while already
         // editing, calling onStartEditBody would reset the draft back
@@ -74,12 +73,26 @@ export default function NoteMain(props: {
         e.preventDefault();
         props.onStartEditBody();
       }}
-      class="relative flex-1 overflow-auto px-2.5 py-1.5"
+      class="relative flex-1 overflow-auto"
     >
-      {/* Fully hides the text (not just blurs it) when hidden, so no
-          content leaks through -- only the lock overlay below stays
-          visible. */}
-      <div classList={{ invisible: props.note.hide && !props.revealed }}>
+      {/* The measurement target for useContentHeight.ts's
+          reportContentHeight. This div stays mounted across the
+          editing/view <Show> below (only its children swap), and it
+          now owns the visual padding that used to live on <main>
+          itself. <main> is flex-1/overflow-auto and gets stretched to
+          fill whatever height the wrapper currently has, so its own
+          box can never be trusted as a content measurement -- this
+          div has no such constraint, so the ordinary CSS box model
+          (content + this element's own padding) gives an accurate
+          .offsetHeight in both modes, with no per-mode padding
+          arithmetic needed on the JS side. Also fully hides the text
+          (not just blurs it) when hidden, so no content leaks through
+          -- only the lock overlay below stays visible. */}
+      <div
+        ref={props.setMeasuredContentRef}
+        class="px-2.5 py-1.5"
+        classList={{ invisible: props.note.hide && !props.revealed }}
+      >
         <Show
           when={!props.editing}
           fallback={
@@ -119,13 +132,11 @@ export default function NoteMain(props: {
               when content (e.g. a shorter image) got smaller -- see
               docs/note-sizing.md and useContentHeight.ts's comment on
               the same problem for editing mode. */}
-          <div ref={props.setBodyRef}>
-            <AnnotationBody
-              body={props.note.body}
-              annotationId={props.note.id}
-              onToggleTask={props.onToggleTask}
-            />
-          </div>
+          <AnnotationBody
+            body={props.note.body}
+            annotationId={props.note.id}
+            onToggleTask={props.onToggleTask}
+          />
         </Show>
       </div>
 

@@ -423,9 +423,8 @@ export default function NoteContent() {
             onKeyDown={onEditorKeyDown}
             onPaste={handlePasteImage}
             onStartEditBody={() => startEdit("body")}
-            setContentRef={contentHeight.setContentRef}
+            setMeasuredContentRef={contentHeight.setMeasuredContentRef}
             setTextareaRef={contentHeight.setTextareaRef}
-            setBodyRef={contentHeight.setBodyRef}
             resizeTextarea={contentHeight.resizeTextarea}
             revealed={revealed()}
             shaking={shaking()}
