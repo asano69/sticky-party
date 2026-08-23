@@ -12,6 +12,7 @@ import {
   NOTE_FOCUS_MESSAGE,
   NOTE_PIN_MESSAGE,
   NOTE_READY_MESSAGE,
+  REQUEST_DISMISS_MESSAGE,
   START_EDIT_TITLE_MESSAGE,
   TOGGLE_PIN_MESSAGE,
   type NoteEditingMessage,
@@ -94,5 +95,11 @@ export function useParentMessaging(params: {
   const sendTogglePin = () =>
     window.parent.postMessage({ type: TOGGLE_PIN_MESSAGE }, "*");
 
-  return { sendFocus, sendDeleted, sendTogglePin };
+  // Requests that content.ts dismiss (fade out and unmount) this note
+  // (see NoteHeader.tsx). Only content.ts can perform the actual
+  // removal, since it owns the wrapper element.
+  const sendDismiss = () =>
+    window.parent.postMessage({ type: REQUEST_DISMISS_MESSAGE }, "*");
+
+  return { sendFocus, sendDeleted, sendTogglePin, sendDismiss };
 }

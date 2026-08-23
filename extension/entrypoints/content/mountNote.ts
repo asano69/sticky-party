@@ -230,7 +230,6 @@ export async function mountNote(
         wrapper,
         iframe,
         initialWidthPx: initial.widthPx,
-        onDismiss: () => playRemoveFaded(),
       });
       cleanupChrome = chrome.cleanup;
 
@@ -275,6 +274,7 @@ export async function mountNote(
         bringToFront,
         togglePin,
         onDeleted: () => playRemoveShredded(),
+        onDismissRequested: () => playRemoveFaded(),
       });
       cleanupIframeProtocol = iframeProtocol.cleanup;
     },

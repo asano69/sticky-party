@@ -1,12 +1,27 @@
 // Renders a note's title row: read-only text, or an editable input
-// while editing. Sits directly under the content script's transparent
-// drag header (see content.ts), which is exactly TITLE_ROW_HEIGHT_PX
-// tall and overlays the Dismiss button -- that's why the title text
-// stops short of the row's right edge (padding-right below).
+// while editing, plus a Dismiss (X) button that's always reachable
+// regardless of mode. Sits directly under the content script's
+// transparent drag header (see content.ts's noteChrome.ts), which is
+// exactly TITLE_ROW_HEIGHT_PX tall but stops short of this row's right
+// edge (see DISMISS_BUTTON_AREA_PX) so clicks on the Dismiss button
+// below reach this iframe instead of being swallowed by that overlay.
+//
+// The Dismiss button lives here, inside the iframe, rather than as a
+// plain DOM element drawn by content.ts directly on the host page.
+// Content.ts's DOM is not isolated from the host page's own CSS, which
+// could override the button's icon color and break its dark/light
+// mode theming -- this iframe is a genuinely separate, same-extension-
+// origin document (see content.ts's header comment), so it isn't
+// affected by anything the host page's stylesheet does. Only content.ts
+// can actually remove the note's wrapper element though, so clicking
+// this button only sends a request message (see useParentMessaging.ts's
+// sendDismiss and noteIframeProtocol.ts's onDismissRequested).
 
 import { Show } from "solid-js";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
+import X from "lucide-solid/icons/x";
+import { Button } from "@kobalte/core/button";
 import { TextField } from "@kobalte/core/text-field";
 import { ToggleButton } from "@kobalte/core/toggle-button";
 import { TITLE_ROW_HEIGHT_PX } from "../../lib/iframe-messages";
@@ -32,6 +47,12 @@ export default function NoteHeader(props: {
   //   unreachable; this is just an at-a-glance indicator.
   pinned: boolean;
   onTogglePin: () => void;
+  // Requests that content.ts dismiss (fade out and unmount) this note.
+  // Reachable in both modes: content.ts's drag-header overlay leaves a
+  // gap over this button's area regardless of editing state (see
+  // noteChrome.ts), unlike the pin toggle above, which is only
+  // reachable while editing.
+  onDismiss: () => void;
 }) {
   return (
     <header
@@ -41,11 +62,7 @@ export default function NoteHeader(props: {
       // that could drift from content.ts's drag-header overlay,
       // which this row has to line up with pixel-for-pixel.
       style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
-      // pr-10 reserves space for content.ts's Dismiss button, drawn on
-      // top of this row from the host page's document (see content.ts).
-      // Pin no longer lives there -- it's a footer button now (see
-      // NoteFooter.tsx) -- so no left padding needs to be reserved.
-      class="flex shrink-0 items-center box-border pl-2 pr-10 font-bold border-b border-[color:var(--note-border)]"
+      class="flex shrink-0 items-center box-border pl-2 pr-1 font-bold border-b border-[color:var(--note-border)]"
     >
       <Show
         when={!props.editing}
@@ -88,7 +105,7 @@ export default function NoteHeader(props: {
           </>
         }
       >
-        <div class="flex w-full min-w-0 items-center gap-1">
+        <div class="flex min-w-0 flex-1 items-center gap-1">
           {/* View mode only shows this when actually pinned -- see the
               pinned prop comment above for why it's a plain icon here,
               not a button. shrink-0 plus the title's min-w-0/flex-1
@@ -102,6 +119,19 @@ export default function NoteHeader(props: {
           </div>
         </div>
       </Show>
+      {/* Sits outside the Show above so it's always present regardless
+          of mode -- unlike the pin toggle, Dismiss has no separate
+          view-mode fallback since there's nothing to indicate at a
+          glance. onMouseDown preventDefault mirrors the pin toggle
+          above, for the same reason. */}
+      <Button
+        class="sticky-party-icon-btn flex shrink-0 items-center justify-center border-none bg-transparent cursor-pointer p-1 rounded"
+        onMouseDown={(e: MouseEvent) => e.preventDefault()}
+        onClick={props.onDismiss}
+        aria-label="Dismiss"
+      >
+        <X size={16} />
+      </Button>
     </header>
   );
 }

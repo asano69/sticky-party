@@ -412,6 +412,7 @@ export default function NoteContent() {
             titleInputRef={(el) => (titleInputRef = el)}
             pinned={pinned()}
             onTogglePin={parentMessaging.sendTogglePin}
+            onDismiss={parentMessaging.sendDismiss}
           />
 
           <NoteMain

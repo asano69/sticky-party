@@ -12,6 +12,7 @@ import {
   NOTE_FOCUS_MESSAGE,
   NOTE_PIN_MESSAGE,
   NOTE_READY_MESSAGE,
+  REQUEST_DISMISS_MESSAGE,
   TOGGLE_PIN_MESSAGE,
   type NotePinMessage,
 } from "../../lib/iframe-messages";
@@ -43,6 +44,10 @@ export function wireIframeProtocol(params: {
   bringToFront: () => void;
   togglePin: () => void;
   onDeleted: () => void;
+  // Requested by the header's Dismiss button (see NoteHeader.tsx).
+  // Only content.ts can perform the actual removal, since it owns the
+  // wrapper element.
+  onDismissRequested: () => void;
 }): NoteIframeProtocolState {
   const {
     iframe,
@@ -55,6 +60,7 @@ export function wireIframeProtocol(params: {
     bringToFront,
     togglePin,
     onDeleted,
+    onDismissRequested,
   } = params;
 
   const onMessage = (e: MessageEvent) => {
@@ -125,6 +131,10 @@ export function wireIframeProtocol(params: {
       // perform the actual toggle, since it needs the page's current
       // scroll offset to convert between fixed/absolute positioning.
       togglePin();
+    } else if (e.data?.type === REQUEST_DISMISS_MESSAGE) {
+      // Requested by the header's Dismiss button (see NoteHeader.tsx /
+      // useParentMessaging.ts's sendDismiss).
+      onDismissRequested();
     }
   };
   window.addEventListener("message", onMessage);

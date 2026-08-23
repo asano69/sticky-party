@@ -112,6 +112,14 @@ export interface NoteEditingMessage {
 // pixel-for-pixel.
 export const TITLE_ROW_HEIGHT_PX = 32;
 
+// Width (px) reserved at the header row's right edge for the Dismiss
+// button, which renders inside the iframe (NoteHeader.tsx) rather than
+// as a plain DOM element drawn by content.ts. Content.ts's drag-header
+// overlay (noteChrome.ts) must stop this far short of the row's right
+// edge, or it would sit on top of the iframe and swallow every click
+// meant for the button underneath.
+export const DISMISS_BUTTON_AREA_PX = 40;
+
 // iframe -> content script, sent when the footer's pin toggle button is
 // clicked. Only content.ts can perform the actual toggle: it needs the
 // page's current scroll offset to convert between fixed/absolute
@@ -123,6 +131,17 @@ export interface TogglePinMessage {
   type: typeof TOGGLE_PIN_MESSAGE;
 }
 
+// iframe -> content script, sent when the header's Dismiss button is
+// clicked. The button now renders inside the iframe (NoteHeader.tsx)
+// instead of as a plain DOM element on the host page, so it isn't
+// exposed to that page's own CSS -- see noteChrome.ts. Only content.ts
+// can perform the actual removal though, since it owns the wrapper
+// element, so this just requests it.
+export const REQUEST_DISMISS_MESSAGE = "sticky-party:request-dismiss";
+export interface RequestDismissMessage {
+  type: typeof REQUEST_DISMISS_MESSAGE;
+}
+
 export type ParentToNoteMessage =
   InitNoteMessage | StartEditTitleMessage | NotePinMessage;
 export type NoteToParentMessage =
@@ -131,4 +150,5 @@ export type NoteToParentMessage =
   | NoteDeletedMessage
   | NoteContentResizeMessage
   | NoteEditingMessage
-  | TogglePinMessage;
+  | TogglePinMessage
+  | RequestDismissMessage;
