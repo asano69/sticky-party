@@ -16,6 +16,13 @@ export function useContentHeight(params: {
   // HTMLElement, not HTMLDivElement: this is attached to NoteMain.tsx's
   // <main>, which is an HTMLElement, not an HTMLDivElement.
   let contentRef: HTMLElement | undefined;
+  // The plain, non-flex-1 div wrapping AnnotationBody in view mode (see
+  // NoteMain.tsx's setBodyRef). Unlike contentRef (<main> itself, a
+  // flex-1 overflow-auto box), this div's own box actually shrinks/grows
+  // with its content, so reportContentHeight must read this one in view
+  // mode -- see that function's comment for why contentRef itself is
+  // wrong there too, not just in the editing branch.
+  let bodyRef: HTMLElement | undefined;
 
   // Grows the textarea to fit its content, with a 4-line floor (see
   // rows={4} in NoteContent.tsx) so a short note still gets a
@@ -63,7 +70,17 @@ export function useContentHeight(params: {
         parseFloat(paddingTop) +
         parseFloat(paddingBottom);
     } else {
-      height = contentRef?.scrollHeight ?? 0;
+      // Same flex-1 trap as the editing branch above, just for view mode:
+      // contentRef (<main>) is stretched to fill whatever height the note
+      // wrapper currently has. Right when editing ends, the wrapper is
+      // still sized for the editor (+footer) -- it only shrinks once
+      // content.ts applies the height this very report carries -- so
+      // contentRef.scrollHeight would report that stale, still-tall box
+      // size instead of the view content's actual (smaller) natural
+      // height, permanently sticking the note at its editing size.
+      // bodyRef has no such constraint and always reflects its real
+      // content size regardless of the wrapper's current (stale) size.
+      height = bodyRef?.scrollHeight ?? contentRef?.scrollHeight ?? 0;
     }
     window.parent.postMessage(
       { type: NOTE_CONTENT_RESIZE_MESSAGE, height, editing },
@@ -112,6 +129,7 @@ export function useContentHeight(params: {
   // contentResizeObserver instance is fine since ResizeObserver can
   // watch multiple elements at once.
   const setBodyRef = (el: HTMLElement) => {
+    bodyRef = el;
     contentResizeObserver.observe(el);
   };
 
