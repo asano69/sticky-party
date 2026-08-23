@@ -154,12 +154,27 @@ export default function NoteContent() {
     });
   };
 
-  // Content height is intentionally NOT re-measured on exiting edit
-  // mode: while editing, reportContentHeight (see useContentHeight.ts)
-  // already keeps the note's size following the textarea (with its
-  // 4-line floor), and that's the size we want to keep once saved --
-  // re-measuring from the read-mode display here would shrink the note
-  // back down below that floor.
+  // Leaves edit mode and re-measures the note's content height once the
+  // view-mode DOM has settled, instead of relying solely on the
+  // ResizeObserver attached to the freshly-mounted body div (see
+  // NoteMain.tsx's setBodyRef / useContentHeight.ts). That observer's
+  // callback is delivered asynchronously and can lag noticeably --
+  // especially right when this iframe loses focus, which is exactly
+  // when saveEdit runs via onBlurWhileEditing below. Without an
+  // explicit re-measurement, content.ts can end up applying the
+  // still-editing-sized (footer-included) height to the wrapper and,
+  // worse, mistake that still-tall wrapper for a manual resize on its
+  // own next observation, permanently turning off auto-sizing (see
+  // entrypoints/content/noteResizing.ts) -- leaving a footer-sized gap
+  // stuck at the bottom of the note even after it's back in view mode.
+  // queueMicrotask defers this until after Solid has swapped the
+  // textarea back out for the read-only view, so it reads the correct,
+  // already-rendered height directly rather than a stale one.
+  const exitEditing = () => {
+    setEditing(false);
+    queueMicrotask(contentHeight.reportContentHeight);
+  };
+
   const parentMessaging = useParentMessaging({
     onInit: (annotation) => {
       setState("annotation", annotation);
@@ -200,7 +215,7 @@ export default function NoteContent() {
   });
 
   const cancelEdit = () => {
-    setEditing(false);
+    exitEditing();
     setConfirmDelete(false);
   };
 
@@ -228,7 +243,7 @@ export default function NoteContent() {
         body: draft(),
       });
       setState("annotation", { title: draftTitle(), body: draft() });
-      setEditing(false);
+      exitEditing();
     } catch (err) {
       log.error("failed to save annotation", { err });
     } finally {
