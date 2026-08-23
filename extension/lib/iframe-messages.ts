@@ -84,10 +84,18 @@ export interface StartEditTitleMessage {
   type: typeof START_EDIT_TITLE_MESSAGE;
 }
 
-// iframe -> content script, sent whenever edit mode toggles, so the
-// content script's drag header can stop intercepting pointer events
-// while editing -- letting clicks reach the title input inside the
-// iframe -- and resume intercepting once editing ends.
+// iframe -> content script, sent whenever edit mode toggles. Drives two
+// things on the content script side, both non-authoritative for sizing:
+// (1) the drag header stops intercepting pointer events while editing,
+// letting clicks reach the title input inside the iframe, and resumes
+// once editing ends; (2) a manual resize (noteResizing.ts) uses this
+// flag to decide which height field (editorHeightPx/previewHeightPx) to
+// write into. It is NOT used to detect whether a resize happened at all
+// -- that comparison is against the wrapper's own last-applied height
+// snapshot instead (see mountNote.ts/noteResizing.ts's
+// getExpectedHeightPx), so this message arriving asynchronously
+// relative to NOTE_CONTENT_RESIZE_MESSAGE can never cause a false
+// resize detection.
 export const NOTE_EDITING_MESSAGE = "sticky-party:note-editing";
 export interface NoteEditingMessage {
   type: typeof NOTE_EDITING_MESSAGE;

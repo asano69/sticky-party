@@ -163,14 +163,17 @@ if (note.editing) {
 
 ```ts
 if (note.editing) {
-  setNote({ editorHeightPx: e.data.height + TITLE_ROW_HEIGHT_PX });
+  setNote({ editorHeightPx: e.data.height });
 }
 ```
 
 `autoHeight` フラグに一切ゲートされていない ―― 手動リサイズ済みの付箋
 でも、編集を始めればtextareaの実サイズにそのまま追従する。`e.data.height`
-はiframe側が計測した「main（footerを含まない）」の高さなので、footer分
-として `TITLE_ROW_HEIGHT_PX` を足したものが `editorHeightPx` になる。
+にはiframe側（`useContentHeight.ts`）がfooter自身の実測 `offsetHeight`
+をすでに足し込んだ「main + footer」の合計値が入っているため、content
+script側で `TITLE_ROW_HEIGHT_PX` を使ってfooter分を推測する必要はない。
+footerはiframe自身のDOM要素なので、実測できるものを推測に頼っていたのが
+以前の設計の弱点だった。
 
 #### 2. ユーザーによる手動リサイズ（編集モード中、`noteResizing.ts`）
 
@@ -216,15 +219,18 @@ inputに届くようにするため（ヘッダーのドラッグオーバーレ
 
 ## iframe側の計測（`useContentHeight.ts`）
 
-`reportContentHeight()` は、編集中/非編集中で計算方法が違う（旧設計から
-変更なし）:
+`reportContentHeight()` は、編集中/非編集中で計算方法が違う:
 
 ```ts
 if (editing() && textareaRef && contentRef) {
   const { paddingTop, paddingBottom } = getComputedStyle(contentRef);
-  height = textareaRef.offsetHeight + parseFloat(paddingTop) + parseFloat(paddingBottom);
+  height =
+    textareaRef.offsetHeight +
+    parseFloat(paddingTop) +
+    parseFloat(paddingBottom) +
+    (footerRef?.offsetHeight ?? 0);
 } else {
-  height = contentRef?.scrollHeight ?? 0;
+  height = bodyRef?.scrollHeight ?? contentRef?.scrollHeight ?? 0;
 }
 ```
 
@@ -232,8 +238,13 @@ if (editing() && textareaRef && contentRef) {
   されてしまうため、`contentRef.scrollHeight` を見ても縮んだことを検知
   できない。代わりに `textareaRef.offsetHeight`（`resizeTextarea()` が毎
   キー入力で正確に追従させている）を直接読み、`contentRef` の上下パディ
-  ング分を足し戻す。
-- **非編集中**: シンプルに `contentRef.scrollHeight` を読む。
+  ング分を足し戻す。footer（`NoteFooter.tsx`、編集中のみマウントされる
+  iframe自身のDOM要素）の実測 `offsetHeight` もここで足し込むため、
+  content script側は以前のように `TITLE_ROW_HEIGHT_PX` でfooter分を
+  推測する必要がなくなった。
+- **非編集中**: `bodyRef`（プレビュー時に`AnnotationBody`を包む素の
+  ブロックdiv）を読む。存在しない場合のみ `contentRef.scrollHeight` に
+  フォールバックする。
 
 ### 既知の落とし穴: `note.editing`ミラーの意味の二重化
 
@@ -260,6 +271,49 @@ if (editing() && textareaRef && contentRef) {
 （`entrypoints/content/noteIframeProtocol.ts`）。教訓: **cross-document
 のメッセージが運ぶ値の意味は、受信側の使い回しの状態ではなく、常に
 メッセージ自身に自己記述させる**こと。
+
+### 追加の既知の落とし穴（解消済み）: footer高さの推測とリサイズ誤検知
+
+上記の対策だけでは、実際に報告されていた別の不具合を防ぎきれていなかった。
+症状は「編集中にすばやくフォーカスを外す（`saveEdit`のネットワーク待ちを
+挟む）と、閲覧モードに戻ってもfooter分の高さがプレビューに残り続ける」と
+いうもの。原因は2つ重なっていた。
+
+1. **footer高さの推測**: `entrypoints/content/noteIframeProtocol.ts`は
+   footerの実高さを持たず、`editorHeightPx = e.data.height + TITLE_ROW_HEIGHT_PX`
+   という**推測**で埋め合わせていた。footerはiframe自身のDOM要素
+   （`NoteFooter.tsx`）なので、本来は推測ではなく実測できる値だった。
+2. **手動リサイズ検知の再計算方式**: `entrypoints/content/noteResizing.ts`は
+   「今このwrapperに期待される高さ」を、その都度
+   `TITLE_ROW_HEIGHT_PX + (note.editing ? note.editorHeightPx : note.previewHeightPx)`
+   として**ストアから再計算**していた。`NOTE_EDITING_MESSAGE`と
+   `NOTE_CONTENT_RESIZE_MESSAGE`は独立した非同期postMessageなので、編集
+   終了の瞬間に両者の到着順序がずれると、この再計算値が実際のwrapperの
+   見た目の高さと一瞬食い違う窓ができる。`ResizeObserver`はこの食い違い
+   を「ユーザーによる手動リサイズ」と誤検知し、`autoHeight: false` を
+   永久に立ててしまっていた。以後そのノートのプレビュー高さは二度と自動
+   計算に追従しなくなり、footer分の余白が残り続けて見える。
+
+対策（それぞれ独立して効く）:
+
+1. footerの実高さをiframe側で実測し（`useContentHeight.ts`の`footerRef`）、
+   `NOTE_CONTENT_RESIZE_MESSAGE`の`height`にすでに含めて送るようにした。
+   `TITLE_ROW_HEIGHT_PX`による推測は撤去した
+   （`entrypoints/content/noteIframeProtocol.ts`）。
+2. `noteResizing.ts`の比較対象を「ストアからの再計算値」から「wrapperの
+   style effect（`mountNote.ts`）が直前に実際に書き込んだ高さのスナップ
+   ショット」に変更した（`getExpectedHeightPx`）。この値は書き込まれた
+   その瞬間に必ず実際のwrapperの高さと一致するため、`note.editing`や
+   `editorHeightPx`/`previewHeightPx`が一時的にずれていても、それだけで
+   手動リサイズと誤検知されることがなくなった。
+
+この変更により、`note.editing`（`NOTE_EDITING_MESSAGE`で更新されるミラー）
+の役割は「ヘッダーのpointer-events切り替え」と「手動リサイズ時にどちら
+のフィールドへ書き込むかの選択」の2つだけになり、**リサイズが発生したか
+どうかの判定には一切関与しない**。この境界を今後も守ること ――
+「リサイズを検知したい」ときは常に`getExpectedHeightPx`（wrapperへの
+最終適用値）とだけ比較し、`note`ストアの他のフィールドから高さを
+再計算しないこと。
 
 これが呼ばれるのは:
 
@@ -459,7 +513,9 @@ setNote({
     ① マウント時: 常に0からスタート（DBには永続化しない。初回編集開始時
                   の実測で上書きされる）
     ② NOTE_CONTENT_RESIZE_MESSAGE（編集時は常に、autoHeightと無関係）:
-         editorHeightPx = 実測値(main) + TITLE_ROW_HEIGHT_PX(footer分)
+         editorHeightPx = 実測値(main + footerの実測offsetHeight、
+                           iframe側ですでに合算済み。TITLE_ROW_HEIGHT_PX
+                           による推測はしない)
     ③ ResizeObserver（編集中のドラッグリサイズ）:
          editorHeightPx = wrapper実測値 - TITLE_ROW_HEIGHT_PX
 
@@ -476,7 +532,8 @@ setNote({
 [iframe (NoteContent.tsx / useContentHeight.ts, 拡張機能オリジン)]
   reportContentHeight():
     編集中    -> textareaRef.offsetHeight + contentRef の上下padding
-    非編集中  -> contentRef.scrollHeight
+                + footerRef.offsetHeight（編集モードでのみマウント）
+    非編集中  -> bodyRef.scrollHeight（無ければ contentRef.scrollHeight）
   → postMessage(NOTE_CONTENT_RESIZE_MESSAGE) で wrapper 側へ通知
 
   呼び出しタイミング:
@@ -487,6 +544,24 @@ setNote({
        HTML到着など、テキスト入力を伴わない高さ変化を拾うための経路）
 ```
 
+## 手動確認手順（自動テスト基盤が無いため）
+
+`extension/package.json` にはテストスクリプトが無く、DOM/iframe間の
+postMessageを跨ぐ挙動は自動テストで再現しづらいため、この種の変更を
+加えたときは以下を手動で確認する。
+
+1. 付箋を1つ開き、編集モードにして本文を数行入力する。
+2. 入力中（`saveEdit` が完了する前）に、素早く付箋の外（Webページ本体）
+   をクリックしてフォーカスを外す。
+3. 閲覧モードに戻った直後の付箋の高さに、footer分（1行）の余白が
+   残っていないことを確認する。
+4. 同じ付箋をネイティブの `resize: both` ハンドルで手動リサイズし、
+   `autoHeight` が意図通り `false` になる（＝以後、本文編集や画像ロード
+   で高さが勝手に変わらない）ことを確認する。
+5. リサイズしていない別の付箋に画像を貼り付けたり長いコードブロックを
+   貼ったりして、`previewHeightPx` が自動で追従することを確認する
+   （`autoHeight` が `true` のまま変わらない）。
+
 主な変更点だけ要約すると:
 - 旧`contentHeightPx`＋`editingFloorPx`/`restoredFloorPx`の優先順位チェーンを廃止し、`previewHeightPx`/`editorHeightPx`の完全独立フィールドに分割したことを明記
 - DB新フィールド`autoHeight`のスキーマ的な意味と初期値ルールを追加
@@ -496,3 +571,5 @@ setNote({
 - リアルタイム同期に`autoHeight`は乗るが、編集中の高さは他の閲覧者に配る価値がないため乗らない、という非対称性を明記
 - `editorHeight`をDBから廃止: textareaの実測値でほぼ即座に上書きされる値であり、復元してもメリットが薄いため`editorHeightPx`は常に0スタートのインメモリ値に変更した
 - `ResizeObserver`の監視対象は`<main>`自身ではなく、コンテンツに応じて伸縮する内側のdiv（`setBodyRef`）にする必要があるという既知の落とし穴を追記
+- footerの高さを`TITLE_ROW_HEIGHT_PX`で推測するのをやめ、iframe側（`useContentHeight.ts`の`footerRef`）で実測して`NOTE_CONTENT_RESIZE_MESSAGE`にすでに合算して送るように変更した
+- `noteResizing.ts`の手動リサイズ検知を、`note`ストアからの再計算値との比較から、wrapperのstyle effectが直前に実際に適用した高さのスナップショット（`getExpectedHeightPx`）との比較に変更し、`NOTE_EDITING_MESSAGE`と`NOTE_CONTENT_RESIZE_MESSAGE`の到着順序に起因する誤検知（footer高さがプレビューに残り続けるバグ）を解消した

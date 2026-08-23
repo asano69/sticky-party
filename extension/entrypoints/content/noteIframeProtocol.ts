@@ -110,6 +110,11 @@ export function wireIframeProtocol(params: {
       // spinner.
       removeLoadingOverlay();
     } else if (e.data?.type === NOTE_EDITING_MESSAGE) {
+      // Feeds two independent, non-sizing-authoritative uses: this
+      // block's pointer-events toggle below, and noteResizing.ts's
+      // choice of which height field a manual resize should write
+      // into. Resize *detection* itself never depends on this flag --
+      // see noteResizing.ts's getExpectedHeightPx.
       setNote({ editing: e.data.editing });
       // Stop the header from intercepting pointer events while
       // editing, so clicks reach the title input inside the iframe.
