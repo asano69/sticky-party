@@ -127,17 +127,31 @@ previewHeightPx: saved.height
 const contentPx = Math.max(0, wrapper.offsetHeight - TITLE_ROW_HEIGHT_PX);
 if (note.editing) {
   setNote({ editorHeightPx: contentPx, autoHeight: false });
-} else {
+} else if (contentPx < note.naturalHeightPx) {
   setNote({ previewHeightPx: contentPx, autoHeight: false });
+} else {
+  setNote({ previewHeightPx: note.naturalHeightPx, autoHeight: true });
 }
 ```
 
-**重要:** 編集モード中にリサイズされた場合でも `autoHeight` は `false` に
-される。つまり「編集モード中のリサイズ」は `editorHeightPx` を直接更新し
-つつ、副作用として**将来のプレビューモードの自動計算も無効化する**。これ
-は「一度でも手動でサイズをいじった」という意思表示を、モードを問わず尊重
-するための単純化であり、`previewHeightPx` と `editorHeightPx` を別々に
-「自動/手動」で管理する複雑さを避けている。
+**重要:** 非編集モードでの手動リサイズは、ドラッグ後の高さを
+`note.naturalHeightPx`（後述「自然な高さ」）と比較して分岐する。
+
+- **自然な高さより短く**縮めた場合のみ `autoHeight` を `false` にして手動
+  値を尊重する。「余白を減らすために意図的に縮めた」という操作なので、以
+  後は自動計算に上書きされないようにする。
+- **自然な高さ以上に**広げようとした場合、そのままでは本文の下に空白がで
+  きるだけなので、この操作は実質的に無視され、`autoHeight` は `true` にな
+  り、`previewHeightPx` は `note.naturalHeightPx` にスナップバックする。
+  ドラッグ中は `ResizeObserver` が発火するたびにこの判定が走るため、体感
+  としては「自然な高さのところで壁に当たって、それ以上は広げられない」と
+  いう挙動になる。
+
+一方、**編集モード中にリサイズされた場合は常に `autoHeight` が `false` に
+される**。`editorHeightPx` には比較対象となる「自然な高さ」がそもそも存在
+せず（常にtextareaの実測に追従するだけ）、この分岐だけは旧設計のまま「一
+度でも手動でサイズをいじったら、以後プレビューの自動計算も無効化する」と
+いう単純なルールを踏襲している。
 
 ## `editorHeightPx`（編集時の高さ）
 
@@ -187,10 +201,17 @@ footerはiframe自身のDOM要素なので、実測できるものを推測に�
 
 - デフォルトは `true`（新規付箋、あるいはこのフィールドが存在しなかった
   頃に保存された付箋 ―― `saved.autoHeight ?? true`）。
-- ネイティブの `resize: both` ハンドルでドラッグされた**瞬間に**、編集
-  中/閲覧中を問わず永久に `false` になる。
-- 一度 `false` になったら二度と `true` には戻らない。「自動調整に戻す」
-  ようなUIは現時点では用意していない。
+- 編集モード中に `resize: both` ハンドルでドラッグされた場合は、モードを
+  問わず永久に `false` になる（`editorHeightPx` に比較対象となる「自然な
+  高さ」が無いため ―― 前節参照）。
+- **非編集モード中**にドラッグされた場合は、自然な高さ（`note.naturalHeightPx`）
+  との比較で決まる:
+  - 自然な高さより短く縮めた場合のみ `false` になる。
+  - 自然な高さ以上に広げようとした場合は `true` のまま（あるいは `true`
+    に戻り）、`previewHeightPx` は自然な高さへスナップバックする。
+- 一度 `false` になったあとでも、非編集モードで自然な高さ以上に広げれば
+  `true` に戻り得る ―― 「自動調整に戻す」専用のUIボタンは無いが、リサイ
+  ズ操作自体がその役割を兼ねる。
 - `previewHeightPx` の自動計算（実測レポートの反映、`500px`キャップ）だけ
   を制御し、`editorHeightPx` には一切影響しない。
 - リアルタイム同期（`positions` コレクションのsubscribe）で他の閲覧者にも
@@ -534,13 +555,16 @@ setNote({
   （呼び出し側は setNote(...) を呼ぶだけでよい）
 
   note.previewHeightPx の更新源:
-    ① マウント時: saved.height から復元（初期値のみ）
-    ② NOTE_CONTENT_RESIZE_MESSAGE（非編集時 かつ autoHeight===true のときのみ）:
-         previewHeightPx = min(実測値, 500px)
-    ③ ResizeObserver（ユーザーのドラッグリサイズ）:
-         previewHeightPx = wrapper実測値 - TITLE_ROW_HEIGHT_PX
-         同時に autoHeight を永久に false にする（編集中のリサイズでも）
-
+    ① マウント時: saved.height から復元(初期値のみ)
+    ② NOTE_CONTENT_RESIZE_MESSAGE(非編集時 かつ autoHeight===true のときのみ):
+         previewHeightPx = naturalHeightPx = min(実測値, 500px)
+    ③ ResizeObserver(非編集時のユーザーのドラッグリサイズ):
+         自然な高さ(naturalHeightPx)より短く縮めた場合のみ:
+           previewHeightPx = wrapper実測値 - TITLE_ROW_HEIGHT_PX、autoHeight = false
+         自然な高さ以上に広げようとした場合:
+           previewHeightPx = naturalHeightPx にスナップバック、autoHeight = true
+    ④ ResizeObserver(編集中のドラッグリサイズ、autoHeightとは別経路):
+         editorHeightPx = wrapper実測値 - TITLE_ROW_HEIGHT_PX、autoHeight は常に false
   note.editorHeightPx の更新源:
     ① マウント時: 常に0からスタート（DBには永続化しない。初回編集開始時
                   の実測で上書きされる）
@@ -552,9 +576,17 @@ setNote({
          editorHeightPx = wrapper実測値 - TITLE_ROW_HEIGHT_PX
 
   note.autoHeight:
-    デフォルト true。手動リサイズ（②のResizeObserver、編集/閲覧どちらの
-    モードでも）で永久に false に固定される。previewHeightPx の自動計算
-    のみを制御し、editorHeightPx には無関係。
+    デフォルト true。編集中のドラッグリサイズでは常に false になる(戻ら
+    ない)。非編集中のドラッグリサイズでは naturalHeightPx との比較で
+    true/false が決まり、自然な高さ以上に広げようとする操作は false から
+    true への復帰にもなり得る。previewHeightPx の自動計算のみを制御し、
+    editorHeightPx には無関係。
+
+  note.naturalHeightPx:
+    コンテンツの「自然な(自動計算された)高さ」を、autoHeight の値に関わ
+    らず常に追跡する内部フィールド(DBには永続化しない)。非編集時の
+    NOTE_CONTENT_RESIZE_MESSAGE のたびに常に更新され、手動リサイズが
+    「縮める操作」か「意味のない拡大操作」かを判定する基準になる。
 
   永続化: height = TITLE_ROW_HEIGHT_PX + previewHeightPx（常に閲覧時の高さ）
           autoHeight
@@ -597,11 +629,14 @@ postMessageを跨ぐ挙動は自動テストで再現しづらいため、この
 主な変更点だけ要約すると:
 - 旧`contentHeightPx`＋`editingFloorPx`/`restoredFloorPx`の優先順位チェーンを廃止し、`previewHeightPx`/`editorHeightPx`の完全独立フィールドに分割したことを明記
 - DB新フィールド`autoHeight`のスキーマ的な意味と初期値ルールを追加
-- `autoHeight`が編集中のリサイズでも`false`になる（モード横断の副作用がある）点を明記
+- `autoHeight`が編集中のリサイズでは常に`false`になる(モード横断の副作用がある)点を明記
 - 500pxキャップが`autoHeight===true`の自動計算のみに効く点を明記
-- iframe側`ResizeObserver`（画像・コードブロックの非同期高さ変化への追従）を新設計の中心的変更として説明
+- iframe側`ResizeObserver`(画像・コードブロックの非同期高さ変化への追従)を新設計の中心的変更として説明
 - リアルタイム同期に`autoHeight`は乗るが、編集中の高さは他の閲覧者に配る価値がないため乗らない、という非対称性を明記
 - `editorHeight`をDBから廃止: textareaの実測値でほぼ即座に上書きされる値であり、復元してもメリットが薄いため`editorHeightPx`は常に0スタートのインメモリ値に変更した
-- `ResizeObserver`の監視対象は`<main>`自身ではなく、コンテンツに応じて伸縮する内側のdiv（`setBodyRef`）にする必要があるという既知の落とし穴を追記
-- footerの高さを`TITLE_ROW_HEIGHT_PX`で推測するのをやめ、iframe側（`useContentHeight.ts`の`footerRef`）で実測して`NOTE_CONTENT_RESIZE_MESSAGE`にすでに合算して送るように変更した
-- `noteResizing.ts`の手動リサイズ検知を、`note`ストアからの再計算値との比較から、wrapperのstyle effectが直前に実際に適用した高さのスナップショット（`getExpectedHeightPx`）との比較に変更し、`NOTE_EDITING_MESSAGE`と`NOTE_CONTENT_RESIZE_MESSAGE`の到着順序に起因する誤検知（footer高さがプレビューに残り続けるバグ）を解消した
+- `ResizeObserver`の監視対象は`<main>`自身ではなく、コンテンツに応じて伸縮する内側のdiv(`setBodyRef`)にする必要があるという既知の落とし穴を追記
+- footerの高さを`TITLE_ROW_HEIGHT_PX`で推測するのをやめ、iframe側(`useContentHeight.ts`の`footerRef`)で実測して`NOTE_CONTENT_RESIZE_MESSAGE`にすでに合算して送るように変更した
+- `noteResizing.ts`の手動リサイズ検知を、`note`ストアからの再計算値との比較から、wrapperのstyle effectが直前に実際に適用した高さのスナップショット(`getExpectedHeightPx`)との比較に変更し、`NOTE_EDITING_MESSAGE`と`NOTE_CONTENT_RESIZE_MESSAGE`の到着順序に起因する誤検知(footer高さがプレビューに残り続けるバグ)を解消した
+- `note.naturalHeightPx`を新設し、`autoHeight`の値に関わらずコンテンツの自然な高さを常に追跡するように変更(以前はここが追跡されておらず、一度手動リサイズすると比較対象を失う「壊れた」状態だった)
+- 非編集モードでの手動リサイズを、自然な高さより縮めたか否かで分岐する設計に変更: 縮めた場合のみ`autoHeight: false`で手動値を尊重し、自然な高さ以上に広げようとした場合は`autoHeight: true`に戻して自然な高さへスナップバックさせ、余白ができる付箋を防ぐ
+- 「一度`autoHeight`が`false`になったら二度と`true`に戻らない」という旧仕様の記述を撤回: 非編集モードでのリサイズに限り、`true`への復帰があり得ることを明記
