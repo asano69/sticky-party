@@ -20,6 +20,8 @@
 - 付箋のアクセスコントロールなし。登録済みユーザのみ、すべの付箋を自由に作成・編集・削除できます。
 - 管理機能：管理者ユーザは、SQLiteに保存された付箋データをWebUIから操作できます。(PocketBase)
 
+## Getting Started
+1. https://addons.mozilla.org/ja/firefox/addon/sticky-party/
 
 ## How It Works
 - 専用のフロントエンドは実装していないのでPocketBase管理画面からユーザを作成する。
