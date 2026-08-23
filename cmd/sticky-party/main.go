@@ -42,7 +42,7 @@ func main() {
 	root.Use = "sticky-party"
 	root.Short = "sticky-party"
 	root.SilenceUsage = true
-	root.Version = "0.0.3"
+	root.Version = "0.0.5"
 
 	root.AddCommand(
 
