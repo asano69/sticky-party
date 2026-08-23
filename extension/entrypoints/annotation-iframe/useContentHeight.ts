@@ -23,6 +23,13 @@ export function useContentHeight(params: {
   // mode -- see that function's comment for why contentRef itself is
   // wrong there too, not just in the editing branch.
   let bodyRef: HTMLElement | undefined;
+  // The edit-mode footer's own element (see NoteFooter.tsx). Only
+  // mounted while editing, but that's exactly the one branch of
+  // reportContentHeight that needs it -- see below. Reading its real
+  // offsetHeight replaces content.ts's old approximation (assuming the
+  // footer is exactly TITLE_ROW_HEIGHT_PX tall) with an exact
+  // measurement, since the footer is this iframe's own DOM element.
+  let footerRef: HTMLElement | undefined;
 
   // Grows the textarea to fit its content, with a 4-line floor (see
   // rows={4} in NoteContent.tsx) so a short note still gets a
@@ -65,10 +72,14 @@ export function useContentHeight(params: {
     const editing = params.editing();
     if (editing && textareaRef && contentRef) {
       const { paddingTop, paddingBottom } = getComputedStyle(contentRef);
+      // Includes the footer's real height so content.ts no longer has
+      // to approximate it as TITLE_ROW_HEIGHT_PX -- the footer is this
+      // iframe's own element, so its exact size is available here.
       height =
         textareaRef.offsetHeight +
         parseFloat(paddingTop) +
-        parseFloat(paddingBottom);
+        parseFloat(paddingBottom) +
+        (footerRef?.offsetHeight ?? 0);
     } else {
       // Same flex-1 trap as the editing branch above, just for view mode:
       // contentRef (<main>) is stretched to fill whatever height the note
@@ -140,6 +151,14 @@ export function useContentHeight(params: {
     resizeTextarea();
   };
 
+  // Ref callback for the edit-mode footer. Mounted/unmounted along
+  // with editing itself (see NoteContent.tsx's <Show when={editing()}>),
+  // so footerRef is only ever read from reportContentHeight's editing
+  // branch above, which is the only place it's needed.
+  const setFooterRef = (el: HTMLElement) => {
+    footerRef = el;
+  };
+
   const setContentRef = (el: HTMLElement) => {
     contentRef = el;
     // Reports the note's initial content height once on mount. The
@@ -158,6 +177,7 @@ export function useContentHeight(params: {
     setTextareaRef,
     setContentRef,
     setBodyRef,
+    setFooterRef,
     resizeTextarea,
     reportContentHeight,
     focusTextarea,

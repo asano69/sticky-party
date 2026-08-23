@@ -150,6 +150,16 @@ export async function mountNote(
     onMount: (wrapper, iframe) => {
       wrapperEl = wrapper;
 
+      // Height (px) most recently written to wrapper.style.height by
+      // the effect below, kept as a plain snapshot rather than
+      // re-derived. noteResizing.ts compares the wrapper's actual
+      // offsetHeight against this value (via getExpectedHeightPx) to
+      // decide whether a size change was this effect's own doing or a
+      // genuine manual drag -- see noteResizing.ts's header comment
+      // for why this is safer than recomputing an "expected" height
+      // from note.editing/editorHeightPx/previewHeightPx there.
+      let lastStyledHeightPx = 0;
+
       // Derives the wrapper's position, size, pin mode, and stacking
       // order from the `note` store -- see this file's header
       // comment. This runs once immediately (Solid effects run on
@@ -167,7 +177,9 @@ export async function mountNote(
           const contentPx = note.editing
             ? note.editorHeightPx
             : note.previewHeightPx;
-          wrapper.style.height = `${TITLE_ROW_HEIGHT_PX + contentPx}px`;
+          const heightPx = TITLE_ROW_HEIGHT_PX + contentPx;
+          wrapper.style.height = `${heightPx}px`;
+          lastStyledHeightPx = heightPx;
           wrapper.style.zIndex = `${Z_BASE + note.z}`;
         });
         return dispose;
@@ -237,6 +249,7 @@ export async function mountNote(
       const resizeState = wireResizing({
         wrapper,
         note,
+        getExpectedHeightPx: () => lastStyledHeightPx,
         setNote,
         persistPosition,
       });

@@ -12,7 +12,6 @@ import {
   NOTE_FOCUS_MESSAGE,
   NOTE_PIN_MESSAGE,
   NOTE_READY_MESSAGE,
-  TITLE_ROW_HEIGHT_PX,
   TOGGLE_PIN_MESSAGE,
   type NotePinMessage,
 } from "../../lib/iframe-messages";
@@ -95,7 +94,10 @@ export function wireIframeProtocol(params: {
       // previewHeightPx, leaving the note stuck at its editing-mode
       // (footer-included) height even after returning to view mode.
       if (e.data.editing) {
-        setNote({ editorHeightPx: e.data.height + TITLE_ROW_HEIGHT_PX });
+        // e.data.height already includes the footer's real height now
+        // (see useContentHeight.ts's footerRef) -- content.ts no
+        // longer needs to guess it as TITLE_ROW_HEIGHT_PX.
+        setNote({ editorHeightPx: e.data.height });
       } else if (note.autoHeight) {
         // Auto-sizing is only ever capped, never floored -- a note
         // that's genuinely short is allowed to stay short.

@@ -460,6 +460,7 @@ export default function NoteContent() {
               // Just a UI toggle now -- the list itself is realtime,
               // not refetched on open (see useHistoryUpdates.ts).
               onShowHistory={() => setHistoryOpen((open) => !open)}
+              footerRef={contentHeight.setFooterRef}
             />
           </Show>
         </div>

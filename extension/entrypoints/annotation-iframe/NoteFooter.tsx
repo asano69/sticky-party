@@ -35,9 +35,15 @@ export default function NoteFooter(props: {
   // need to reflect which direction this click will go.
   historyOpen: boolean;
   onShowHistory: () => void;
+  // Ref to this footer's own root element, so useContentHeight.ts can
+  // read its real offsetHeight instead of content.ts having to guess
+  // it (it used to assume footer height == TITLE_ROW_HEIGHT_PX -- see
+  // docs/note-sizing.md).
+  footerRef: (el: HTMLElement) => void;
 }) {
   return (
     <footer
+      ref={props.footerRef}
       // Height stays inline for the same reason as the title row in
       // NoteHeader.tsx: it must stay tied to TITLE_ROW_HEIGHT_PX.
       style={{ height: `${TITLE_ROW_HEIGHT_PX}px` }}
