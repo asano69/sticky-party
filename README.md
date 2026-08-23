@@ -22,31 +22,31 @@
 
 ## Getting Started
 
-1. 拡張機能のインストール
-**Firefox**
+### 1. 拡張機能のインストール  
+Firefox:
 - https://addons.mozilla.org/ja/firefox/addon/sticky-party/
 
-**Chrome**
+Chrome:
 
-2. バックエンドサーバのセットアップ
+### 2. バックエンドサーバのセットアップ
 ```sh
 git clone https://github.com/asano69/sticky-party.git
 cd sticky-party
 docker compose up -d
 ```
 
-3. ユーザアカウントの作成
+### 3. ユーザアカウントの作成
 ```sh
-docker exec -it sticky-party sticky-party user-upsert user@mail.internal userpassword
+docker exec -it sticky-party sticky-party --dir data user-upsert user@mail.internal userpassword
 ```
 
-4. 拡張機能の設定
+### 4. 拡張機能の設定
 ブラウザを開き、Sticky Party拡張機能のポップアップを開き、接続情報の設定をする
 - 作成したユーザメール
 - パスワード
 - サーバURL
 
-5. 付箋を作成する
+### 5. 付箋を作成する
 
 ## How It Works
 - 専用のフロントエンドは実装していないのでPocketBase管理画面からユーザを作成する。
