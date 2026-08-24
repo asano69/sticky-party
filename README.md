@@ -23,32 +23,41 @@
 ## Getting Started
 
 ### 1. 拡張機能のインストール  
-Firefox:
+#### Firefox:
 - https://addons.mozilla.org/ja/firefox/addon/sticky-party/
 
-Chrome:
+#### Chrome:
 
 ### 2. バックエンドサーバのセットアップ
+
+>[!NOTE]
+>demoサーバがあります
+>1. https://sticky-party.onrender.com にアクセスしてインスタンスを起動します(50秒)
+>2. 管理者のメール:パスワードは、admin@mail.internal:password。デフォルトユーザのメール:パスワードは、user@mail.internal:passwordです。
+>3. 15分で内容がリセットされます。
+
+### 2.1  バックエンドサーバのデプロイ
 ```sh
 git clone https://github.com/asano69/sticky-party.git
 cd sticky-party
 docker compose up -d
 ```
 
-### 3. ユーザアカウントの作成
-- CLIからも作成できますが、安全のため、Web UIから作成することを推奨します。
+### 2.2. ユーザアカウントの作成
+- 管理者アカウントとユーザアカウントが分けられています。1人で使う場合でも２種類作成する必要があります。
+- ユーザアカウントの作成はCLIからも作成できますが、安全のため、Web UIから作成することを推奨します。
 - 初期管理者アカウントはadmin@mail.internal:passwordなので、必ず変更してください。
 ```sh
 docker exec -it sticky-party sticky-party --dir data user-upsert user@mail.internal userpassword
 ```
 
-### 4. 拡張機能の設定
+### 3. 拡張機能の設定
 ブラウザを開き、Sticky Party拡張機能のポップアップを開き、接続情報の設定をする
 - 作成したユーザメール
 - パスワード
 - サーバURL
 
-### 5. 付箋を作成する
+### 4. 付箋を作成する
 
 ## How It Works
 - 専用のフロントエンドは実装していないのでPocketBase管理画面からユーザを作成する。
