@@ -19,6 +19,7 @@
 - **Sticky Note Blur for Sensitive Information**: Blur sensitive content displayed on sticky notes to help mitigate the risk of information theft by screen-capturing infostealers.
 - 付箋のアクセスコントロールなし。登録済みユーザのみ、すべの付箋を自由に作成・編集・削除できます。
 - 管理機能：管理者ユーザは、SQLiteに保存された付箋データをWebUIから操作できます。(PocketBase)
+![](.github/assets/sample-01.png)
 
 ## Getting Started
 
