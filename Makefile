@@ -15,7 +15,7 @@ PORTS := 3000
 # Build
 # ============================================================
 
-build:
+build: build-web
 	go build -o $(BINARY) ./cmd/$(BINARY)
 
 extension-deps:
