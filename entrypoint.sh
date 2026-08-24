@@ -6,6 +6,8 @@ if [ -d "/certs" ] && [ "$(ls -A /certs/*.crt 2>/dev/null)" ]; then
   update-ca-certificates
 fi
 
+pwd
+
 # Bootstrap: create the first superuser if one doesn't exist yet.
 # Throwaway credential meant to be rotated via the UI right after first login.
 ADMIN_EMAIL="${INITIAL_ADMIN_EMAIL:-admin@mail.internal}"
