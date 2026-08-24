@@ -63,6 +63,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 EXPOSE 3000
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["sticky-party", "serve", "--dir=pb_data"]
+CMD ["sticky-party", "serve"]
 
 
