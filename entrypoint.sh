@@ -11,7 +11,7 @@ fi
 ADMIN_EMAIL="${INITIAL_ADMIN_EMAIL:-admin@mail.internal}"
 ADMIN_PASSWORD="${INITIAL_ADMIN_PASSWORD:-password}"
 
-# /sticky-party/data
-su-exec sticky-party:sticky-party sticky-party superuser create "$ADMIN_EMAIL" "$ADMIN_PASSWORD" --dir=data || true
+# /sticky-party/pb_data
+su-exec sticky-party:sticky-party sticky-party superuser create "$ADMIN_EMAIL" "$ADMIN_PASSWORD" --dir=pb_data || true
 
 exec su-exec sticky-party:sticky-party "$@"
