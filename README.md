@@ -49,7 +49,7 @@ docker compose up -d
 - ユーザアカウントの作成はCLIからも作成できますが、安全のため、Web UIから作成することを推奨します。
 - 初期管理者アカウントはadmin@mail.internal:passwordなので、必ず変更してください。
 ```sh
-docker exec -it sticky-party sticky-party --dir data user-upsert user@mail.internal userpassword
+docker exec -it sticky-party sticky-party --dir pb_data user-upsert user@mail.internal userpassword
 ```
 
 ### 3. 拡張機能の設定
