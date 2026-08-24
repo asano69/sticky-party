@@ -6,7 +6,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - data:/sticky-party/data
+      - data:/sticky-party/pb_data
         #- /etc/ssl/certs/root_ca.crt:/certs/root_ca.crt:ro # optional
     environment:
       - TZ=Etc/UTC
@@ -14,5 +14,8 @@ services:
       - STICKYPARTY_SERVER_HOST=0.0.0.0
       - STICKYPARTY_SERVER_PORT=3000
       - STICKYPARTY_DATA_DIR=/sticky-party/pb_data
+      #
+      #- INITIAL_ADMIN_EMAIL=admin@mail.internal # default
+      #- INITIAL_ADMIN_PASSWORD=password # default
 volumes:
   data:
