@@ -12,6 +12,7 @@ import (
 	"github.com/asano69/sticky-party/internal/gc"
 	"github.com/asano69/sticky-party/internal/history"
 	"github.com/asano69/sticky-party/internal/render"
+	"github.com/asano69/sticky-party/internal/version"
 )
 
 // dataDirEnvVar lets the data directory be set via environment variable
@@ -52,7 +53,7 @@ func main() {
 	root.Use = "sticky-party"
 	root.Short = "sticky-party"
 	root.SilenceUsage = true
-	root.Version = "0.0.5"
+	root.Version = version.Version
 
 	root.AddCommand(
 

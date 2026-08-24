@@ -14,6 +14,7 @@ import (
 
 	"github.com/asano69/sticky-party/internal/config"
 	"github.com/asano69/sticky-party/internal/static"
+	"github.com/asano69/sticky-party/internal/version"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -46,6 +47,10 @@ func Run(app *pocketbase.PocketBase, cfg *config.Config) error {
 
 		// See internal/serve/handler.go's embedHandler for why this exists.
 		e.Router.GET("/embed", embedHandler())
+
+		e.Router.GET("/api/version", func(re *core.RequestEvent) error {
+			return re.JSON(http.StatusOK, map[string]string{"version": version.Version})
+		})
 
 		return e.Next()
 	})
