@@ -54,7 +54,7 @@ RUN addgroup -g 1000 sticky-party && \
 
 COPY --from=go-builder /build/sticky-party /usr/local/bin/sticky-party
 
-RUN mkdir -p /certs /sticky-party/data
+RUN mkdir -p /certs /sticky-party/pb_data
 RUN chown -R sticky-party:sticky-party /sticky-party
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -63,6 +63,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 EXPOSE 3000
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["sticky-party", "serve", "--dir=data"]
+CMD ["sticky-party", "serve", "--dir=pb_data"]
 
 
